@@ -1,0 +1,24 @@
+[user]
+	name = Elhaam
+	email = e4elhaam@gmail.com
+[credential]
+	helper = cache
+
+[alias]
+	ac = !git add -A && git commit -m
+	acp = "!f() { git add -A && git commit -m \"$1\" && git push origin $(git symbolic-ref --short HEAD); }; f"	
+	pom = push origin master
+	po = push origin
+	pl = pull origin
+	st = status -sb
+	s = status
+	co = checkout
+	br = branch --format='%(HEAD) %(color:yellow)%(refname:short)%(color:reset) - %(contents:subject) %(color:green)(%(committerdate:relative)) [%(authorname)]' --sort=-committerdate
+	ll = log --oneline
+	last = log -1 HEAD --stat
+	fo = fetch origin
+	fa = fetch --all
+	rh = reset --hard
+	plc = "!git pull origin $(git symbolic-ref --short HEAD)"
+	poc = "!git push origin $(git symbolic-ref --short HEAD)"
+    	cbr = "!f() { echo 'Current branch:' && git rev-parse --abbrev-ref HEAD && git rev-parse --abbrev-ref HEAD | xclip -selection clipboard; }; f"
