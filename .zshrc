@@ -71,6 +71,7 @@ alias codeo="code ."
 alias xcopy="xclip -selection clipboard"
 alias cls='clear'
 alias rt='source ~/.zshrc'
+alias tans='tmux new-session -A -s'
 
 bindkey '^H' backward-kill-word
 bindkey '^[[1;6D' emacs-backward-word
