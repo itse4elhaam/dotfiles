@@ -71,7 +71,26 @@ alias codeo="code ."
 alias xcopy="xclip -selection clipboard"
 alias cls='clear'
 alias rt='source ~/.zshrc'
-alias tans='tmux new-session -A -s'
+# Define a function to create a tmux session with a dynamic name or a provided name
+tans() {
+    # If a session name is provided, use it
+    if [ -n "$1" ]; then
+        session_name="$1"
+    else
+        # Get the current directory
+        current_dir=$(pwd)
+        # Check if the current directory is the home directory
+        if [ "$current_dir" = "$HOME" ]; then
+            session_name="~"
+        else
+            # Get the basename of the current directory
+            session_name=$(basename "$current_dir")
+        fi
+    fi
+    # Start a new tmux session with the derived or provided session name
+    tmux new-session -A -s "$session_name" -n "$session_name"
+}
+
 
 bindkey '^H' backward-kill-word
 bindkey '^[[1;6D' emacs-backward-word
