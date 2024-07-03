@@ -7,6 +7,7 @@ fi
 export ZSH="$HOME/.oh-my-zsh"
 ZSH_THEME="powerlevel10k/powerlevel10k"
 plugins=(git zsh-autosuggestions zsh-syntax-highlighting fzf-tab sudo dirhistory)
+export EDITOR=vim
 
 if [ -x "$(command -v colorls)" ]; then
     alias ls="colorls"
@@ -50,7 +51,12 @@ alias .4='cd ../../../..'
 
 # others
 alias cpth='pwd | tr -d "\n" | xclip -selection clipboard'
+alias cwp='echo "\\\\\wsl.localhost\\\Ubuntu${PWD//\//\\\\}" | xcopy'
 alias ecat='cat <<EOF >>'
+alias cat="bat"
+alias tls="tmux ls"
+alias oc="code ."
+alias clp="clip.exe"
 
 # To customize prompt, run `p10k configure` or edit ~/.p10k.zsh.
 [[ ! -f ~/.p10k.zsh ]] || source ~/.p10k.zsh
@@ -71,8 +77,8 @@ alias codeo="code ."
 alias xcopy="xclip -selection clipboard"
 alias cls='clear'
 alias rt='source ~/.zshrc'
-# Define a function to create a tmux session with a dynamic name or a provided name
-tans() {
+
+function tans() {
     # If a session name is provided, use it
     if [ -n "$1" ]; then
         session_name="$1"
