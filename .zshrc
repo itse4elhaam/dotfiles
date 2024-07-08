@@ -4,15 +4,16 @@
 if [[ -r "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh" ]]; then
   source "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh"
 fi
+
 export ZSH="$HOME/.oh-my-zsh"
 ZSH_THEME="powerlevel10k/powerlevel10k"
 plugins=(git zsh-autosuggestions zsh-syntax-highlighting fzf-tab sudo dirhistory)
 export EDITOR=vim
-
-if [ -x "$(command -v colorls)" ]; then
-    alias ls="colorls"
-    alias la="colorls -al"
-fi
+# todo remove this completely if needed
+# if [ -x "$(command -v colorls)" ]; then
+#     alias ls="colorls"
+#     alias la="colorls -al"
+# fi
 
 source $ZSH/oh-my-zsh.sh
 
@@ -36,7 +37,8 @@ export PATH="$HOME/downloads/zig-linux-x86_64-0.11.0:$PATH"
 
 # Created by `pipx` on 2024-03-30 18:21:07
 export PATH="$PATH:/home/e4elhaam/.local/bin"
-alias ls="ls -a --color"
+alias ls="exa -a --icons"
+alias ll="exa -a --icons --long"
 
 # Aliases for common Windows utilities
 alias ex='explorer.exe .'
@@ -57,6 +59,7 @@ alias cat="bat"
 alias tls="tmux ls"
 alias oc="code ."
 alias clp="clip.exe"
+alias tmux="tmux -2"
 
 # To customize prompt, run `p10k configure` or edit ~/.p10k.zsh.
 [[ ! -f ~/.p10k.zsh ]] || source ~/.p10k.zsh
@@ -73,7 +76,6 @@ alias nv=nvim
 alias nvo="nvim ."
 alias envi="cd ~/.config/nvim; nvim ."
 alias vi=vim
-alias codeo="code ."
 alias xcopy="xclip -selection clipboard"
 alias cls='clear'
 alias rt='source ~/.zshrc'
@@ -97,6 +99,11 @@ function tans() {
     tmux new-session -A -s "$session_name" -n "$session_name"
 }
 
+# fzf 
+alias tmuxf='tmux attach-session -t $(tmux list-sessions -F "#{session_name}" | fzf)'
+alias catf='fzf --preview "cat {}"'
+alias vimf='fzf --preview "cat {}" | xargs -r vim'
+alias cdf='cd "$(find . -type d | fzf)"'
 
 bindkey '^H' backward-kill-word
 bindkey '^[[1;6D' emacs-backward-word
@@ -116,8 +123,6 @@ setopt hist_ignore_dups
 setopt hist_save_no_dups
 setopt hist_find_no_dups
 
-# z style
-
 # zstyle ':completion:*' menu select
 zstyle ':completion:*' list-colors "${(s.:.)LS_COLORS}"
 zstyle ':completion:*' menu no
@@ -126,6 +131,9 @@ zstyle ':fzf-tab:complete:__zoxide_z:*' fzf-preview 'ls --color $realpath'
 
 [ -f ~/.fzf.zsh ] && source ~/.fzf.zsh
 eval "$(zoxide init --cmd cd zsh)"
+
+source /usr/share/doc/fzf/examples/key-bindings.zsh
+source /usr/share/doc/fzf/examples/completion.zsh
 
 fpath+=${ZSH_CUSTOM:-${ZSH:-~/.oh-my-zsh}/custom}/plugins/zsh-completions/src
 fpath+=~/.zfunc
