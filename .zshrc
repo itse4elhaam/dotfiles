@@ -29,6 +29,8 @@ export PATH=$PATH:"$HOME/flutter/bin"
 export GOPATH=$HOME/go
 export PATH=$PATH:/usr/local/go/bin:$GOPATH/bin
 export N_PREFIX=$HOME/.
+export PATH="$PATH:/opt/nvim-linux64/bin"
+export PATH=$PATH:/usr/local/go/bin
 PATH=~/.console-ninja/.bin:$PATH
 
 export NVM_DIR="$([ -z "${XDG_CONFIG_HOME-}" ] && printf %s "${HOME}/.nvm" || printf %s "${XDG_CONFIG_HOME}/nvm")"
@@ -100,10 +102,10 @@ function tans() {
 }
 
 # fzf 
-alias tmuxf='tmux attach-session -t $(tmux list-sessions -F "#{session_name}" | fzf)'
-alias catf='fzf --preview "cat {}"'
-alias vimf='fzf --preview "cat {}" | xargs -r vim'
-alias cdf='cd "$(find . -type d | fzf)"'
+alias tmuxf='tmux attach-session -t $(tmux list-sessions -F "#{session_name}" | fzf --height 40%)'
+alias catf='fzf --height 40% --preview "cat {}"'
+alias vimf='fzf --height 40% --preview "cat {}" | xargs -r vim'
+alias cdf='cd "$(find . -type d | fzf --height 40%)"'
 
 bindkey '^H' backward-kill-word
 bindkey '^[[1;6D' emacs-backward-word
