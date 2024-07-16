@@ -25,3 +25,5 @@
 	cof = "!git branch | fzf | xargs git checkout"
 [core]
 	editor = vim
+[init]
+	defaultBranch = main

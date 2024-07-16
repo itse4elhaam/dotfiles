@@ -9,11 +9,6 @@ export ZSH="$HOME/.oh-my-zsh"
 ZSH_THEME="powerlevel10k/powerlevel10k"
 plugins=(git zsh-autosuggestions zsh-syntax-highlighting fzf-tab sudo dirhistory)
 export EDITOR=vim
-# todo remove this completely if needed
-# if [ -x "$(command -v colorls)" ]; then
-#     alias ls="colorls"
-#     alias la="colorls -al"
-# fi
 
 source $ZSH/oh-my-zsh.sh
 
@@ -30,13 +25,11 @@ export GOPATH=$HOME/go
 export PATH=$PATH:/usr/local/go/bin:$GOPATH/bin
 export N_PREFIX=$HOME/.
 PATH=~/.console-ninja/.bin:$PATH
-
 export NVM_DIR="$([ -z "${XDG_CONFIG_HOME-}" ] && printf %s "${HOME}/.nvm" || printf %s "${XDG_CONFIG_HOME}/nvm")"
 [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
 export PATH="$HOME/downloads/zig-linux-x86_64-0.11.0:$PATH"
-
-# Created by `pipx` on 2024-03-30 18:21:07
 export PATH="$PATH:/home/e4elhaam/.local/bin"
+
 alias ls="exa -a --icons"
 alias ll="exa -a --icons --long"
 
@@ -80,6 +73,7 @@ alias xcopy="xclip -selection clipboard"
 alias cls='clear'
 alias rt='source ~/.zshrc'
 
+# used to create a tmux session with automation
 function tans() {
     # If a session name is provided, use it
     if [ -n "$1" ]; then
@@ -99,8 +93,8 @@ function tans() {
     tmux new-session -A -s "$session_name" -n "$session_name"
 }
 
-# fzf 
 alias tmuxf='tmux attach-session -t $(tmux list-sessions -F "#{session_name}" | fzf)'
+alias nvimf='fzf --preview "cat {}" | xargs -r nvim'
 alias catf='fzf --preview "cat {}"'
 alias vimf='fzf --preview "cat {}" | xargs -r vim'
 alias cdf='cd "$(find . -type d | fzf)"'
@@ -132,8 +126,13 @@ zstyle ':fzf-tab:complete:__zoxide_z:*' fzf-preview 'ls --color $realpath'
 [ -f ~/.fzf.zsh ] && source ~/.fzf.zsh
 eval "$(zoxide init --cmd cd zsh)"
 
-source /usr/share/doc/fzf/examples/key-bindings.zsh
-source /usr/share/doc/fzf/examples/completion.zsh
+if [ -f /usr/share/doc/fzf/examples/key-bindings.zsh ]; then
+  source /usr/share/doc/fzf/examples/key-bindings.zsh
+fi
+
+if [ -f /usr/share/doc/fzf/examples/completion.zsh ]; then
+  source /usr/share/doc/fzf/examples/completion.zsh
+fi
 
 fpath+=${ZSH_CUSTOM:-${ZSH:-~/.oh-my-zsh}/custom}/plugins/zsh-completions/src
 fpath+=~/.zfunc
