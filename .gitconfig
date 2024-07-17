@@ -27,3 +27,5 @@
 	editor = vim
 [init]
 	defaultBranch = main
+[safe]
+	directory = /home/trueerp/frappe-bench/apps/doc_appointments
