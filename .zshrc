@@ -139,3 +139,19 @@ source /usr/share/doc/fzf/examples/completion.zsh
 
 fpath+=${ZSH_CUSTOM:-${ZSH:-~/.oh-my-zsh}/custom}/plugins/zsh-completions/src
 fpath+=~/.zfunc
+
+export PATH="$HOME/.tmuxifier/bin:$PATH"
+# fnm
+FNM_PATH="/home/e4elhaam/.local/share/fnm"
+if [ -d "$FNM_PATH" ]; then
+  export PATH="/home/e4elhaam/.local/share/fnm:$PATH"
+  eval "`fnm env`"
+fi
+
+# pnpm
+export PNPM_HOME="/home/e4elhaam/.local/share/pnpm"
+case ":$PATH:" in
+  *":$PNPM_HOME:"*) ;;
+  *) export PATH="$PNPM_HOME:$PATH" ;;
+esac
+# pnpm end
