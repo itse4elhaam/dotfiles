@@ -188,7 +188,6 @@ zstyle ':fzf-tab:complete:__zoxide_z:*' fzf-preview 'ls --color $realpath'
 
 [ -f ~/.fzf.zsh ] && source ~/.fzf.zsh
 eval "$(zoxide init --cmd cd zsh)"
-eval "$(tmuxifier init -)"
 
 if [ -f /usr/share/doc/fzf/examples/key-bindings.zsh ]; then
   source /usr/share/doc/fzf/examples/key-bindings.zsh
@@ -201,7 +200,6 @@ fi
 fpath+=${ZSH_CUSTOM:-${ZSH:-~/.oh-my-zsh}/custom}/plugins/zsh-completions/src
 fpath+=~/.zfunc
 
-export PATH="$HOME/.tmuxifier/bin:$PATH"
 # fnm
 FNM_PATH="/home/e4elhaam/.local/share/fnm"
 if [ -d "$FNM_PATH" ]; then
