@@ -23,3 +23,9 @@
 	poc = "!git push origin $(git symbolic-ref --short HEAD)"
     cbr = "!f() { echo 'Current branch:' && git rev-parse --abbrev-ref HEAD && git rev-parse --abbrev-ref HEAD | xclip -selection clipboard; }; f"
 	cof = "!git branch | fzf --height 35% | xargs git checkout"
+[core]
+	editor = vim
+[init]
+	defaultBranch = main
+[safe]
+	directory = /home/trueerp/frappe-bench/apps/doc_appointments
