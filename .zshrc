@@ -8,7 +8,12 @@ fi
 export ZSH="$HOME/.oh-my-zsh"
 ZSH_THEME="powerlevel10k/powerlevel10k"
 plugins=(git zsh-autosuggestions zsh-syntax-highlighting fzf-tab sudo dirhistory)
-export EDITOR=vim
+
+if command -v nvim > /dev/null 2>&1; then
+  export EDITOR=nvim
+else
+  export EDITOR=vim
+fi
 
 source $ZSH/oh-my-zsh.sh
 
@@ -74,6 +79,8 @@ alias nv=nvim
 alias nvo="nvim ."
 alias envi="cd ~/.config/nvim; nvim ."
 alias vi=vim
+alias vim=nvim
+alias ov="vim ."
 alias xcopy="xclip -selection clipboard"
 alias cls='clear'
 alias rt='source ~/.zshrc'
