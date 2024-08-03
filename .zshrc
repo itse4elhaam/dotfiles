@@ -71,6 +71,7 @@ alias lgit=lazygit
 alias vi=vim
 alias vim=nvim
 # fzf 
+alias tf='tmux attach-session -t $(tmux list-sessions -F "#{session_name}" | fzf --height 40%)'
 alias tmuxf='tmux attach-session -t $(tmux list-sessions -F "#{session_name}" | fzf --height 40%)'
 alias nvimf='fzf --preview "cat {}" | xargs -r nvim'
 alias catf='fzf --height 40% --preview "cat {}"'
