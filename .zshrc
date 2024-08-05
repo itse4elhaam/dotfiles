@@ -28,8 +28,6 @@ export PATH=$PATH:"$HOME/.nvm"
 export PATH=$PATH:"$HOME/.cargo/bin"
 export PATH=$PATH:"$HOME/.bun/bin"
 export PATH=$PATH:"$HOME/flutter/bin"
-export GOPATH=$HOME/go
-export PATH=$PATH:/usr/local/go/bin:$GOPATH/bin
 export N_PREFIX=$HOME/.
 export PATH="$PATH:/opt/nvim-linux64/bin"
 export PATH=$PATH:/usr/local/go/bin
@@ -38,6 +36,10 @@ export NVM_DIR="$([ -z "${XDG_CONFIG_HOME-}" ] && printf %s "${HOME}/.nvm" || pr
 [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
 export PATH="$HOME/downloads/zig-linux-x86_64-0.11.0:$PATH"
 export PATH="$PATH:/home/e4elhaam/.local/bin"
+
+GOROOT=$(dirname $(dirname $(which go)))
+export GOPATH=$HOME/go
+export PATH=$PATH:$GOROOT/bin:$GOPATH/bin
 
 # === aliases ===
 
