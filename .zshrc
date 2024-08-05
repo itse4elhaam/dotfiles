@@ -60,6 +60,7 @@ alias mv="mv -i"
 # others
 alias cpth='pwd | tr -d "\n" | xclip -selection clipboard'
 alias cwp='echo "\\\\\wsl.localhost\\\Ubuntu${PWD//\//\\\\}" | xcopy'
+alias pn=pnpm
 alias cat="bat"
 alias tls="tmux ls"
 alias oc="code ."
