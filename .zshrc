@@ -24,6 +24,7 @@ export NVM_DIR="$HOME/.nvm"
 [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"
 . "$HOME/.cargo/env"
 
+export PATH=$PATH:/home/e4elhaam/.nvm/versions/node/v19.9.0/bin
 export PATH=$PATH:"$HOME/.nvm"
 export PATH=$PATH:"$HOME/.cargo/bin"
 export PATH=$PATH:"$HOME/.bun/bin"
