@@ -1,3 +1,4 @@
+
 [user]
 	name = Elhaam
 	email = e4elhaam@gmail.com
@@ -5,6 +6,7 @@
 	helper = cache
 
 [alias]
+	cm = !git commit -m
 	ac = !git add -A && git commit -m
 	acp = "!f() { git add -A && git commit -m \"$1\" && git push origin $(git symbolic-ref --short HEAD); }; f"	
 	pom = push origin master
@@ -21,7 +23,7 @@
 	rh = reset --hard
 	plc = "!git pull origin $(git symbolic-ref --short HEAD)"
 	poc = "!git push origin $(git symbolic-ref --short HEAD)"
-    cbr = "!f() { echo 'Current branch:' && git rev-parse --abbrev-ref HEAD && git rev-parse --abbrev-ref HEAD | xclip -selection clipboard; }; f"
+  cbr = "!f() { echo 'Current branch:' && git rev-parse --abbrev-ref HEAD && git rev-parse --abbrev-ref HEAD | xclip -selection clipboard; }; f"
 	cof = "!git branch | fzf --height 35% | xargs git checkout"
 [core]
 	editor = vim
