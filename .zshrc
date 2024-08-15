@@ -167,7 +167,7 @@ bindkey '^[[1;6C' emacs-forward-word
 
 autoload -Uz compinit
 
-HISTSIZE=5000
+HISTSIZE=15000
 HISTFILE=~/.zsh_history
 SAVEHIST=$HISTSIZE
 HISTDUP=erase
