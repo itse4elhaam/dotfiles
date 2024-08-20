@@ -59,7 +59,7 @@ alias .4='cd ../../../..'
 alias cp="cp -i"
 alias mv="mv -i"
 # others
-alias cpth='pwd | tr -d "\n" | xclip -selection clipboard'
+alias cpth='pwd | tr -d "\n" | clip.exe'
 alias cwp='echo "\\\\\wsl.localhost\\\Ubuntu${PWD//\//\\\\}" | xcopy'
 alias pn=pnpm
 alias cat="bat"
