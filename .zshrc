@@ -38,7 +38,6 @@ export NVM_DIR="$([ -z "${XDG_CONFIG_HOME-}" ] && printf %s "${HOME}/.nvm" || pr
 export PATH="$HOME/downloads/zig-linux-x86_64-0.11.0:$PATH"
 export PATH="$PATH:/home/e4elhaam/.local/bin"
 
-GOROOT=$(dirname $(dirname $(which go)))
 export GOPATH=$HOME/go
 export PATH=$PATH:$GOROOT/bin:$GOPATH/bin
 
