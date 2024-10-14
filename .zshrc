@@ -235,3 +235,7 @@ unset __conda_setup
 
 # bun completions
 [ -s "/home/e4elhaam/.bun/_bun" ] && source "/home/e4elhaam/.bun/_bun"
+
+tmux-git-autofetch() {(/home/e4elhaam/.tmux/plugins/tmux-git-autofetch/git-autofetch.tmux --current &)}
+add-zsh-hook chpwd tmux-git-autofetch
+    
