@@ -76,7 +76,8 @@ alias lgit=lazygit
 alias vi=vim
 alias vim=nvim
 # fzf 
-alias tf='tmux attach-session -t $(tmux list-sessions -F "#{session_name}" | fzf --height 40%)'
+# alias tf='tmux attach-session -t $(tmux list-sessions -F "#{session_name}" | fzf --height 40%)'
+alias tf='t'
 alias tmuxf='tmux attach-session -t $(tmux list-sessions -F "#{session_name}" | fzf --height 40%)'
 alias nvimf='fzf --preview "cat {}" | xargs -r nvim'
 alias catf='fzf --height 40% --preview "cat {}"'
@@ -216,6 +217,10 @@ esac
 
 export GOPATH="$HOME/go"; export GOROOT="$HOME/.go"; export PATH="$GOPATH/bin:$PATH"; # g-install: do NOT edit, see https://github.com/stefanmaric/g
 alias gvm="$GOPATH/bin/g"; # g-install: do NOT edit, see https://github.com/stefanmaric/g
+# ~/.tmux/plugins
+export PATH=$HOME/.tmux/plugins/tmux-session-wizard/bin:$PATH
+# ~/.config/tmux/plugins
+export PATH=$HOME/.config/tmux/plugins/tmux-session-wizard/bin:$PATH
 
 # >>> conda initialize >>>
 # !! Contents within this block are managed by 'conda init' !!
