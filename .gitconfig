@@ -25,7 +25,8 @@
 	fo = fetch origin
 	fa = fetch --all
 	rh = reset --hard
-	rh = reset --soft
+  rha = "!git add. && reset --soft"
+	rs = reset --soft
 	plc = "!git pull origin $(git symbolic-ref --short HEAD)"
 	poc = "!git push origin $(git symbolic-ref --short HEAD)"
   cbr = "!f() { echo 'Current branch:' && git rev-parse --abbrev-ref HEAD && git rev-parse --abbrev-ref HEAD | clip.exe; }; f"
