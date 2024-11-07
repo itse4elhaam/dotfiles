@@ -8,7 +8,7 @@
 [alias]
 	cm = !git commit -m
 	ca = !git commit --amend
-  atpc = "git add -A && git commit --amend"
+  atpc = "!git add -A && git commit --amend"
   atpp = "!git add -A && git commit --amend && git push --force-with-lease origin $(git symbolic-ref --short HEAD)"
 	ac = !git add -A && git commit -m
 	cmp = "!f() { git commit -m \"$1\" && git push origin $(git symbolic-ref --short HEAD); }; f"	
