@@ -7,7 +7,7 @@ fi
 
 export ZSH="$HOME/.oh-my-zsh"
 ZSH_THEME="powerlevel10k/powerlevel10k"
-plugins=(git zsh-autosuggestions zsh-syntax-highlighting fzf-tab sudo dirhistory zsh-autopair)
+plugins=(git zsh-autosuggestions zsh-syntax-highlighting fzf-tab sudo dirhistory zsh-autopair asdf)
 
 if command -v nvim > /dev/null 2>&1; then
   export EDITOR=nvim
@@ -45,6 +45,7 @@ export PATH=$PATH:$GOROOT/bin:$GOPATH/bin
 
 alias ls="exa -a --icons"
 alias ll="exa -a --icons --long"
+alias rmid="rm *.Identifier"
 # Aliases for common Windows utilities - wsl
 alias ex='explorer.exe .'
 alias notepad='notepad.exe'
