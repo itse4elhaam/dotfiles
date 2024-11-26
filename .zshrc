@@ -1,3 +1,5 @@
+# Add deno completions to search path
+if [[ ":$FPATH:" != *":/home/e4elhaam/.zsh/completions:"* ]]; then export FPATH="/home/e4elhaam/.zsh/completions:$FPATH"; fi
 # Enable Powerlevel10k instant prompt. Should stay close to the top of ~/.zshrc.
 # Initialization code that may require console input (password prompts, [y/n]
 # confirmations, etc.) must go above this block; everything else may go below.
@@ -251,3 +253,4 @@ tmux-window-name() {
 }
 
 add-zsh-hook chpwd tmux-window-name
+. "/home/e4elhaam/.deno/env"
