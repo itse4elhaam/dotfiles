@@ -33,6 +33,7 @@
   ahead-of = "!f() { git log --oneline \"$1..HEAD\"; }; f"
   fprs= fetch origin '+refs/pull/*/head:refs/remotes/origin/pull/*'
   unpushed = log @{u}..
+  stp = stash pop
 [core]
 	editor = vim
 [init]
