@@ -92,7 +92,7 @@ alias checkcommand="type -t"
 alias openports='netstat -nape --inet'
 
 # === alias functions ===
-function rmnvas() {
+function rns() {
     DIR_IN_Q="/home/e4elhaam/.local/share/nvim/sessions"
     content=$(ls -1 "$DIR_IN_Q")  # Store the output of ls in 'content'
     converted_curr_dir="$(echo "$(pwd)" | sed 's/\//%2F/g; s/\./%2E/g').vim"  # Convert current directory to desired format
