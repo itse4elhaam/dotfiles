@@ -92,6 +92,31 @@ alias checkcommand="type -t"
 alias openports='netstat -nape --inet'
 
 # === alias functions ===
+function rmnvas() {
+    DIR_IN_Q="/home/e4elhaam/.local/share/nvim/sessions"
+    content=$(ls -1 "$DIR_IN_Q")  # Store the output of ls in 'content'
+    converted_curr_dir="$(echo "$(pwd)" | sed 's/\//%2F/g; s/\./%2E/g').vim"  # Convert current directory to desired format
+    top_match=$(echo "$content" | fzf --filter "$converted_curr_dir" | head -n 1)  # Get the top match using fzf
+
+    # Check if no match was selected
+    if [ -z "$top_match" ]; then
+        echo "No match found!"
+        return 1  # Exit the function if no match was found
+    fi
+
+    # Ask for confirmation before deleting
+    echo "Are you sure you want to delete $top_match? (y/n)"
+    read -r confirmation
+
+    # Confirm deletion
+    if [ "$confirmation" = "y" ] || [ "$confirmation" = "Y" ] || [ "$confirmation" = "yes" ] || [ "$confirmation" = "Yes" ]; then
+        rm -rf "$DIR_IN_Q/$top_match"  # Delete the top match if confirmed
+        echo "$top_match has been deleted."
+    else
+        echo "Deletion of $top_match was canceled."
+    fi
+}
+
 function cmkdir() {
     mkdir -p "$1"         # Create the directory (and parent directories if needed)
     if [ $? -eq 0 ]; then # Check if directory creation was successful
