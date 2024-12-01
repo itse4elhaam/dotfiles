@@ -94,7 +94,7 @@ alias openports='netstat -nape --inet'
 # === alias functions ===
 function rns() {
     DIR_IN_Q="/home/e4elhaam/.local/share/nvim/sessions"
-    content=$(ls -1 "$DIR_IN_Q")  # Store the output of ls in 'content'
+    content=$(command ls -1 "$DIR_IN_Q")  # Store the output of ls in 'content'
     converted_curr_dir="$(echo "$(pwd)" | sed 's/\//%2F/g; s/\./%2E/g').vim"  # Convert current directory to desired format
     top_match=$(echo "$content" | fzf --filter "$converted_curr_dir" | head -n 1)  # Get the top match using fzf
 
@@ -111,7 +111,7 @@ function rns() {
     # Confirm deletion
     if [ "$confirmation" = "y" ] || [ "$confirmation" = "Y" ] || [ "$confirmation" = "yes" ] || [ "$confirmation" = "Yes" ]; then
         rm -rf "$DIR_IN_Q/$top_match"  # Delete the top match if confirmed
-        echo "$top_match has been deleted."
+        echo "$DIR_IN_Q/$top_match has been deleted."
     else
         echo "Deletion of $top_match was canceled."
     fi
