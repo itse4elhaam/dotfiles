@@ -91,6 +91,13 @@ alias psf="ps aux | fzf --preview 'ps --forest -o pid,cmd --pid=$(echo {} | awk 
 alias checkcommand="type -t"
 alias openports='netstat -nape --inet'
 
+if grep -qi microsoft /proc/version && [[ $(uname -r) == *microsoft* ]]; then
+  alias xdg-open="wslview"
+else
+  alias xdg-open="xdg-open"
+fi
+
+
 # === alias functions ===
 function rns() {
     DIR_IN_Q="/home/e4elhaam/.local/share/nvim/sessions"
