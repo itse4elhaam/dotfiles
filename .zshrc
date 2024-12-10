@@ -202,6 +202,18 @@ bindkey '^H' backward-kill-word
 bindkey '^[[1;6D' emacs-backward-word
 bindkey '^[[1;6C' emacs-forward-word
 
+fancy-ctrl-z () {
+  if [[ $#BUFFER -eq 0 ]]; then
+    BUFFER="fg"
+    zle accept-line
+  else
+    zle push-input
+    zle clear-screen
+  fi
+}
+zle -N fancy-ctrl-z
+bindkey '^Z' fancy-ctrl-z
+
 autoload -Uz compinit
 
 HISTSIZE=15000
