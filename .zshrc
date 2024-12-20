@@ -116,7 +116,7 @@ function rns() {
     read -r confirmation
 
     # Confirm deletion
-    if [ "$confirmation" = "y" ] || [ "$confirmation" = "Y" ] || [ "$confirmation" = "yes" ] || [ "$confirmation" = "Yes" ]; then
+    if [ "$confirmation" != "n" ] || [ "$confirmation" != "N" ] ]; then
         rm -rf "$DIR_IN_Q/$top_match"  # Delete the top match if confirmed
         echo "$DIR_IN_Q/$top_match has been deleted."
     else
