@@ -29,6 +29,7 @@
 	rs = reset --soft
 	plc = "!git pull origin $(git symbolic-ref --short HEAD)"
 	poc = "!git push origin $(git symbolic-ref --short HEAD)"
+	pocf = "!git push origin $(git symbolic-ref --short HEAD) --force-with-lease"
   cbr = "!f() { echo 'Current branch:' && git rev-parse --abbrev-ref HEAD && git rev-parse --abbrev-ref HEAD | clip.exe; }; f"
   ahead-of = "!f() { git log --oneline \"$1..HEAD\"; }; f"
   fprs= fetch origin '+refs/pull/*/head:refs/remotes/origin/pull/*'
