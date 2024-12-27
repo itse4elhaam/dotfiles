@@ -35,6 +35,7 @@
   fprs= fetch origin '+refs/pull/*/head:refs/remotes/origin/pull/*'
   unpushed = log @{u}..
   stp = stash pop
+  cbb = "!git checkout -b bak/$(git rev-parse --abbrev-ref HEAD) && git checkout -"
 [core]
 	editor = vim
     pager = delta
@@ -46,7 +47,7 @@
   diffFilter = delta --color-only
 [delta]
   navigate = true
-  blame-palette = "#303446 #292c3c #232634 #414559 #51576d"
+  blame-palette = ["#303446", "#292c3c", "#232634", "#414559", "#51576d"]
   commit-decoration-style = box ul
   dark = true
   file-decoration-style = "#c6d0f5"
@@ -56,13 +57,13 @@
   hunk-header-line-number-style = bold "#a5adce"
   hunk-header-style = file line-number syntax
   line-numbers-left-style = "#737994"
-  line-numbers-minus-style = bold "#e78284"
-  line-numbers-plus-style = bold "#a6d189"
+  line-numbers-minus-style = bold "#e06c75"  # GitHub red
+  line-numbers-plus-style = bold "#98c379"   # GitHub green
   line-numbers-right-style = "#737994"
   line-numbers-zero-style = "#737994"
-  minus-emph-style = bold syntax "#5e4855"
-  minus-style = syntax "#433c4c"
-  plus-emph-style = bold syntax "#4e5b56"
-  plus-style = syntax "#3c444d"
+  minus-emph-style = bold syntax "#dc3545"
+  minus-style = syntax "#bd2c34"          # GitHub red
+  plus-emph-style = bold syntax "#28a745"
+  plus-style = syntax "#22863a"          # GitHub green
   map-styles = bold purple => syntax "#574f6e", bold blue => syntax "#475270", bold cyan => syntax "#4a5b6b", bold yellow => syntax "#5d5958"
   line-numbers = true
