@@ -47,23 +47,23 @@
   diffFilter = delta --color-only
 [delta]
   navigate = true
-  blame-palette = ["#303446", "#292c3c", "#232634", "#414559", "#51576d"]
+  blame-palette = ["#1f2129", "#1c1e26", "#181a21", "#2a2d3a", "#333748"]  # Dark muted tones
   commit-decoration-style = box ul
   dark = true
-  file-decoration-style = "#c6d0f5"
-  file-style = "#c6d0f5"
+  file-decoration-style = "#aab2ce"   # Muted gray-blue
+  file-style = "#aab2ce"
   hunk-header-decoration-style = box ul
   hunk-header-file-style = bold
-  hunk-header-line-number-style = bold "#a5adce"
+  hunk-header-line-number-style = bold "#8a93ab"  # Muted dark gray-blue
   hunk-header-style = file line-number syntax
-  line-numbers-left-style = "#737994"
-  line-numbers-minus-style = bold "#e06c75"  # GitHub red
-  line-numbers-plus-style = bold "#98c379"   # GitHub green
-  line-numbers-right-style = "#737994"
-  line-numbers-zero-style = "#737994"
-  minus-emph-style = bold syntax "#dc3545"
-  minus-style = syntax "#bd2c34"          # GitHub red
-  plus-emph-style = bold syntax "#28a745"
-  plus-style = syntax "#22863a"          # GitHub green
-  map-styles = bold purple => syntax "#574f6e", bold blue => syntax "#475270", bold cyan => syntax "#4a5b6b", bold yellow => syntax "#5d5958"
+  line-numbers-left-style = "#656c82"  # Dark gray
+  line-numbers-minus-style = bold "#b3525b"  # Dark muted red
+  line-numbers-plus-style = bold "#6c946e"   # Dark muted green
+  line-numbers-right-style = "#656c82"
+  line-numbers-zero-style = "#656c82"
+  minus-emph-style = bold syntax "#a94449"  # Darker red for emphasis
+  minus-style = syntax "#8a3a3f"            # Very dark muted red
+  plus-emph-style = bold syntax "#507750"   # Darker green for emphasis
+  plus-style = syntax "#3e5e3e"            # Very dark muted green
+  map-styles = bold purple => syntax "#4e445c", bold blue => syntax "#39475a", bold cyan => syntax "#3b505d", bold yellow => syntax "#524f48"
   line-numbers = true
