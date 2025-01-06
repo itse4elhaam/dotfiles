@@ -75,6 +75,7 @@ alias xcopy="xclip -selection clipboard"
 alias cls='clear'
 alias rt='source ~/.zshrc'
 alias lgit=lazygit
+alias lsql=lsql
 # vim alias
 alias vi=vim
 alias vim=nvim
