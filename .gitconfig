@@ -40,6 +40,9 @@
   com = "!git checkout $(for b in main master trunk release production prod stable; do git branch --list $b; done | head -n 1 | xargs)"
   # checkouts to dev branch
   cod = "!git checkout $(for b in dev develop development stg staging ; do git branch --list $b; done | head -n 1 | xargs)"
+  sync = "!git pull origin $(git symbolic-ref --short HEAD) && git push origin $(git symbolic-ref --short HEAD)"
+  wip = !git add -A && git commit -m "WIP"
+  undo = reset --soft HEAD~1
 [core]
 	editor = vim
     pager = delta
