@@ -44,7 +44,7 @@ export GOPATH=$HOME/go
 export PATH=$PATH:$GOROOT/bin:$GOPATH/bin
 
 # === aliases ===
-
+alias grandport='echo $((RANDOM % 1000 + 3000)) | xclip -selection clipboard'
 alias ls="exa -a --icons"
 alias ll="exa -a --icons --long"
 alias rmid="rm *.Identifier"
