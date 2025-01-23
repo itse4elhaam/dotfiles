@@ -74,3 +74,5 @@
   plus-style = syntax "#3e5e3e"            # Very dark muted green
   map-styles = bold purple => syntax "#4e445c", bold blue => syntax "#39475a", bold cyan => syntax "#3b505d", bold yellow => syntax "#524f48"
   line-numbers = true
+[rerere]
+	enabled = true
