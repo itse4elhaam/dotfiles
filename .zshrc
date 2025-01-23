@@ -68,6 +68,7 @@ alias cwp='echo "\\\\\wsl.localhost\\\Ubuntu${PWD//\//\\\\}" | xcopy'
 alias pn=pnpm
 alias cat="bat"
 alias tls="tmux ls"
+alias tmuxt="tmux set-option -g status \$(tmux show-option -gqv status | sed 's/on/off/;t;s/off/on/')"
 alias oc="code ."
 alias tmux="tmux -2"
 alias ov="vim .; clear"
