@@ -99,13 +99,13 @@ export PATH="$HOME/.deno/bin:$PATH"
 
 # Setup PostgreSQL
 sudo systemctl enable --now postgresql
-sudo -u postgres psql -c "CREATE USER e4elhaam WITH PASSWORD 'password';"
-sudo -u postgres psql -c "ALTER USER e4elhaam CREATEDB;"
+sudo -u postgres psql -c "CREATE USER elhaam WITH PASSWORD 'password';"
+sudo -u postgres psql -c "ALTER USER elhaam CREATEDB;"
 
 # Setup MySQL
 sudo systemctl enable --now mysql
-sudo mysql -e "CREATE USER 'e4elhaam'@'localhost' IDENTIFIED BY 'password';"
-sudo mysql -e "GRANT ALL PRIVILEGES ON *.* TO 'e4elhaam'@'localhost' WITH GRANT OPTION;"
+sudo mysql -e "CREATE USER 'elhaam'@'localhost' IDENTIFIED BY 'password';"
+sudo mysql -e "GRANT ALL PRIVILEGES ON *.* TO 'elhaam'@'localhost' WITH GRANT OPTION;"
 
 # Setup MongoDB
 sudo systemctl enable --now mongodb
@@ -117,7 +117,7 @@ if ! id "e4elhaam" &>/dev/null; then
 fi
 
 # Clone Neovim Configuration
-git clone https://github.com/e4elhaam/nvim-config ~/.config/nvim
+git clone https://github.com/itse4elhaam/nvim-config ~/.config/nvim
 
 # Install and configure Zsh
 sudo apt install -y zsh
@@ -140,7 +140,7 @@ source ~/.zshrc
 # Backup existing dotfiles and apply stow
 mkdir -p ~/.dotfiles_backup
 mv ~/.dotfiles/* ~/.dotfiles_backup/
-git clone https://github.com/e4elhaam/dotfiles ~/.dotfiles
+git clone https://github.com/itse4elhaam/dotfiles ~/.dotfiles
 cd ~/.dotfiles && stow .
 
 # Create essential directories
