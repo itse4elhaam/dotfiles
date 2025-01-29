@@ -1,0 +1,3 @@
+- complete setup.sh
+- refactor current zshrc
+- add p10k file here as well for rep
