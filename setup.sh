@@ -19,6 +19,12 @@ sudo apt update && sudo apt upgrade
 # install xclip
 # install bun
 # install deno
+# install ripgrep
+# install jq
+# install gcc, build-essentials and other stuff like that which is basic
+# install psql and create a user as well with passwords
+# install mysql and create a user as well with passwords
+# install mongodb
 
 
 # setup
@@ -29,6 +35,8 @@ sudo apt update && sudo apt upgrade
 # install oh my zsh and powerlevel 10k, also run power level 10k conf
 # first mv all dotfiles present in the .dotfiles folder to a bak file and then run stow . in ~/.dotfiles 
 # mkdir ~/coding ~/downloads ~/scripts ~/temp
+# clone truedevs repo
+# open tmux, trigger shift-i and then open neovim in the end
 
 
 
