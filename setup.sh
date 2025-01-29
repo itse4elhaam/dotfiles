@@ -1,3 +1,4 @@
+#!/bin/bash
 # if system is not ubuntu, exit out
 
 # installs
@@ -33,11 +34,6 @@
 # mkdir ~/coding ~/downloads ~/scripts ~/temp
 # clone truedevs repo
 # open tmux, trigger shift-i and then open neovim in the end
-
-
-
-
-#!/bin/bash
 
 # Ensure the script runs on Ubuntu
 if [[ "$(lsb_release -is)" != "Ubuntu" ]]; then
