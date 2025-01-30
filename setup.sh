@@ -123,6 +123,8 @@ echo "Zsh installed. Restart shell to apply changes."
 # Prompt user to install JetBrains Mono font
 read -p "Please install the JetBrains Mono font manually. Press ENTER to continue."
 
+read -p "Do you want to go ahead with oh my zsh and other setup, any key to continue"
+
 # Install Oh-My-Zsh & Powerlevel10k
 if [[ ! -d "$HOME/.oh-my-zsh" ]]; then
   sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
