@@ -57,10 +57,13 @@ sudo apt install -y \
 # Install NVM and Node.js (LTS)
 curl -fsSL https://raw.githubusercontent.com/nvm-sh/nvm/master/install.sh | bash
 export NVM_DIR="$HOME/.nvm"
-source "$NVM_DIR/nvm.sh"
-nvm install --lts
-nvm use --lts
-nvm alias default lts
+if [ -d "$NVM_DIR" ] && [ -f "$NVM_DIR/nvm.sh" ]; then
+  source "$NVM_DIR/nvm.sh"
+fi
+node_version_to_install="lts"
+nvm install "$node_version_to_install"
+nvm use "$node_version_to_install"
+nvm alias default "$node_version_to_install"
 
 # Install Neovim (via PPA)
 sudo add-apt-repository -y ppa:neovim-ppa/unstable
@@ -81,9 +84,10 @@ curl -fsSL https://github.com/sxyazi/yazi/releases/latest/download/yazi-linux.ta
 # Install g (GVM)
 curl -fsSL https://raw.githubusercontent.com/voidint/g/master/install.sh | bash
 export PATH="$HOME/.g/bin:$PATH"
-g install lts
-g use lts
-g alias default lts
+go_version_to_install="lts"
+g install "$go_version_to_install"
+g use "$go_version_to_install"
+g alias default "$go_version_to_install"
 
 # Install Bun
 curl -fsSL https://bun.sh/install | bash
@@ -93,15 +97,16 @@ export PATH="$HOME/.bun/bin:$PATH"
 curl -fsSL https://deno.land/x/install/install.sh | bash
 export PATH="$HOME/.deno/bin:$PATH"
 
-# Setup PostgreSQL
-sudo systemctl enable --now postgresql
-sudo -u postgres psql -c "CREATE USER elhaam WITH PASSWORD 'password';"
-sudo -u postgres psql -c "ALTER USER elhaam CREATEDB;"
+db_username="elhaam"
+db_pw="testpass"
 
-# Setup MySQL
+sudo systemctl enable --now postgresql
+sudo -u postgres psql -c "CREATE USER $db_username WITH PASSWORD '$db_pw';"
+sudo -u postgres psql -c "ALTER USER $db_username CREATEDB;"
+
 sudo systemctl enable --now mysql
-sudo mysql -e "CREATE USER 'elhaam'@'localhost' IDENTIFIED BY 'password';"
-sudo mysql -e "GRANT ALL PRIVILEGES ON *.* TO 'elhaam'@'localhost' WITH GRANT OPTION;"
+sudo mysql -e "CREATE USER '$db_username'@'localhost' IDENTIFIED BY '$db_pw';"
+sudo mysql -e "GRANT ALL PRIVILEGES ON *.* TO '$db_username'@'localhost' WITH GRANT OPTION;"
 
 # Setup MongoDB
 sudo systemctl enable --now mongodb
@@ -117,13 +122,13 @@ git clone https://github.com/itse4elhaam/nvim-config ~/.config/nvim
 
 # Install and configure Zsh
 sudo apt install -y zsh
-chsh -s $(which zsh)
+chsh -s "$(which zsh)"
 echo "Zsh installed. Restart shell to apply changes."
 
 # Prompt user to install JetBrains Mono font
-read -p "Please install the JetBrains Mono font manually. Press ENTER to continue."
+read -rp "Please install the JetBrains Mono font manually. Press ENTER to continue."
 
-read -p "Do you want to go ahead with oh my zsh and other setup, any key to continue"
+read -rp "Do you want to go ahead with oh my zsh and other setup, any key to continue"
 
 # Install Oh-My-Zsh & Powerlevel10k
 if [[ ! -d "$HOME/.oh-my-zsh" ]]; then
