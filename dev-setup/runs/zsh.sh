@@ -8,8 +8,16 @@ echo "Zsh installed. Restart shell to apply changes."
 # TODO: make this better
 cd ~/.dotfiles && stow .
 
-# Prompt user to install JetBrains Mono font
-read -rp "Please install the JetBrains Mono font manually. Press ENTER to continue."
+# does this work?
+mkdir -p ~/.local/share/fonts
+cd ~/.local/share/fonts || exit
+
+wget https://github.com/ryanoasis/nerd-fonts/releases/latest/download/JetBrainsMono.zip
+unzip JetBrainsMono.zip -d JetBrainsMono-NF
+rm JetBrainsMono.zip
+
+# Refresh font cache
+fc-cache -fv
 
 # Install Oh-My-Zsh & Powerlevel10k
 if [[ ! -d "$HOME/.oh-my-zsh" ]]; then
