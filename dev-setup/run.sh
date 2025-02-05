@@ -54,6 +54,7 @@ fi
 
 scripts="$(find $runs_dir -maxdepth 1 -mindepth 1 -type f)"
 
+# TODO: need to make sure that is runs in a specific sequence or smth
 for script in $scripts; do
   # v here inverts it and says if it does not contain it
   if echo "$script" | grep -qv "$filter"; then
