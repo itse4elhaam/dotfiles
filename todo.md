@@ -3,3 +3,4 @@
 - add p10k file here as well for rep
 - add ls | grep $1 and cat $1 | clip
 - how to store ssh keys?
+- use docker to test out the current setup.sh
