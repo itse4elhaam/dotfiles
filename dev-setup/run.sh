@@ -1,5 +1,10 @@
 #!/bin/bash
 
+if ! command -v apt-get &> /dev/null && ! command -v dpkg &> /dev/null; then
+  echo "This script is intended for apt-based systems. Exiting..."
+  exit 1
+fi
+
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 filter=""
