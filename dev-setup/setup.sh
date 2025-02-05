@@ -43,31 +43,6 @@ fi
 
 echo "Welcome to the installation script. Let's start with updates and package installations."
 
-# Update and upgrade the system
-sudo apt update && sudo apt upgrade -y
-
-# Install required packages
-sudo apt install -y \
-  software-properties-common curl git wget unzip build-essential \
-  python3 python-is-python3 \
-  redis fzf exa xclip ripgrep jq gcc make \
-  postgresql postgresql-contrib mysql-server mongodb \
-  stow tmux
-
-# Install NVM and Node.js (LTS)
-curl -fsSL https://raw.githubusercontent.com/nvm-sh/nvm/master/install.sh | bash
-export NVM_DIR="$HOME/.nvm"
-if [ -d "$NVM_DIR" ] && [ -f "$NVM_DIR/nvm.sh" ]; then
-  source "$NVM_DIR/nvm.sh"
-fi
-node_version_to_install="lts"
-nvm install "$node_version_to_install"
-nvm use "$node_version_to_install"
-nvm alias default "$node_version_to_install"
-
-# Install Neovim (via PPA)
-sudo add-apt-repository -y ppa:neovim-ppa/unstable
-sudo apt update && sudo apt install -y neovim
 
 # Install tmux (via PPA)
 sudo add-apt-repository -y ppa:pi-rho/dev
@@ -81,35 +56,6 @@ tar xf lazygit.tar.gz -C /usr/local/bin lazygit && rm lazygit.tar.gz
 # Install Yazi
 curl -fsSL https://github.com/sxyazi/yazi/releases/latest/download/yazi-linux.tar.gz | tar xz -C ~/.local/bin
 
-# Install g (GVM)
-curl -fsSL https://raw.githubusercontent.com/voidint/g/master/install.sh | bash
-export PATH="$HOME/.g/bin:$PATH"
-go_version_to_install="lts"
-g install "$go_version_to_install"
-g use "$go_version_to_install"
-g alias default "$go_version_to_install"
-
-# Install Bun
-curl -fsSL https://bun.sh/install | bash
-export PATH="$HOME/.bun/bin:$PATH"
-
-# Install Deno
-curl -fsSL https://deno.land/x/install/install.sh | bash
-export PATH="$HOME/.deno/bin:$PATH"
-
-db_username="elhaam"
-db_pw="testpass"
-
-sudo systemctl enable --now postgresql
-sudo -u postgres psql -c "CREATE USER $db_username WITH PASSWORD '$db_pw';"
-sudo -u postgres psql -c "ALTER USER $db_username CREATEDB;"
-
-sudo systemctl enable --now mysql
-sudo mysql -e "CREATE USER '$db_username'@'localhost' IDENTIFIED BY '$db_pw';"
-sudo mysql -e "GRANT ALL PRIVILEGES ON *.* TO '$db_username'@'localhost' WITH GRANT OPTION;"
-
-# Setup MongoDB
-sudo systemctl enable --now mongodb
 
 # Create a new user (if not exists)
 if ! id "e4elhaam" &>/dev/null; then
