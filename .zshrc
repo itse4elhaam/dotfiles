@@ -81,6 +81,9 @@ alias lsql=lazysql
 # vim alias
 alias vi=vim
 alias vim=nvim
+nvmiu() {
+  nvm install "$1" && nvm use "$1"
+}
 # fzf 
 # alias tf='tmux attach-session -t $(tmux list-sessions -F "#{session_name}" | fzf --height 40%)'
 alias tf='t'
