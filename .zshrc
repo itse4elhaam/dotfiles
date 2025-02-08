@@ -28,6 +28,7 @@ export NVM_DIR="$HOME/.nvm"
 . "$HOME/.cargo/env"
 
 export PATH=$PATH:/home/e4elhaam/.nvm/versions/node/v19.9.0/bin
+export NODE_OPTIONS="--max-old-space-size=8192"
 export PATH=$PATH:"$HOME/.nvm"
 export PATH=$PATH:"$HOME/.cargo/bin"
 export PATH=$PATH:"$HOME/.bun/bin"
