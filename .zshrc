@@ -106,6 +106,22 @@ fi
 
 
 # === alias functions ===
+function jpm() {
+  if [ -f "yarn.lock" ]; then
+    yarn "$@"
+  elif [ -f "pnpm-lock.yaml" ]; then
+    pnpm "$@"
+  elif [ -f "package-lock.json" ]; then
+    npm "$@"
+  elif [ -f "bun.lockb" ]; then
+    bun "$@"
+  elif [ -f "deno.lock" ]; then
+    deno "$@"
+  else
+    echo "No known package manager lock file found."
+    return 1
+  fi
+}
 function rns() {
     DIR_IN_Q="/home/e4elhaam/.local/share/nvim/sessions"
     content=$(command ls -1 "$DIR_IN_Q")  # Store the output of ls in 'content'
