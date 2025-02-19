@@ -46,6 +46,7 @@ export GOPATH=$HOME/go
 export PATH=$PATH:$GOROOT/bin:$GOPATH/bin
 
 # === aliases ===
+alias vimdb='nvim -c "DBUI" --cmd "let g:auto_session_enabled = v:false"'
 alias grandport='echo $((RANDOM % 1000 + 3000)) | xclip -selection clipboard'
 alias ls="exa -a --icons"
 alias ll="exa -a --icons --long"
