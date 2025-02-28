@@ -47,7 +47,7 @@
   wip = !git add -A && git commit -m "WIP"
   undo = reset --soft HEAD~1
 [core]
-	editor = vim
+	editor = nvim
     pager = delta
 [init]
 	defaultBranch = main
