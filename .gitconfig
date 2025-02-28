@@ -36,6 +36,8 @@
   unpushed = log @{u}..
   stp = stash pop
   cbb = "!git checkout -b bak/$(git rev-parse --abbrev-ref HEAD) && git checkout -"
+  dbb = "!git branch -D bak/$(git rev-parse --abbrev-ref HEAD)"
+  mel = "!git merge -"
   # checkouts to main branch
   com = "!git checkout $(for b in main master trunk release production prod stable; do git branch --list $b; done | head -n 1 | xargs)"
   # checkouts to dev branch
