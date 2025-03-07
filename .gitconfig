@@ -20,7 +20,8 @@
 	s = status
 	co = checkout
 	br = branch --format='%(HEAD) %(color:yellow)%(refname:short)%(color:reset) - %(contents:subject) %(color:green)(%(committerdate:relative)) [%(authorname)]' --sort=-committerdate
-	ll = log --oneline
+	sl = shortlog
+	ll = log --oneline --decorate
 	last = log -1 HEAD --stat
 	fo = fetch origin
 	fa = fetch --all
