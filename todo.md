@@ -1,3 +1,4 @@
 - complete setup.sh
 - refactor current zshrc
 - add p10k file here as well for rep
+- add ls | grep $1 and cat $1 | clip
