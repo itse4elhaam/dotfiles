@@ -13,6 +13,7 @@
 	ac = !git add -A && git commit -m
 	cmp = "!f() { git commit -m \"$1\" && git push origin $(git symbolic-ref --short HEAD); }; f"	
 	acp = "!f() { git add -A && git commit -m \"$1\" && git push origin $(git symbolic-ref --short HEAD); }; f"	
+  acpd = "!f() { git add . && git commit -m \"$1 $(date '+%Y-%m-%d %H:%M:%S')\" && git push origin $(git symbolic-ref --short HEAD); }; f"
 	pom = push origin master
 	po = push origin
 	pl = pull origin
