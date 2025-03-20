@@ -69,6 +69,7 @@ alias ccfh="history | fzf --height 40% | awk '{\$1=\"\"; print \$0}' | xclip -se
 alias cpth='pwd | tr -d "\n" | clip.exe'
 alias cwp='echo "\\\\\wsl.localhost\\\Ubuntu${PWD//\//\\\\}" | xcopy'
 alias pn=pnpm
+alias bn=bun
 alias cat="bat"
 alias tls="tmux ls"
 alias tmuxt="tmux set-option -g status \$(tmux show-option -gqv status | sed 's/on/off/;t;s/off/on/')"
