@@ -76,6 +76,7 @@ alias tmuxt="tmux set-option -g status \$(tmux show-option -gqv status | sed 's/
 alias oc="code ."
 alias tmux="tmux -2"
 alias ov="vim .; clear"
+alias sp="supabase"
 alias xcopy="xclip -selection clipboard"
 alias cls='clear'
 alias rt='source ~/.zshrc'
@@ -226,6 +227,8 @@ bindkey '^F' cdi_command
 bindkey '^H' backward-kill-word
 bindkey '^[[1;6D' emacs-backward-word
 bindkey '^[[1;6C' emacs-forward-word
+bindkey '^p' history-search-backward
+bindkey '^n' history-search-forward
 
 fancy-ctrl-z () {
   if [[ $#BUFFER -eq 0 ]]; then
