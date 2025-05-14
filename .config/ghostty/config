@@ -4,11 +4,13 @@ background-opacity             = 0.85
 
 # Font settings
 font-family                    = ""
-font-family                    = "JetBrainsMono Nerd Font Mono"
-font-family                    = JetBrainsMono Nerd Font
-font-family-bold              = JetBrainsMono Nerd Font
-font-family-italic            = JetBrainsMono Nerd Font
-font-family-bold-italic       = JetBrainsMono Nerd Font
+
+
+font-family = "JetBrainsMono Nerd Font"
+font-size = 13
+font-family-bold              = "JetBrainsMono Nerd Font"
+font-family-italic            = "JetBrainsMono Nerd Font"
+font-family-bold-italic       = "JetBrainsMono Nerd Font"
 
 
 # Title and theming
@@ -37,4 +39,9 @@ copy-on-select                = true
 # Mouse behavior
 mouse-hide-while-typing       = true
 cursor-style = block
+
+# these are the keybinds:
+
+keybind = ctrl+v=paste_from_clipboard
+
 
