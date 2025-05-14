@@ -1,6 +1,6 @@
 theme                          = tokyonight_moon
 
-background-opacity             = 0.75
+background-opacity             = 0.85
 
 # Font settings
 font-family                    = ""
@@ -36,22 +36,5 @@ copy-on-select                = true
 
 # Mouse behavior
 mouse-hide-while-typing       = true
-
-# Palette
-palette                       = 0=#1b1d2b
-palette                       = 1=#ff757f
-palette                       = 2=#c3e88d
-palette                       = 3=#ffc777
-palette                       = 4=#82aaff
-palette                       = 5=#c099ff
-palette                       = 6=#86e1fc
-palette                       = 7=#828bb8
-palette                       = 8=#444a73
-palette                       = 9=#ff757f
-palette                       = 10=#c3e88d
-palette                       = 11=#ffc777
-palette                       = 12=#82aaff
-palette                       = 13=#c099ff
-palette                       = 14=#86e1fc
-palette                       = 15=#c8d3f5
+cursor-style = block
 
