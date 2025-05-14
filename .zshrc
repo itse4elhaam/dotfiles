@@ -85,6 +85,9 @@ alias lsql=lazysql
 # vim alias
 alias vi=vim
 alias vim=nvim
+ai() {
+  sudo apt install "$1" -y
+}
 nvmiu() {
   nvm install "$1" && nvm use "$1"
 }
