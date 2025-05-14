@@ -1,0 +1,57 @@
+theme                          = tokyonight_moon
+
+background-opacity             = 0.75
+
+# Font settings
+font-family                    = ""
+font-family                    = "JetBrainsMono Nerd Font Mono"
+font-family                    = JetBrainsMono Nerd Font
+font-family-bold              = JetBrainsMono Nerd Font
+font-family-italic            = JetBrainsMono Nerd Font
+font-family-bold-italic       = JetBrainsMono Nerd Font
+
+
+# Title and theming
+title                         = CodeCrypt
+window-title-font-family      = CodeCrypt
+window-theme                  = dark
+theme                         = tokyonight_moon
+
+# Colors
+background                    = #222436
+foreground                    = #c8d3f5
+selection-background          = #2d3f76
+selection-foreground          = #c8d3f5
+cursor-color                  = #c8d3f5
+cursor-text                   = #222436
+
+# Cursor behavior
+cursor-style-blink            = true
+
+# Clipboard settings
+confirm-close-surface         = false
+clipboard-read                = allow
+clipboard-write               = allow
+copy-on-select                = true
+
+# Mouse behavior
+mouse-hide-while-typing       = true
+
+# Palette
+palette                       = 0=#1b1d2b
+palette                       = 1=#ff757f
+palette                       = 2=#c3e88d
+palette                       = 3=#ffc777
+palette                       = 4=#82aaff
+palette                       = 5=#c099ff
+palette                       = 6=#86e1fc
+palette                       = 7=#828bb8
+palette                       = 8=#444a73
+palette                       = 9=#ff757f
+palette                       = 10=#c3e88d
+palette                       = 11=#ffc777
+palette                       = 12=#82aaff
+palette                       = 13=#c099ff
+palette                       = 14=#86e1fc
+palette                       = 15=#c8d3f5
+

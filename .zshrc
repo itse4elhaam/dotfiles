@@ -25,7 +25,7 @@ source $ZSH/oh-my-zsh.sh
 export NVM_DIR="$HOME/.nvm"
 [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
 [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"
-. "$HOME/.cargo/env"
+# . "$HOME/.cargo/env"
 
 export PATH=$PATH:/home/e4elhaam/.nvm/versions/node/v19.9.0/bin
 export NODE_OPTIONS="--max-old-space-size=8192"
@@ -54,7 +54,7 @@ alias rmid="rm *.Identifier"
 # Aliases for common Windows utilities - wsl
 alias ex='explorer.exe .'
 alias notepad='notepad.exe'
-alias clip='clip.exe'
+alias clip='xcopy'
 alias edge='msedge.exe'
 # for cd:
 alias ..='cd ..'
@@ -66,7 +66,7 @@ alias mv="mv -i"
 # others
 # copy cmd from history
 alias ccfh="history | fzf --height 40% | awk '{\$1=\"\"; print \$0}' | xclip -selection clipboard"
-alias cpth='pwd | tr -d "\n" | clip.exe'
+alias cpth='pwd | tr -d "\n" | xcopy'
 alias cwp='echo "\\\\\wsl.localhost\\\Ubuntu${PWD//\//\\\\}" | xcopy'
 alias pn=pnpm
 alias bn=bun
@@ -256,6 +256,8 @@ setopt hist_ignore_dups
 setopt hist_save_no_dups
 setopt hist_find_no_dups
 
+
+export PATH="$HOME/.local/bin:$PATH"
 # zstyle ':completion:*' menu select
 zstyle ':completion:*' list-colors "${(s.:.)LS_COLORS}"
 zstyle ':completion:*' menu no
@@ -325,4 +327,5 @@ tmux-window-name() {
 }
 
 add-zsh-hook chpwd tmux-window-name
-. "/home/e4elhaam/.deno/env"
+# . "/home/e4elhaam/.deno/env"
+
