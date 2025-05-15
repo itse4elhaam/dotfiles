@@ -1,5 +1,5 @@
 theme                          = tokyonight_moon
-background-opacity             = 0.85
+background-opacity             = 0.975
 
 title                         = CodeCrypt
 window-title-font-family      = CodeCrypt
@@ -18,4 +18,7 @@ keybind = ctrl+v=paste_from_clipboard
 keybind = ctrl+u=copy_url_to_clipboard
 
 background-blur-radius = 20
-window-decoration = true
+window-decoration = false
+fullscreen = true
+
+padding = [0, 0, 0, 0]        # No padding at all
