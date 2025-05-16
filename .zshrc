@@ -82,6 +82,7 @@ alias cls='clear'
 alias rt='source ~/.zshrc'
 alias lgit=lazygit
 alias lsql=lazysql
+alias gty="ghostty"
 # vim alias
 alias vi=vim
 alias vim=nvim
@@ -331,4 +332,7 @@ tmux-window-name() {
 
 add-zsh-hook chpwd tmux-window-name
 # . "/home/e4elhaam/.deno/env"
+
+
+[ -s "${HOME}/.g/env" ] && \. "${HOME}/.g/env"  # g shell setup
 
