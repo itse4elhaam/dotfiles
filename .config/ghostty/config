@@ -20,5 +20,3 @@ keybind = ctrl+shift+u=copy_url_to_clipboard
 background-blur-radius = 20
 window-decoration = false
 fullscreen = true
-
-padding = [0, 0, 0, 0]        # No padding at all
