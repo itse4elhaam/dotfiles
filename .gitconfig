@@ -116,7 +116,6 @@
   showUntrackedFiles = all  # show individual untracked files
 [push]
   autoSetupRemote = true  # easier to push new branches
-  default = current  # push only current branch by default
   followTags = true  # push also tags
 [pull]
   rebase = true
@@ -124,14 +123,6 @@
   fetchJobs = 16
 [rebase]
   autoStash = true
-[color "blame"]
-  highlightRecent = black bold,1 year ago,white,1 month ago,default,7 days ago,blue
-[color "branch"]
-  current  = magenta
-  local    = default
-  remote   = yellow
-  upstream = green
-  plain    = blue
 # URL shortcuts
 [url "git@github.com:"]
     insteadOf = "gh:"
