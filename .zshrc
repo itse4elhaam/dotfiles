@@ -336,3 +336,4 @@ add-zsh-hook chpwd tmux-window-name
 
 [ -s "${HOME}/.g/env" ] && \. "${HOME}/.g/env"  # g shell setup
 
+export TERM="xterm-256color"
