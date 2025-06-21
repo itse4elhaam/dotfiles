@@ -1,5 +1,5 @@
 # Add deno completions to search path
-if [[ ":$FPATH:" != *":/home/e4elhaam/.zsh/completions:"* ]]; then export FPATH="/home/e4elhaam/.zsh/completions:$FPATH"; fi
+if [[ ":$FPATH:" != *":/home/$USER/.zsh/completions:"* ]]; then export FPATH="/home/$USER/.zsh/completions:$FPATH"; fi
 # Enable Powerlevel10k instant prompt. Should stay close to the top of ~/.zshrc.
 # Initialization code that may require console input (password prompts, [y/n]
 # confirmations, etc.) must go above this block; everything else may go below.
@@ -27,7 +27,7 @@ export NVM_DIR="$HOME/.nvm"
 [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"
 # . "$HOME/.cargo/env"
 
-export PATH=$PATH:/home/e4elhaam/.nvm/versions/node/v19.9.0/bin
+export PATH=$PATH:/home/$USER/.nvm/versions/node/v19.9.0/bin
 export NODE_OPTIONS="--max-old-space-size=8192"
 export PATH=$PATH:"$HOME/.nvm"
 export PATH=$PATH:"$HOME/.cargo/bin"
@@ -40,7 +40,7 @@ PATH=~/.console-ninja/.bin:$PATH
 export NVM_DIR="$([ -z "${XDG_CONFIG_HOME-}" ] && printf %s "${HOME}/.nvm" || printf %s "${XDG_CONFIG_HOME}/nvm")"
 [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
 export PATH="$HOME/downloads/zig-linux-x86_64-0.11.0:$PATH"
-export PATH="$PATH:/home/e4elhaam/.local/bin"
+export PATH="$PATH:/home/$USER/.local/bin"
 
 export GOPATH=$HOME/go
 export PATH=$PATH:$GOROOT/bin:$GOPATH/bin
@@ -130,7 +130,7 @@ function jpm() {
   fi
 }
 function rns() {
-    DIR_IN_Q="/home/e4elhaam/.local/share/nvim/sessions"
+    DIR_IN_Q="/home/$USER/.local/share/nvim/sessions"
     content=$(command ls -1 "$DIR_IN_Q")  # Store the output of ls in 'content'
     converted_curr_dir="$(echo "$(pwd)" | sed 's/\//%2F/g; s/\./%2E/g').vim"  # Convert current directory to desired format
     top_match=$(echo "$content" | fzf --filter "$converted_curr_dir" | head -n 1)  # Get the top match using fzf
@@ -283,14 +283,14 @@ fpath+=${ZSH_CUSTOM:-${ZSH:-~/.oh-my-zsh}/custom}/plugins/zsh-completions/src
 fpath+=~/.zfunc
 
 # fnm
-FNM_PATH="/home/e4elhaam/.local/share/fnm"
+FNM_PATH="/home/$USER/.local/share/fnm"
 if [ -d "$FNM_PATH" ]; then
-  export PATH="/home/e4elhaam/.local/share/fnm:$PATH"
+  export PATH="/home/$USER/.local/share/fnm:$PATH"
   eval "`fnm env`"
 fi
 
 # pnpm
-export PNPM_HOME="/home/e4elhaam/.local/share/pnpm"
+export PNPM_HOME="/home/$USER/.local/share/pnpm"
 case ":$PATH:" in
   *":$PNPM_HOME:"*) ;;
   *) export PATH="$PNPM_HOME:$PATH" ;;
@@ -305,14 +305,14 @@ export PATH=$HOME/.config/tmux/plugins/tmux-session-wizard/bin:$PATH
 
 # >>> conda initialize >>>
 # !! Contents within this block are managed by 'conda init' !!
-__conda_setup="$('/home/e4elhaam/miniconda3/bin/conda' 'shell.zsh' 'hook' 2> /dev/null)"
+__conda_setup="$('/home/$USER/miniconda3/bin/conda' 'shell.zsh' 'hook' 2> /dev/null)"
 if [ $? -eq 0 ]; then
     eval "$__conda_setup"
 else
-    if [ -f "/home/e4elhaam/miniconda3/etc/profile.d/conda.sh" ]; then
-        . "/home/e4elhaam/miniconda3/etc/profile.d/conda.sh"
+    if [ -f "/home/$USER/miniconda3/etc/profile.d/conda.sh" ]; then
+        . "/home/$USER/miniconda3/etc/profile.d/conda.sh"
     else
-        export PATH="/home/e4elhaam/miniconda3/bin:$PATH"
+        export PATH="/home/$USER/miniconda3/bin:$PATH"
     fi
 fi
 unset __conda_setup
@@ -320,7 +320,7 @@ unset __conda_setup
 
 
 # bun completions
-[ -s "/home/e4elhaam/.bun/_bun" ] && source "/home/e4elhaam/.bun/_bun"
+[ -s "/home/$USER/.bun/_bun" ] && source "/home/$USER/.bun/_bun"
 
 tmux-git-autofetch() {(/home/$USER/.tmux/plugins/tmux-git-autofetch/git-autofetch.tmux --current &)}
 add-zsh-hook chpwd tmux-git-autofetch
@@ -331,7 +331,7 @@ tmux-window-name() {
 }
 
 add-zsh-hook chpwd tmux-window-name
-# . "/home/e4elhaam/.deno/env"
+# . "/home/$USER/.deno/env"
 
 
 [ -s "${HOME}/.g/env" ] && \. "${HOME}/.g/env"  # g shell setup
