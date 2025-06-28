@@ -34,6 +34,7 @@ export PATH=$PATH:"$HOME/.cargo/bin"
 export PATH=$PATH:"$HOME/.bun/bin"
 export PATH=$PATH:"$HOME/flutter/bin"
 export N_PREFIX=$HOME/.
+export PATH="$HOME/.wakatime:$PATH"
 export PATH="$PATH:/opt/nvim-linux64/bin"
 export PATH=$PATH:/usr/local/go/bin
 PATH=~/.console-ninja/.bin:$PATH
