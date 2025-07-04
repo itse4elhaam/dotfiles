@@ -54,6 +54,7 @@
   wip = !git add -A && git commit -m "WIP"
   undo = reset --soft HEAD~1
   diffc = "!f() { git diff \"$1\"..\"$(git symbolic-ref --short HEAD)\"; }; f"
+  br-parent = !git show-branch | grep "*" | grep -v "$(git rev-parse --abbrev-ref HEAD)" | head -n1 | sed "s/.*\\[\\(.*\\)\\].*/\\1/" | cut -d" " -f1
 [core]
 	editor = nvim
   pager = delta
