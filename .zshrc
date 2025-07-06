@@ -27,6 +27,7 @@ export NVM_DIR="$HOME/.nvm"
 [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"
 # . "$HOME/.cargo/env"
 
+export PATH="$HOME/.nvm/versions/node/v22.17.0/bin:$PATH"
 export PATH=$PATH:/home/$USER/.nvm/versions/node/v19.9.0/bin
 export NODE_OPTIONS="--max-old-space-size=8192"
 export PATH=$PATH:"$HOME/.nvm"
