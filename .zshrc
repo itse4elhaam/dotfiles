@@ -9,8 +9,6 @@ fi
 
 if [ -f "$PWD/.env.local" ]; then
   source "$PWD/.env.local"
-else
-  echo ".env not set"
 fi
 
 # TODO: move all aliases to a different file
