@@ -57,6 +57,7 @@ export GOPATH=$HOME/go
 export PATH=$PATH:$GOROOT/bin:$GOPATH/bin
 
 # === aliases ===
+alias napp='ngrok http --url=engaging-grizzly-merry.ngrok-free.app'
 alias vimdb='nvim -c "DBUI" --cmd "let g:auto_session_enabled = v:false"'
 alias vimdbee='nvim -c "lua require("dbee").open()" --cmd "let g:auto_session_enabled = v:false"'
 alias grandport='echo $((RANDOM % 1000 + 3000)) | xclip -selection clipboard'
