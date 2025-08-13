@@ -7,8 +7,8 @@ if [[ -r "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh" ]]
   source "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh"
 fi
 
-if [ -f "$PWD/.env.local" ]; then
-  source "$PWD/.env.local"
+if [ -f ~/.zshenv_local ]; then
+  source ~/.zshenv_local
 fi
 
 # TODO: move all aliases to a different file
