@@ -7,9 +7,6 @@
     "typescript": {
       "command": "typescript-language-server",
       "args": ["--stdio"]
-    },
-    "nix": {
-      "command": "nil"
     }
   },
   "mcp": {
