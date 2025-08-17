@@ -1,2 +1,5 @@
 *.local
 .crush
+tmp
+installtion_id
+oauth_creds*
