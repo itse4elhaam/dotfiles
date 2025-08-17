@@ -1,0 +1,12 @@
+{
+  "selectedAuthType": "qwen-oauth",
+  "theme": "ANSI",
+  "preferredEditor": "neovim",
+  "mcpServers": {
+    "context7": {
+      "httpUrl": "https://mcp.context7.com/mcp"
+    }
+  },
+  "contextFileName": "./guide.md",
+  "vimMode": false
+}

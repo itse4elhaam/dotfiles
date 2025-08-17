@@ -1,5 +1,5 @@
 *.local
 .crush
 tmp
-installtion_id
+installation_id
 oauth_creds*
