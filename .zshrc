@@ -10,6 +10,10 @@ fi
 if [ -f ~/.zshenv_local ]; then
   source ~/.zshenv_local
 fi
+# assuming you cloned zff to ~/zff
+if [[ -f ~/zff/zff.sh ]]; then
+  source ~/zff/zff.sh
+fi
 
 # TODO: move all aliases to a different file
 export ZSH="$HOME/.oh-my-zsh"
@@ -58,6 +62,7 @@ export PATH=$PATH:$GOROOT/bin:$GOPATH/bin
 
 # === aliases ===
 alias napp='ngrok http --url=engaging-grizzly-merry.ngrok-free.app'
+alias fd='fdfind'
 alias vimdb='nvim -c "DBUI" --cmd "let g:auto_session_enabled = v:false"'
 alias vimdbee='nvim -c "lua require("dbee").open()" --cmd "let g:auto_session_enabled = v:false"'
 alias grandport='echo $((RANDOM % 1000 + 3000)) | xclip -selection clipboard'
@@ -350,3 +355,17 @@ add-zsh-hook chpwd tmux-window-name
 [ -s "${HOME}/.g/env" ] && \. "${HOME}/.g/env"  # g shell setup
 
 export TERM="xterm-256color"
+
+zff-widget() {
+  if [[ -n "$BUFFER" ]]; then
+    # Insert path if typed something
+    zffi
+  else
+    # Empty prompt: open file
+    zff
+    zle reset-prompt
+  fi
+}
+zle -N zff-widget
+bindkey '^@' zff-widget # Ctrl + space
+naval-cli --no-ascii
