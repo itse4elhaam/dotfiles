@@ -7,7 +7,7 @@
 #     gpgSign = true
 
 [credential]
-	helper = cache
+	helper = store
 [alias]
 	cm = !git commit -m
 	ca = !git commit --amend
