@@ -1,9 +1,3 @@
 {
-  "$schema": "https://charm.land/crush.json",
-  "mcp": {
-    "context7": {
-      "type": "http",
-      "url": "https://mcp.context7.com/mcp"
-    }
-  }
+  "$schema": "https://charm.land/crush.json"
 }
