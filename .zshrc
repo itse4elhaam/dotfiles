@@ -1,3 +1,4 @@
+naval-cli --no-ascii
 # Add deno completions to search path
 if [[ ":$FPATH:" != *":/home/$USER/.zsh/completions:"* ]]; then export FPATH="/home/$USER/.zsh/completions:$FPATH"; fi
 # Enable Powerlevel10k instant prompt. Should stay close to the top of ~/.zshrc.
@@ -368,4 +369,3 @@ zff-widget() {
 }
 zle -N zff-widget
 bindkey '^@' zff-widget # Ctrl + space
-naval-cli --no-ascii
