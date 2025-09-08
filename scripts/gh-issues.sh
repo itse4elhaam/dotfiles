@@ -1,6 +1,28 @@
 #!/bin/bash
 
-REPO="itse4elhaam/prs-td"
+# Check if fzf is installed
+if ! command -v fzf &> /dev/null; then
+    echo "fzf is not installed. Please install it first: https://github.com/junegunn/fzf#installation"
+    exit 1
+fi
+
+# Check if gh is installed
+if ! command -v gh &> /dev/null; then
+    echo "GitHub CLI (gh) is not installed. Please install it first: https://cli.github.com/"
+    exit 1
+fi
+
+# Fetch repositories and let user select one
+echo "Fetching your repositories..."
+REPO=$(gh repo list --limit 1000 | fzf --header="Select a repository:" | awk '{print $1}')
+
+# Check if a repository was selected
+if [ -z "$REPO" ]; then
+    echo "No repository selected. Exiting."
+    exit 0
+fi
+
+echo "Selected repository: $REPO"
 
 # Workstreams
 gh label create "design" --color "#1f77b4" --description "UI/UX, Figma, creative work" --repo $REPO
