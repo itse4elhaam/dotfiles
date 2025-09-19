@@ -84,7 +84,7 @@ alias cp="cp -i"
 alias mv="mv -i"
 # others
 # copy cmd from history
-alias ccfh="history | fzf --height 40% | awk '{\$1=\"\"; print \$0}' | xclip -selection clipboard"
+alias ccfh="history | tac | fzf --height 40% | awk '{\$1=\"\"; print \$0}' | xclip -selection clipboard"
 alias cpth='pwd | tr -d "\n" | xcopy'
 alias cwp='echo "\\\\\wsl.localhost\\\Ubuntu${PWD//\//\\\\}" | xcopy'
 alias pn=pnpm
