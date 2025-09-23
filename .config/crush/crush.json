@@ -1,3 +1,15 @@
 {
-  "$schema": "https://charm.land/crush.json"
+  "$schema": "https://charm.land/crush.json",
+  "lsp": {
+    "typescript": {
+      "command": "typescript-language-server",
+      "args": ["--stdio"]
+    }
+  },
+  "mcp": {
+    "context7":{
+      "type": "http",
+      "url": "https://mcp.context7.com/mcp"
+    }
+  }
 }

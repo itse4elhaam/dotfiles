@@ -1,4 +1,4 @@
-# Gemini Style Guide
+Important: Run `coderabbit review --plain` to get comprehensive code analysis and improvement suggestions. Apply the feedback to write cleaner, more maintainable code.
 
 ## Language Preferences
 
@@ -61,4 +61,3 @@
 - Keep functions under 30 lines unless justified - split functions always
 - if params are > 2, prefer object based params
 - destructure stuff in the params directly not below in seperate line
-
