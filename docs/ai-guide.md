@@ -1,63 +1,101 @@
-Important: Run `coderabbit review --plain` to get comprehensive code analysis and improvement suggestions. Apply the feedback to write cleaner, more maintainable code.
+Important: Run `coderabbit review --plain` to get comprehensive code analysis and improvement suggestions. Apply the feedback to write **cleaner, safer, and more maintainable code**.
+
+## Core Philosophy
+
+- **Fail Fast, Defend Early**:  
+  Every function should validate its inputs and fail loudly with clear errors.
+- **Edge-Case Driven**:  
+  Always consider null/undefined, empty arrays/objects, out-of-range values, and unexpected inputs.
+- **Clarity > Cleverness**:  
+  Code should be readable by a new engineer in minutes, not hours.
+
+---
 
 ## Language Preferences
 
-- Use **TypeScript** over JavaScript wherever possible.
-- Prefer **ESM** syntax. Avoid `require()` or CommonJS unless necessary.
+- Use **TypeScript** (never plain JavaScript unless absolutely unavoidable).
+- Prefer **ESM** syntax — no `require()` or CommonJS.
 - Use `async/await` over `.then()` chains.
-- Prefer concise, readable, and performant code.
 
 ---
 
 ## TypeScript Guidelines
 
-- Use `interface` over `type` unless extending.
-- Always prepend I with interfaces and T with types.
-- Avoid `any`; use `unknown` if necessary.
-- Prefer `readonly` arrays: `readonly string[]` over `string[]`.
-- Lean on `zod` for runtime validation.
+- Use `interface` (prefixed with `I`) over `type` unless extending.
+- Prefix types with `T`.
+- Avoid `any`; use `unknown` if unavoidable.
+- Mark arrays as `readonly string[]` over `string[]`.
+- Use **zod** for runtime validation at all input/output boundaries.
+
+---
+
+## Defensive Programming
+
+- Always null-check inputs and external data.
+- Validate function parameters at the top (fail fast).
+- Avoid silent failures — log or throw with meaningful messages.
+- Treat every exported function as if it could be called by untrusted code.
 
 ---
 
 ## Functional Style
 
-- Prefer **pure functions** with no side effects unless explicitly required.
-- Use `.map`, `.filter`, `.reduce` judiciously — don't chain unnecessarily.
-- Use `for` loops for performance-sensitive logic.
+- Pure functions by default (no hidden side effects).
+- Use `.map`, `.filter`, `.reduce` only when semantically clear.
+- Use `for` loops for performance-sensitive code.
 - Prefer helper functions over inline duplication.
 
 ---
 
 ## Control Flow
 
-- Use early returns and guard claues to avoid deep nesting.
-- Don't use ternaries inside JSX or deeply nested logic.
-- Use `switch` sparingly and only when semantically clear.
+- Guard clauses & early returns > deep nesting.
+- Avoid complex ternaries inside JSX.
+- Use `switch` only when semantically appropriate.
+
+---
 
 ## Frontend (React/Next.js)
 
-- Use functional components with hooks.
-- Avoid `useEffect` misuse — prefer derived state and signals if available.
-- Prefer `tailwindcss` or utility-first styles over CSS modules.
-- Use `zod` for schema validation, especially in forms and APIs.
-- Avoid unnecessary re-renders (memoize when needed).
+- Functional components with hooks.
+- Avoid misuse of `useEffect` (derive state where possible).
+- Prefer **TailwindCSS** utilities over CSS modules.
+- Schema validation (`zod`) for forms and APIs.
+- Optimize rendering (memoize intelligently, don’t overdo).
 
 ---
 
 ## Performance-Sensitive Coding
 
-- Avoid unnecessary allocations or abstractions in tight loops.
-- Use `Set` for fast `.has()` checks.
-- Avoid `forEach`/`map`/`filter` in critical paths — use `for` when performance matters.
-- Avoid closures in loops unless essential.
-- Profile before optimizing.
+- Avoid unnecessary allocations or object churn.
+- Prefer `Set` for `.has()` lookups.
+- Don’t use `.forEach`/`.map` in critical paths — use `for`.
+- Avoid closures in hot loops.
+- Profile before micro-optimizing.
 
-## Misc
+---
 
-- Use meaningful variable and function names, not abbreviations.
-- prefer clear code over comments unless really needed
-- Prefer clarity over cleverness — future you will thank you.
-- Write short, composable utilities. Avoid deep object mutation.
-- Keep functions under 30 lines unless justified - split functions always
-- if params are > 2, prefer object based params
-- destructure stuff in the params directly not below in seperate line
+## Quality & Maintainability
+
+- Clear, meaningful names (no abbreviations).
+- Prefer clarity over comments — self-documenting code.
+- Functions should be **short, composable, <30 lines** unless justified.
+- Prefer object-based params if >2 arguments.
+- Destructure params in function signatures, not inside function bodies.
+
+---
+
+## Testing & Verification
+
+- Always add **unit tests** for core logic.
+- Focus tests on edge cases and failure paths (not just happy path).
+- Mock external dependencies cleanly.
+- Ensure all public APIs are validated and tested.
+
+---
+
+## Engineer’s Mindset
+
+- Ship code you’d trust your **future self** to maintain.
+- Don’t chase speed at the expense of stability.
+- AI-generated code must **pass your quality checks**, not the other way around.
