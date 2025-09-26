@@ -105,11 +105,79 @@ alias gty="ghostty"
 # vim alias
 alias vi=vim
 alias vim=nvim
+alias tai=tmuxai
 ai() {
   sudo apt install "$1" -y
 }
 nvmiu() {
   nvm install "$1" && nvm use "$1"
+}
+tmuxai() {
+  # colors
+  RED='\033[0;31m'
+  GREEN='\033[0;32m'
+  YELLOW='\033[1;33m'
+  BLUE='\033[0;34m'
+  NC='\033[0m' # no color
+
+ if [[ "$(basename "$PWD")" == "ai" ]]; then
+    echo -e "${RED}❌ Cannot run tmuxai inside a directory named 'ai'.${NC}"
+    return 1
+  fi
+
+  # portable read with prompt
+  prompt_confirm() {
+    if [ -n "$ZSH_VERSION" ]; then
+      read "?$1 " ans
+    else
+      read -p "$1 " ans
+    fi
+    [[ "$ans" =~ ^[Yy]$ ]]
+  }
+
+  if tmux has-session -t ai 2>/dev/null; then
+    echo -e "${YELLOW}⚠️  A tmux session named 'ai' already exists.${NC}"
+    if prompt_confirm "👉 Do you want to kill and recreate it? (y/N):"; then
+      echo -e "${RED}🗑️  Killing old 'ai' session...${NC}"
+      tmux kill-session -t ai
+    else
+      echo -e "${GREEN}✅ Using existing 'ai' session...${NC}"
+      if [ -n "$TMUX" ]; then
+        echo -e "${BLUE}🔀 Switching client to 'ai'...${NC}"
+        tmux switch-client -t ai
+      else
+        echo -e "${BLUE}📎 Attaching to 'ai'...${NC}"
+        tmux attach -t ai
+      fi
+      return
+    fi
+  fi
+
+  echo -e "${BLUE}🚀 Creating new tmux session 'ai'...${NC}"
+
+  tmux new-session -d -s ai -n crush "crush"
+  echo -e "   ${GREEN}✓ Window 'crush' created${NC}"
+
+  tmux new-window -t ai -n qwen "qwen"
+  echo -e "   ${GREEN}✓ Window 'qwen' created${NC}"
+
+  # gemini window with two panes
+  tmux new-window -t ai -n gemini "gemini --model=gemini-2.5-flash"
+  tmux split-window -h -t ai:gemini "gemini --model=gemini-2.5-pro"
+  tmux select-layout -t ai:gemini even-horizontal
+  echo -e "   ${GREEN}✓ Window 'gemini' created with two 50% panes${NC}"
+
+  # jump back to first window (crush)
+  tmux select-window -t ai:1
+  echo -e "${GREEN}✅ All windows ready! Starting in 'crush'.${NC}"
+
+  if [ -n "$TMUX" ]; then
+    echo -e "${BLUE}🔀 Switching client to 'ai'...${NC}"
+    tmux switch-client -t ai
+  else
+    echo -e "${BLUE}📎 Attaching to 'ai'...${NC}"
+    tmux attach -t ai
+  fi
 }
 # fzf 
 # alias tf='tmux attach-session -t $(tmux list-sessions -F "#{session_name}" | fzf --height 40%)'
