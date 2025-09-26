@@ -2,6 +2,6 @@
   "selectedAuthType": "qwen-oauth",
   "theme": "ANSI",
   "preferredEditor": "neovim",
-  "contextFileName": "../docs/ai-guide.md",
+  "contextFileName": "QWEN.md",
   "vimMode": false
 }
