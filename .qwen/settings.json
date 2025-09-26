@@ -3,5 +3,11 @@
   "theme": "ANSI",
   "preferredEditor": "neovim",
   "contextFileName": "QWEN.md",
-  "vimMode": false
+  "vimMode": false,
+  "hideTips": true,
+  "hideFooter": false,
+  "tools": {
+    "useRipgrep": true
+  }
+
 }

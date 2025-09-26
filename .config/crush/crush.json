@@ -12,7 +12,12 @@
       "url": "https://mcp.context7.com/mcp"
     }
   },
+
   "options": {
-    "context_paths": ["docs/ai-guide.md", "CRUSH.md.local"]
+    "context_paths": ["docs/ai-guide.md", "CRUSH.md.local"],
+    "attribution": {
+      "co_authored_by": false,
+      "generated_with": false
+    }
   }
 }
