@@ -1,0 +1,12 @@
+{
+  "theme": "ANSI",
+  "selectedAuthType": "gemini-api-key",
+  "preferredEditor": "neovim",
+  "mcpServers": {
+    "context7": {
+      "httpUrl": "https://mcp.context7.com/mcp"
+    }
+  },
+  "contextFileName": "../docs/ai-guide.md",
+  "vimMode": false
+}

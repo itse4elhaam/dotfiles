@@ -1,12 +1,22 @@
 {
-  "theme": "ANSI",
-  "selectedAuthType": "gemini-api-key",
-  "preferredEditor": "neovim",
+  "context": {
+    "fileName": "../docs/ai-guide.md"
+  },
   "mcpServers": {
     "context7": {
       "httpUrl": "https://mcp.context7.com/mcp"
     }
   },
-  "contextFileName": "../docs/ai-guide.md",
-  "vimMode": false
+  "general": {
+    "preferredEditor": "neovim",
+    "vimMode": false
+  },
+  "security": {
+    "auth": {
+      "selectedType": "gemini-api-key"
+    }
+  },
+  "ui": {
+    "theme": "ANSI"
+  }
 }
