@@ -24,7 +24,7 @@ Important: Run `coderabbit review --plain` to get comprehensive code analysis an
 - Use `interface` (prefixed with `I`) over `type` unless extending.
 - Prefix types with `T`.
 - Avoid `any`; use `unknown` if unavoidable.
-- Mark arrays as `readonly string[]` over `string[]`.
+- Mark arrays as `readonly string[]` over `string[]`. Use `as const` to make types stricter
 - Use **zod** for runtime validation at all input/output boundaries.
 
 ---
@@ -52,6 +52,8 @@ Important: Run `coderabbit review --plain` to get comprehensive code analysis an
 - Guard clauses & early returns > deep nesting.
 - Avoid complex ternaries inside JSX.
 - Use `switch` only when semantically appropriate.
+- Use map (object) based logic for complicated logic (strategy pattern)
+- use VALUES.includes pattern over multi OR conditions, the idea is to keep it elegant and readable
 
 ---
 
@@ -82,15 +84,7 @@ Important: Run `coderabbit review --plain` to get comprehensive code analysis an
 - Functions should be **short, composable, <30 lines** unless justified.
 - Prefer object-based params if >2 arguments.
 - Destructure params in function signatures, not inside function bodies.
-
----
-
-## Testing & Verification
-
-- Always add **unit tests** for core logic.
-- Focus tests on edge cases and failure paths (not just happy path).
-- Mock external dependencies cleanly.
-- Ensure all public APIs are validated and tested.
+- Follow https://refactoring.guru/refactoring guidelines
 
 ---
 
