@@ -167,6 +167,12 @@ tmuxai() {
   tmux select-layout -t ai:gemini even-horizontal
   echo -e "   ${GREEN}✓ Window 'gemini' created with two 50% panes${NC}"
 
+  tmux new-window -t ai -n cursor "cursor-agent"
+  echo -e "   ${GREEN}✓ Window 'cursor' created${NC}"
+
+  tmux new-window -t ai -n copilot "copilot"
+  echo -e "   ${GREEN}✓ Window 'copilot' created${NC}"
+
   # jump back to first window (crush)
   tmux select-window -t ai:1
   echo -e "${GREEN}✅ All windows ready! Starting in 'crush'.${NC}"
@@ -438,3 +444,6 @@ zff-widget() {
 zle -N zff-widget
 bindkey '^@' zff-widget # Ctrl + space
 # naval-cli --no-ascii
+
+# opencode
+export PATH=/home/e4elhaam/.opencode/bin:$PATH
