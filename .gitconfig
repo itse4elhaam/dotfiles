@@ -57,6 +57,7 @@
   br-parent = !git show-branch | grep "*" | grep -v "$(git rev-parse --abbrev-ref HEAD)" | head -n1 | sed "s/.*\\[\\(.*\\)\\].*/\\1/" | cut -d" " -f1
   sus = !b=$(git symbolic-ref --short HEAD) && git branch --set-upstream-to=origin/$b $b
   dbak="!f() { git diff --name-only $(git symbolic-ref --short HEAD)..bak/$(git symbolic-ref --short HEAD); }; f"
+  mreb = "!f() { git dbb; git checkout $1 && git plc && git col && git cbb && git rebase $1; }; f"
 [core]
 	editor = nvim
   pager = delta
