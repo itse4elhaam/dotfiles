@@ -446,4 +446,4 @@ bindkey '^@' zff-widget # Ctrl + space
 # naval-cli --no-ascii
 
 # opencode
-export PATH=/home/e4elhaam/.opencode/bin:$PATH
+export PATH=/home/$USER/.opencode/bin:$PATH
