@@ -122,7 +122,7 @@
   autoSetupRemote = true  # easier to push new branches
   followTags = true  # push also tags
 [pull]
-  rebase = true
+  ff = only
 [submodule]
   fetchJobs = 16
 [rebase]
