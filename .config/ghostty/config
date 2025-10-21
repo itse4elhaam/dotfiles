@@ -24,3 +24,31 @@ font-thicken = false
 font-thicken-strength = 255
 font-synthetic-style =
 cursor-style=block
+
+# Unbinding ALT+(1-9) so that I can use it in tmux to switch windows
+
+keybind = alt+1=unbind
+keybind = alt+2=unbind
+keybind = alt+3=unbind
+keybind = alt+4=unbind
+keybind = alt+5=unbind
+keybind = alt+6=unbind
+keybind = alt+7=unbind
+keybind = alt+8=unbind
+keybind = alt+9=unbind
+keybind = alt+0=unbind
+keybind = ctrl+j=unbind
+
+# Unbinding CTRL+(1-9), just in-case
+
+keybind = ctrl+1=unbind
+keybind = ctrl+2=unbind
+keybind = ctrl+3=unbind
+keybind = ctrl+4=unbind
+keybind = ctrl+5=unbind
+keybind = ctrl+6=unbind
+keybind = ctrl+7=unbind
+keybind = ctrl+8=unbind
+keybind = ctrl+9=unbind
+keybind = ctrl+0=unbind
+keybind = ctrl+shift+t=unbind
