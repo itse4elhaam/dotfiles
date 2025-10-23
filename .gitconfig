@@ -38,6 +38,7 @@
 	poc = "!git push origin $(git symbolic-ref --short HEAD)"
 	pocf = "!git push origin $(git symbolic-ref --short HEAD) --force-with-lease"
   cbr = "!f() { echo 'Current branch:' && git rev-parse --abbrev-ref HEAD && git rev-parse --abbrev-ref HEAD | xclip -selection clipboard; }; f"
+  lbr = "!f() { LAST=$(git rev-parse --abbrev-ref @{-1}); echo \"Last branch: $LAST\"; echo -n \"$LAST\" | xclip -selection clipboard; }; f"
   ahead-of = "!f() { git log --oneline \"$1..HEAD\"; }; f"
   fprs= fetch origin '+refs/pull/*/head:refs/remotes/origin/pull/*'
   unpushed = log @{u}..
@@ -67,11 +68,7 @@
   }; f"
   mlws = "!f() { \
     LAST=$(git rev-parse --abbrev-ref @{-1}); \
-    git fetch origin $LAST && \
-    git merge --squash origin/$LAST && \
-    COMMIT_MSG=\"squash merge of $LAST\"; \
-    COMMITS=$(git log origin/$LAST --pretty=format:'- %s%n%b' $(git merge-base HEAD origin/$LAST)..origin/$LAST); \
-    git commit -m \"$COMMIT_MSG\" -m \"\\n\\nCommits from $LAST:\\n$COMMITS\"; \
+    git mws $LAST \
   }; f"
 [core]
 	editor = nvim
