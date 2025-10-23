@@ -61,13 +61,12 @@
   mreb = "!f() { git dbb; git checkout $1 && git plc && git col && git cbb && git rebase $1; }; f"
   mws = "!f() { \
     BRANCH=\"$1\"; \
-    git fetch origin \"$BRANCH\" && \
-    git merge --squash \"origin/$BRANCH\"; \
+    git merge --squash \"$BRANCH\"; \
     TMP_FILE=$(mktemp); \
     echo \"Merged $BRANCH\" > \"$TMP_FILE\"; \
     echo \"\" >> \"$TMP_FILE\"; \
     echo \"Commits from $BRANCH:\" >> \"$TMP_FILE\"; \
-    git log \"origin/$BRANCH\" --pretty=format:'- %s%n%b' $(git merge-base HEAD \"origin/$BRANCH\")..\"origin/$BRANCH\" >> \"$TMP_FILE\"; \
+    git log \"$BRANCH\" --pretty=format:'- %s%n%b' $(git merge-base HEAD \"$BRANCH\")..\"$BRANCH\" >> \"$TMP_FILE\"; \
     git commit --file=\"$TMP_FILE\"; \
     rm \"$TMP_FILE\"; \
   }; f"
