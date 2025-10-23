@@ -58,6 +58,21 @@
   sus = !b=$(git symbolic-ref --short HEAD) && git branch --set-upstream-to=origin/$b $b
   dbak="!f() { git diff --name-only $(git symbolic-ref --short HEAD)..bak/$(git symbolic-ref --short HEAD); }; f"
   mreb = "!f() { git dbb; git checkout $1 && git plc && git col && git cbb && git rebase $1; }; f"
+  mws = "!f() { \
+    git fetch origin $1 && \
+    git merge --squash origin/$1 && \
+    COMMIT_MSG=\"squash merge of $1\"; \
+    COMMITS=$(git log origin/$1 --pretty=format:'- %s%n%b' $(git merge-base HEAD origin/$1)..origin/$1); \
+    git commit -m \"$COMMIT_MSG\" -m \"\\n\\nCommits from $1:\\n$COMMITS\"; \
+  }; f"
+  mlws = "!f() { \
+    LAST=$(git rev-parse --abbrev-ref @{-1}); \
+    git fetch origin $LAST && \
+    git merge --squash origin/$LAST && \
+    COMMIT_MSG=\"squash merge of $LAST\"; \
+    COMMITS=$(git log origin/$LAST --pretty=format:'- %s%n%b' $(git merge-base HEAD origin/$LAST)..origin/$LAST); \
+    git commit -m \"$COMMIT_MSG\" -m \"\\n\\nCommits from $LAST:\\n$COMMITS\"; \
+  }; f"
 [core]
 	editor = nvim
   pager = delta
