@@ -60,16 +60,22 @@
   dbak="!f() { git diff --name-only $(git symbolic-ref --short HEAD)..bak/$(git symbolic-ref --short HEAD); }; f"
   mreb = "!f() { git dbb; git checkout $1 && git plc && git col && git cbb && git rebase $1; }; f"
   mws = "!f() { \
-    git fetch origin $1 && \
-    git merge --squash origin/$1 && \
-    COMMIT_MSG=\"squash merge of $1\"; \
-    COMMITS=$(git log origin/$1 --pretty=format:'- %s%n%b' $(git merge-base HEAD origin/$1)..origin/$1); \
-    git commit -m \"$COMMIT_MSG\" -m \"\\n\\nCommits from $1:\\n$COMMITS\"; \
+    BRANCH=\"$1\"; \
+    git fetch origin \"$BRANCH\" && \
+    git merge --squash \"origin/$BRANCH\"; \
+    TMP_FILE=$(mktemp); \
+    echo \"Merged $BRANCH\" > \"$TMP_FILE\"; \
+    echo \"\" >> \"$TMP_FILE\"; \
+    echo \"Commits from $BRANCH:\" >> \"$TMP_FILE\"; \
+    git log \"origin/$BRANCH\" --pretty=format:'- %s%n%b' $(git merge-base HEAD \"origin/$BRANCH\")..\"origin/$BRANCH\" >> \"$TMP_FILE\"; \
+    git commit --file=\"$TMP_FILE\"; \
+    rm \"$TMP_FILE\"; \
   }; f"
   mlws = "!f() { \
     LAST=$(git rev-parse --abbrev-ref @{-1}); \
-    git mws $LAST \
-  }; f"
+    echo \"Merging last branch: $LAST\"; \
+    git -c alias.mws=\"$(git config alias.mws)\" mws \"$LAST\"; \
+    }; f"
 [core]
 	editor = nvim
   pager = delta
