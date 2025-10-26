@@ -447,3 +447,55 @@ bindkey '^@' zff-widget # Ctrl + space
 
 # opencode
 export PATH=/home/$USER/.opencode/bin:$PATH
+
+function set-cursor() {
+  local style="$1"
+
+  case "$style" in
+    block)
+      echo -ne '\e[2 q' > /dev/tty 2>/dev/null ;;
+    beam)
+      echo -ne '\e[6 q' > /dev/tty 2>/dev/null ;;
+    underline)
+      echo -ne '\e[4 q' > /dev/tty 2>/dev/null ;;
+    *)
+      echo "Invalid cursor type: $style" >&2
+      return 1 ;;
+  esac
+}
+
+# this is for having editable long commands via the terminal directly with good vi mode integration
+
+bindkey -v # vi mode
+export KEYTIMEOUT=1 # instant keypress
+zle -N edit-command-line
+bindkey -M vicmd V edit-command-line
+
+export VI_MODE_SET_CURSOR=true
+
+function zle-keymap-select() {
+  if [[ ${KEYMAP} == vicmd ]]; then
+    set-cursor block
+  else
+    set-cursor beam
+  fi
+}
+
+zle -N zle-keymap-select
+
+function zle-line-init() {
+  zle -K viins
+
+  set-cursor beam
+}
+
+zle -N zle-line-init
+
+function vi-yank-clipboard() {
+  zle vi-yank
+  echo "$CUTBUFFER" | clip
+}
+
+zle -N vi-yank-clipboard
+
+bindkey -M vicmd 'y' vi-yank-clipboard
