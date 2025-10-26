@@ -448,54 +448,22 @@ bindkey '^@' zff-widget # Ctrl + space
 # opencode
 export PATH=/home/$USER/.opencode/bin:$PATH
 
-function set-cursor() {
-  local style="$1"
+autoload -Uz edit-command-line
 
-  case "$style" in
-    block)
-      echo -ne '\e[2 q' > /dev/tty 2>/dev/null ;;
-    beam)
-      echo -ne '\e[6 q' > /dev/tty 2>/dev/null ;;
-    underline)
-      echo -ne '\e[4 q' > /dev/tty 2>/dev/null ;;
-    *)
-      echo "Invalid cursor type: $style" >&2
-      return 1 ;;
-  esac
-}
+# Create a function to handle double-tab
+function double-tab-edit() {
+  local now elapsed
+  now=$(date +%s%3N)  # current time in milliseconds
 
-# this is for having editable long commands via the terminal directly with good vi mode integration
-
-bindkey -v # vi mode
-export KEYTIMEOUT=1 # instant keypress
-zle -N edit-command-line
-bindkey -M vicmd V edit-command-line
-
-export VI_MODE_SET_CURSOR=true
-
-function zle-keymap-select() {
-  if [[ ${KEYMAP} == vicmd ]]; then
-    set-cursor block
+  # If last Tab was pressed recently (within 300 ms)
+  if [[ -n $LAST_TAB_TIME && $((now - LAST_TAB_TIME)) -lt 300 ]]; then
+    zle edit-command-line
+    unset LAST_TAB_TIME
   else
-    set-cursor beam
+    LAST_TAB_TIME=$now
+    zle expand-or-complete  # normal Tab behavior
   fi
 }
 
-zle -N zle-keymap-select
-
-function zle-line-init() {
-  zle -K viins
-
-  set-cursor beam
-}
-
-zle -N zle-line-init
-
-function vi-yank-clipboard() {
-  zle vi-yank
-  echo "$CUTBUFFER" | clip
-}
-
-zle -N vi-yank-clipboard
-
-bindkey -M vicmd 'y' vi-yank-clipboard
+zle -N double-tab-edit
+bindkey '\t' double-tab-edit
