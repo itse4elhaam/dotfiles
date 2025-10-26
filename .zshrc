@@ -447,3 +447,23 @@ bindkey '^@' zff-widget # Ctrl + space
 
 # opencode
 export PATH=/home/$USER/.opencode/bin:$PATH
+
+autoload -Uz edit-command-line
+
+# Create a function to handle double-tab
+function double-tab-edit() {
+  local now elapsed
+  now=$(date +%s%3N)  # current time in milliseconds
+
+  # If last Tab was pressed recently (within 300 ms)
+  if [[ -n $LAST_TAB_TIME && $((now - LAST_TAB_TIME)) -lt 300 ]]; then
+    zle edit-command-line
+    unset LAST_TAB_TIME
+  else
+    LAST_TAB_TIME=$now
+    zle expand-or-complete  # normal Tab behavior
+  fi
+}
+
+zle -N double-tab-edit
+bindkey '\t' double-tab-edit
