@@ -102,6 +102,7 @@ alias rt='source ~/.zshrc'
 alias lgit=lazygit
 alias lsql=lazysql
 alias gty="ghostty"
+alias killport='f() { sudo kill -9 $(sudo lsof -t -i:$1); }; f'
 # vim alias
 alias vi=vim
 alias vim=nvim
