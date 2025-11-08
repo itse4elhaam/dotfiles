@@ -466,5 +466,5 @@ function double-tab-edit() {
   fi
 }
 
-zle -N double-tab-edit
-bindkey '\t' double-tab-edit
+# zle -N double-tab-edit
+# bindkey '\t' double-tab-edit

@@ -50,7 +50,6 @@ keybind = ctrl+6=unbind
 keybind = ctrl+7=unbind
 keybind = ctrl+8=unbind
 keybind = ctrl+9=unbind
-keybind = ctrl+0=unbind
 keybind = ctrl+shift+t=unbind
 
 keybind = ctrl+alt+u=unbind
