@@ -93,3 +93,13 @@ Important: Run `coderabbit review --plain` to get comprehensive code analysis an
 - Ship code you’d trust your **future self** to maintain.
 - Don’t chase speed at the expense of stability.
 - AI-generated code must **pass your quality checks**, not the other way around.
+
+## Git Usage
+
+- Always study the git diff before committing.
+- **NEVER** commit unless you are ASKED to.
+- You may ask the user to use the gh cli if it is relevant (Creating PR or reading linked issue)
+- If the branch named contains a number, it is the issue number, you can use gh to study the linked issue
+- Keep the commit message short and descriptive, follow the [conventional commits](https://www.conventionalcommits.org/en/v1.0.0/) guidelines.
+- If there is extra detail regarding the commit, it should be in the commit description.
+- When the user asks you to review changes, you must ask them for the base branch and then study the relevant diff.
