@@ -25,7 +25,7 @@
     "playwright": {
       "type": "local",
       "command": [
-        "npx",
+        "npx -y",
         "@playwright/mcp@latest"
       ],
       "enabled": true
@@ -33,7 +33,7 @@
     "next-devtools": {
       "type": "local",
       "command": [
-        "npx",
+        "npx -y",
         "next-devtools-mcp@latest"
       ],
       "enabled": true
@@ -41,7 +41,7 @@
     "sequential-thinking": {
       "type": "local",
       "command": [
-        "npx",
+        "npx -y",
         "@modelcontextprotocol/server-sequential-thinking"
       ],
       "enabled": true
@@ -49,7 +49,7 @@
     "memory": {
       "type": "local",
       "command": [
-        "npx",
+        "npx -y",
         "@modelcontextprotocol/server-memory"
       ],
       "environment": {
@@ -60,7 +60,7 @@
     "desktop-commander": {
       "type": "local",
       "command": [
-        "npx",
+        "npx -y",
         "@wonderwhy-er/desktop-commander@latest"
       ],
       "enabled": true
@@ -68,7 +68,7 @@
     "mindpilot": {
       "type": "local",
       "command": [
-        "npx",
+        "npx -y",
         "@mindpilot/mcp@latest"
       ],
       "enabled": true
@@ -76,7 +76,7 @@
     "aid": {
       "type": "local",
       "command": [
-        "npx",
+        "npx -y",
         "@janreges/ai-distiller-mcp"
       ],
       "enabled": true
@@ -92,7 +92,7 @@
     "mcp-compass": {
       "type": "local",
       "command": [
-        "npx",
+        "npx -y",
         "@liuyoshio/mcp-compass"
       ],
       "enabled": true
