@@ -22,5 +22,7 @@
   "keybinds": {
     "messages_half_page_down": "alt+j",
     "messages_half_page_up": "alt+k",
+    "model_cycle_recent": "alt+l",
+    "model_cycle_recent_reverse": "alt+h",
   }
 }
