@@ -103,6 +103,7 @@ alias lgit=lazygit
 alias lsql=lazysql
 alias gty="ghostty"
 alias killport='f() { sudo kill -9 $(sudo lsof -t -i:$1); }; f'
+alias opencode="opencode --continue"
 # vim alias
 alias vi=vim
 alias vim=nvim

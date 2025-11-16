@@ -17,6 +17,85 @@
       "type": "remote",
       "url": "https://mcp.chonkie.ai/better-auth/better-auth-builder/mcp",
       "enabled": true,
+    },
+    "augments": {
+      "type": "remote",
+      "url": "https://mcp.augments.dev/mcp"
+    },
+    "playwright": {
+      "type": "local",
+      "command": [
+        "npx",
+        "@playwright/mcp@latest"
+      ],
+      "enabled": true
+    },
+    "next-devtools": {
+      "type": "local",
+      "command": [
+        "npx",
+        "next-devtools-mcp@latest"
+      ],
+      "enabled": true
+    },
+    "sequential-thinking": {
+      "type": "local",
+      "command": [
+        "npx",
+        "@modelcontextprotocol/server-sequential-thinking"
+      ],
+      "enabled": true
+    },
+    "memory": {
+      "type": "local",
+      "command": [
+        "npx",
+        "@modelcontextprotocol/server-memory"
+      ],
+      "environment": {
+        "MEMORY_BANK_ROOT": "~/.memory/memory.jsonl"
+      },
+      "enabled": true
+    },
+    "desktop-commander": {
+      "type": "local",
+      "command": [
+        "npx",
+        "@wonderwhy-er/desktop-commander@latest"
+      ],
+      "enabled": true
+    },
+    "mindpilot": {
+      "type": "local",
+      "command": [
+        "npx",
+        "@mindpilot/mcp@latest"
+      ],
+      "enabled": true
+    },
+    "aid": {
+      "type": "local",
+      "command": [
+        "npx",
+        "@janreges/ai-distiller-mcp"
+      ],
+      "enabled": true
+    },
+    "ddg-search": {
+      "type": "local",
+      "command": [
+        "uvx",
+        "duckduckgo-mcp-server"
+      ],
+      "enabled": true
+    },
+    "mcp-compass": {
+      "type": "local",
+      "command": [
+        "npx",
+        "@liuyoshio/mcp-compass"
+      ],
+      "enabled": true
     }
   },
   "keybinds": {
