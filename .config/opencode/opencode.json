@@ -96,7 +96,23 @@
         "@liuyoshio/mcp-compass"
       ],
       "enabled": true
-    }
+    },
+    "octocode": {
+      "type": "local",
+      "command": [
+        "npx -y",
+        "octocode-mcp@latest"
+      ],
+      "enabled": true
+    },
+    "chrome-devtools": {
+      "type": "local",
+      "command": [
+        "npx -y",
+        "chrome-devtools-mcp@latest"
+      ],
+      "enabled": true
+    },
   },
   "keybinds": {
     "messages_half_page_down": "alt+j",
