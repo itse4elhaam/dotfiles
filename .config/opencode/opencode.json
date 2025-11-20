@@ -16,7 +16,7 @@
     "Better Auth": {
       "type": "remote",
       "url": "https://mcp.chonkie.ai/better-auth/better-auth-builder/mcp",
-      "enabled": false,
+      "enabled": false
     },
     "augments": {
       "type": "remote",
@@ -122,13 +122,13 @@
         "chrome-devtools-mcp@latest"
       ],
       "enabled": true
-    },
+    }
   },
   "keybinds": {
     "messages_half_page_down": "alt+j",
     "messages_half_page_up": "alt+k",
     "model_cycle_recent": "alt+l",
-    "model_cycle_recent_reverse": "alt+h",
+    "model_cycle_recent_reverse": "alt+h"
   },
   "instructions": ["docs/ai-guide.md"],
   "plugin": ["opencode-skills"]
