@@ -1,3 +1,5 @@
+**⚠️ CRITICAL: NEVER COMMIT CHANGES UNLESS EXPLICITLY ASKED BY THE USER ⚠️**
+
 Important: Run `coderabbit review --plain` to get comprehensive code analysis and improvement suggestions. Apply the feedback to write **cleaner, safer, and more maintainable code**.
 
 ## Core Philosophy

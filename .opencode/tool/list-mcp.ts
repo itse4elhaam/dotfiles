@@ -25,12 +25,33 @@ export default tool({
       }
 
       // Step 2: Read MCP documentation from ai-guide.md
-      const aiGuidePath = join(process.cwd(), "docs/ai-guide.md")
-      let aiGuideContent: string
-      try {
-        aiGuideContent = readFileSync(aiGuidePath, "utf-8")
-      } catch (error) {
-        return "Error: Could not read docs/ai-guide.md. Ensure the file exists in the current working directory."
+      // Try multiple locations: dotfiles repo, current working directory
+      const possiblePaths = [
+        join(homedir(), "dotfiles/docs/ai-guide.md"),
+        join(process.cwd(), "docs/ai-guide.md"),
+        join(homedir(), "workspace/dotfiles/docs/ai-guide.md"),
+      ]
+
+      let aiGuideContent: string | null = null
+      let aiGuidePath: string | null = null
+
+      for (const path of possiblePaths) {
+        try {
+          aiGuideContent = readFileSync(path, "utf-8")
+          aiGuidePath = path
+          break
+        } catch {
+          // Try next path
+          continue
+        }
+      }
+
+      if (!aiGuideContent) {
+        return `Error: Could not find ai-guide.md in any of these locations:
+${possiblePaths.map((p) => `  - ${p}`).join("\n")}
+
+The ai-guide.md file contains MCP server documentation needed for this tool.
+Please ensure it exists in one of the above locations.`
       }
 
       // Extract the MCP Servers section
