@@ -1,401 +1,514 @@
-**⚠️ CRITICAL: NEVER COMMIT CHANGES UNLESS EXPLICITLY ASKED BY THE USER ⚠️**
+<critical_warning>
+⚠️ NEVER COMMIT CHANGES UNLESS EXPLICITLY ASKED BY THE USER ⚠️
+</critical_warning>
 
 ---
 
-## Technology Documentation Lookup Protocol
+<protocol name="technology_documentation_lookup">
+  <requirement type="mandatory">
+    When the user mentions ANY technology, library, framework, or tool, you MUST look up current documentation FIRST before providing guidance.
+  </requirement>
 
-**MANDATORY: When the user mentions ANY technology, library, framework, or tool, you MUST look up current documentation FIRST before providing guidance.**
+<lookup_priority>
+<tool priority="1" name="context7">
+<description>Official up-to-date library/framework docs</description>
+<example>
+context7_resolve-library-id(libraryName: "react")
+context7_get-library-docs(context7CompatibleLibraryID: "/facebook/react")
+</example>
+</tool>
 
-### Lookup Priority Order
+    <tool priority="2" name="webfetch">
+      <description>Official documentation websites</description>
+      <example>
+        webfetch(url: "https://nextjs.org/docs", format: "markdown")
+      </example>
+    </tool>
 
-1. **context7** (HIGHEST PRIORITY) - Official up-to-date library/framework docs
-   ```
-   Example: context7_resolve-library-id(libraryName: "react")
-            context7_get-library-docs(context7CompatibleLibraryID: "/facebook/react")
-   ```
+    <tool priority="3" name="gh_grep">
+      <description>Real-world production code examples</description>
+      <example>
+        gh_grep_searchGitHub(query: "useState(", language: ["TypeScript", "TSX"])
+      </example>
+    </tool>
 
-2. **webfetch** - Official documentation websites
-   ```
-   Example: webfetch(url: "https://nextjs.org/docs", format: "markdown")
-   ```
+</lookup_priority>
 
-3. **gh_grep** - Real-world production code examples
-   ```
-   Example: gh_grep_searchGitHub(query: "useState(", language: ["TypeScript", "TSX"])
-   ```
+<decision_matrix>
+<scenario type="framework_library">
+<action>Get official API docs</action>
+<tool>context7</tool>
+<example>"React hooks" → context7(react)</example>
+</scenario>
 
-### When to Use Each Tool
+    <scenario type="configuration">
+      <action>Fetch current syntax</action>
+      <tool>webfetch</tool>
+      <example>"Tailwind config" → webfetch(tailwindcss.com/docs/configuration)</example>
+    </scenario>
 
-| Technology Mentioned | Action Required | Tool to Use | Example |
-|---------------------|-----------------|-------------|---------|
-| Framework/Library | Get official API docs | context7 | "React hooks" → context7(react) |
-| Configuration | Fetch current syntax | webfetch | "Tailwind config" → webfetch(tailwindcss.com/docs/configuration) |
-| Best Practices | Find real implementations | gh_grep | "Error boundaries" → gh_grep("ErrorBoundary", language=["TSX"]) |
-| Version-specific | Check current docs | context7 + webfetch | "Next.js 15 API" → context7(/vercel/next.js/v15) |
+    <scenario type="best_practices">
+      <action>Find real implementations</action>
+      <tool>gh_grep</tool>
+      <example>"Error boundaries" → gh_grep("ErrorBoundary", language=["TSX"])</example>
+    </scenario>
 
-### Workflow Example
+    <scenario type="version_specific">
+      <action>Check current docs</action>
+      <tool>context7 + webfetch</tool>
+      <example>"Next.js 15 API" → context7(/vercel/next.js/v15)</example>
+    </scenario>
 
-```
-User mentions: "Add authentication with NextAuth"
+</decision_matrix>
 
-REQUIRED STEPS:
-1. context7_resolve-library-id(libraryName: "next-auth")
-2. context7_get-library-docs(context7CompatibleLibraryID: "/nextauthjs/next-auth", topic: "authentication")
-3. gh_grep_searchGitHub(query: "NextAuth(", language: ["TypeScript"], repo: "nextauthjs/next-auth-example")
-4. Only THEN provide implementation guidance based on CURRENT documentation
-```
+<workflow_example>
+<user_message>Add authentication with NextAuth</user_message>
+<required_steps>
+<step number="1">context7_resolve-library-id(libraryName: "next-auth")</step>
+<step number="2">context7_get-library-docs(context7CompatibleLibraryID: "/nextauthjs/next-auth", topic: "authentication")</step>
+<step number="3">gh_grep_searchGitHub(query: "NextAuth(", language: ["TypeScript"], repo: "nextauthjs/next-auth-example")</step>
+<step number="4">Only THEN provide implementation guidance based on CURRENT documentation</step>
+</required_steps>
+</workflow_example>
 
-### Critical Rules
+<critical_rules>
+<rule type="forbidden">❌ NEVER rely on training data knowledge for technology guidance</rule>
+<rule type="mandatory">✅ ALWAYS verify current API syntax, configuration, and patterns</rule>
+<rule type="mandatory">✅ CHECK for version-specific changes (especially major versions)</rule>
+<rule type="mandatory">✅ VALIDATE deprecated patterns before suggesting them</rule>
+<rule type="mandatory">✅ SEARCH for production examples when patterns are unclear</rule>
+</critical_rules>
 
-- ❌ **NEVER** rely on training data knowledge for technology guidance
-- ✅ **ALWAYS** verify current API syntax, configuration, and patterns
-- ✅ **CHECK** for version-specific changes (especially major versions)
-- ✅ **VALIDATE** deprecated patterns before suggesting them
-- ✅ **SEARCH** for production examples when patterns are unclear
+<technologies_requiring_lookup>
+<category name="frontend_frameworks">
+<items>React, Vue, Angular, Svelte, Next.js</items>
+</category>
+<category name="build_tools">
+<items>Vite, Webpack, Turbopack, esbuild</items>
+</category>
+<category name="state_management">
+<items>Redux, Zustand, Jotai, Recoil</items>
+</category>
+<category name="ui_libraries">
+<items>Tailwind, MUI, Chakra, shadcn/ui</items>
+</category>
+<category name="backend_frameworks">
+<items>Express, Fastify, NestJS, Hono</items>
+</category>
+<category name="orms">
+<items>Prisma, Drizzle, TypeORM</items>
+</category>
+<category name="testing_tools">
+<items>Vitest, Jest, Playwright, Cypress</items>
+</category>
+<category name="ai_ml_libraries">
+<items>LangChain, OpenAI SDK, Anthropic SDK</items>
+</category>
+</technologies_requiring_lookup>
 
-### Technologies Requiring Immediate Lookup
+<correct_workflow_example>
+<user_request>Help me set up Drizzle ORM with PostgreSQL</user_request>
 
-**Always lookup before advising on:**
-- JavaScript/TypeScript frameworks (React, Vue, Angular, Svelte, Next.js)
-- Build tools (Vite, Webpack, Turbopack, esbuild)
-- State management (Redux, Zustand, Jotai, Recoil)
-- UI libraries (Tailwind, MUI, Chakra, shadcn/ui)
-- Backend frameworks (Express, Fastify, NestJS, Hono)
-- ORMs (Prisma, Drizzle, TypeORM)
-- Testing tools (Vitest, Jest, Playwright, Cypress)
-- AI/ML libraries (LangChain, OpenAI SDK, Anthropic SDK)
+    <assistant_must_do>
+      <action>context7_resolve-library-id(libraryName: "drizzle-orm")</action>
+      <action>context7_get-library-docs(context7CompatibleLibraryID: "/drizzle-team/drizzle-orm", topic: "postgresql setup")</action>
+      <action>gh_grep_searchGitHub(query: "drizzle(", language: ["TypeScript"])</action>
+      <action>Provide setup guidance based on CURRENT docs (not training data)</action>
+    </assistant_must_do>
 
-**Example of CORRECT workflow:**
+    <assistant_must_not_do>
+      <forbidden>Suggest setup steps from memory/training data</forbidden>
+      <forbidden>Use outdated API patterns</forbidden>
+      <forbidden>Skip documentation lookup</forbidden>
+    </assistant_must_not_do>
 
-```
-User: "Help me set up Drizzle ORM with PostgreSQL"
-
-Assistant MUST do:
-1. context7_resolve-library-id(libraryName: "drizzle-orm")
-2. context7_get-library-docs(context7CompatibleLibraryID: "/drizzle-team/drizzle-orm", topic: "postgresql setup")
-3. gh_grep_searchGitHub(query: "drizzle(", language: ["TypeScript"])
-4. Provide setup guidance based on CURRENT docs (not training data)
-
-Assistant MUST NOT do:
-❌ Suggest setup steps from memory/training data
-❌ Use outdated API patterns
-❌ Skip documentation lookup
-```
-
----
-
-## Quick Start
-
-### Code Review Workflow
-1. **Review changes**: `git diff` before committing
-2. **Run CodeRabbit**: `coderabbit review --plain` for security, performance, best practices
-3. **Apply feedback**: Fix issues, improve code quality
-4. **Stage & commit**: Use conventional commit format
-
-### Core Philosophy
-- **Fail Fast, Defend Early**: Validate inputs, fail loudly with clear errors
-- **Edge-Case Driven**: Consider null/undefined, empty arrays, out-of-range values
-- **Clarity > Cleverness**: Code readable by new engineer in minutes, not hours
-
-### Language Preferences
-- **TypeScript** (never plain JavaScript unless absolutely unavoidable)
-- **ESM** syntax — no `require()` or CommonJS
-- `async/await` over `.then()` chains
-
----
-
-## Language-Specific Guidelines
-
-### TypeScript Guidelines
-- Use `interface` (prefixed with `I`) over `type` unless extending
-- Prefix types with `T`
-- Avoid `any`; use `unknown` if unavoidable
-- Mark arrays as `readonly string[]` over `string[]`
-- Use `as const` to make types stricter
-- Use **zod** for runtime validation at all input/output boundaries
-
-### Shell Scripts (Bash/Zsh)
-- Use `#!/bin/bash` or `#!/usr/bin/env bash` as shebang
-- Always include `set -euo pipefail` for robustness
-- Use shellcheck for linting: `shellcheck **/*.sh`
-- Naming: snake_case for variables/functions (e.g., `script_dir`)
-- Quote variables: `"$variable"` not `$variable`
-- Use `[[ ]]` over `[ ]` for conditionals
-- Document complex logic with comments
-- Pass arguments with `"$@"` to preserve spacing
-
-### Frontend (React/Next.js)
-- Functional components with hooks
-- Avoid misuse of `useEffect` (derive state where possible)
-- Prefer **TailwindCSS** utilities over CSS modules
-- Schema validation (`zod`) for forms and APIs
-- Optimize rendering (memoize intelligently, don't overdo)
+</correct_workflow_example>
+</protocol>
 
 ---
 
-## Coding Principles
+<quick_start>
+<code_review_workflow>
+<step number="1">Review changes: `git diff` before committing</step>
+<step number="2">Run CodeRabbit: `coderabbit review --plain` for security, performance, best practices</step>
+<step number="3">Apply feedback: Fix issues, improve code quality</step>
+<step number="4">Stage & commit: Use conventional commit format</step>
+</code_review_workflow>
 
-### Defensive Programming
-- Always null-check inputs and external data
-- Validate function parameters at the top (fail fast)
-- Avoid silent failures — log or throw with meaningful messages
-- Treat every exported function as if it could be called by untrusted code
+<core_philosophy>
+<principle>Fail Fast, Defend Early: Validate inputs, fail loudly with clear errors</principle>
+<principle>Edge-Case Driven: Consider null/undefined, empty arrays, out-of-range values</principle>
+<principle>Clarity > Cleverness: Code readable by new engineer in minutes, not hours</principle>
+</core_philosophy>
 
-### Functional Style
-- Pure functions by default (no hidden side effects)
-- Use `.map`, `.filter`, `.reduce` only when semantically clear
-- Use `for` loops for performance-sensitive code
-- Prefer helper functions over inline duplication
-
-### Control Flow
-- Guard clauses & early returns > deep nesting
-- Avoid complex ternaries inside JSX
-- Use `switch` only when semantically appropriate
-- Use map (object) based logic for complicated logic (strategy pattern)
-- Use `VALUES.includes` pattern over multi OR conditions
-
-### Performance-Sensitive Coding
-- Avoid unnecessary allocations or object churn
-- Prefer `Set` for `.has()` lookups
-- Don't use `.forEach`/`.map` in critical paths — use `for`
-- Avoid closures in hot loops
-- Profile before micro-optimizing
-
-### Quality & Maintainability
-- Clear, meaningful names (no abbreviations)
-- Prefer clarity over comments — self-documenting code
-- Functions should be **short, composable, <30 lines** unless justified
-- Prefer object-based params if >2 arguments
-- Destructure params in function signatures, not inside function bodies
-- Follow https://refactoring.guru/refactoring guidelines
+<language_preferences>
+<preference>TypeScript (never plain JavaScript unless absolutely unavoidable)</preference>
+<preference>ESM syntax — no `require()` or CommonJS</preference>
+<preference>`async/await` over `.then()` chains</preference>
+</language_preferences>
+</quick_start>
 
 ---
 
-## OpenCode Customization
+<language_specific_guidelines>
+<language name="typescript">
+<guideline>Use `interface` (prefixed with `I`) over `type` unless extending</guideline>
+<guideline>Prefix types with `T`</guideline>
+<guideline>Avoid `any`; use `unknown` if unavoidable</guideline>
+<guideline>Mark arrays as `readonly string[]` over `string[]`</guideline>
+<guideline>Use `as const` to make types stricter</guideline>
+<guideline>Use **zod** for runtime validation at all input/output boundaries</guideline>
+</language>
 
-### Custom Tools (.opencode/tool/)
-- Use TypeScript with `@opencode-ai/plugin` SDK
-- Export with `tool()` helper for type-safety and validation
-- Tools auto-load from `.opencode/tool/` or `~/.config/opencode/tool/`
-- Filename becomes tool name (e.g., `list-mcp.ts` → `list-mcp` tool)
-- Cannot be invoked directly with Node.js — only through OpenCode
-- Use `tool.schema` (Zod) for argument validation
+  <language name="shell_scripts">
+    <guideline>Use `#!/bin/bash` or `#!/usr/bin/env bash` as shebang</guideline>
+    <guideline>Always include `set -euo pipefail` for robustness</guideline>
+    <guideline>Use shellcheck for linting: `shellcheck **/*.sh`</guideline>
+    <guideline>Naming: snake_case for variables/functions (e.g., `script_dir`)</guideline>
+    <guideline>Quote variables: `"$variable"` not `$variable`</guideline>
+    <guideline>Use `[[ ]]` over `[ ]` for conditionals</guideline>
+    <guideline>Document complex logic with comments</guideline>
+    <guideline>Pass arguments with `"$@"` to preserve spacing</guideline>
+  </language>
 
-### Custom Agents (.opencode/agent/)
-- Markdown files with YAML frontmatter
-- Specify: name, description, mode (primary/subagent), temperature
-- Choose MCP servers wisely:
-  - **Subagents**: 2-3 focused servers (e.g., git agent: octocode, context7)
-  - **Primary agents**: 5-10 servers (e.g., sales agent: 7 servers)
-- Temperature guide:
-  - 0.0-0.2: Deterministic (git, code generation)
-  - 0.4-0.6: Balanced (general coding)
-  - 0.6-0.8: Creative (writing, proposals)
-
-### Custom Commands (.opencode/command/)
-- Markdown files with YAML frontmatter
-- Can route to agents with `agent: <name>` field
-- Use `$ARGUMENTS` for user input
-- Set `subtask: true` to invoke subagents
-- Commands are invoked with `/command-name`
-
----
-
-## Tool Strategy
-
-### File Operation Priority
-1. **Read tool** - Direct file access (FASTEST)
-   - Use for: Known file paths, configuration files
-   - Example: Read package.json, tsconfig.json
-
-2. **Octocode** - GitHub repo access
-   - Use for: Remote repos, no local clone needed
-   - Example: Study public repos without cloning
-
-3. **Desktop Commander** - Advanced file operations
-   - Use for: Search, process management, system operations
-   - Example: Search for patterns, manage processes
-
-### Task Tool Strategy
-**When to Use Task Tool**:
-- Open-ended searches (don't know exact file/pattern)
-- Exploratory codebase analysis
-- Multi-step research workflows
-- When you need multiple search attempts
-
-**When NOT to Use Task Tool**:
-- Know exact file path → Use Read tool
-- Know class/function name → Use Glob/Grep directly
-- Simple file operations → Use basic tools
-
-**Examples**:
-❌ Bad: Task("Find the UserController class")
-✅ Good: grep("class UserController", include="*.ts")
-
-❌ Bad: Task("Read package.json")
-✅ Good: read("package.json")
-
-### Memory MCP Usage
-**When to Use Memory**:
-- Store project-specific facts across sessions
-- Remember user preferences and coding style
-- Track codebase architecture and patterns
-- Link agents to codebases they work with
-
-**Entity Design**:
-- **Codebases**: Store project metadata (type, language, architecture)
-- **Modules**: Store component/module information
-- **Agents**: Store agent context and capabilities
-- **Relations**: Link entities with meaningful relations
-
-**Best Practices**:
-- Use descriptive entity types: `codebase`, `module`, `agent`, `pattern`
-- Store observations as facts (not prose)
-- Create relations for discoverability: `contains`, `uses`, `depends_on`, `operates_on`
-- Update agents when studying new codebases
+  <language name="frontend_react_nextjs">
+    <guideline>Functional components with hooks</guideline>
+    <guideline>Avoid misuse of `useEffect` (derive state where possible)</guideline>
+    <guideline>Prefer **TailwindCSS** utilities over CSS modules</guideline>
+    <guideline>Schema validation (`zod`) for forms and APIs</guideline>
+    <guideline>Optimize rendering (memoize intelligently, don't overdo)</guideline>
+  </language>
+</language_specific_guidelines>
 
 ---
 
-## MCP Servers
+<coding_principles>
+<category name="defensive_programming">
+<principle>Always null-check inputs and external data</principle>
+<principle>Validate function parameters at the top (fail fast)</principle>
+<principle>Avoid silent failures — log or throw with meaningful messages</principle>
+<principle>Treat every exported function as if it could be called by untrusted code</principle>
+</category>
 
-### Quick Reference Matrix
+  <category name="functional_style">
+    <principle>Pure functions by default (no hidden side effects)</principle>
+    <principle>Use `.map`, `.filter`, `.reduce` only when semantically clear</principle>
+    <principle>Use `for` loops for performance-sensitive code</principle>
+    <principle>Prefer helper functions over inline duplication</principle>
+  </category>
 
-| Server | Type | Use Case | Priority |
-|--------|------|----------|----------|
-| context7 | Docs | Latest framework docs | HIGH |
-| octocode | GitHub | Repo analysis | HIGH |
-| memory | Storage | Cross-session memory | HIGH |
-| aid | Analysis | Code structure | MEDIUM |
-| gh_grep | Search | Real-world patterns | MEDIUM |
-| augments | Docs | Framework examples | MEDIUM |
-| playwright | Browser | UI testing | AS_NEEDED |
-| next-devtools | Dev | Next.js debugging | AS_NEEDED |
-| desktop-commander | System | File ops | AS_NEEDED |
-| mindpilot | Viz | Diagrams | AS_NEEDED |
-| ddg-search | Search | Web search | LOW |
-| sequential-thinking | Reasoning | Complex problems | LOW |
-| mcp-compass | Discovery | Find MCP servers | LOW |
-| chrome-devtools | Browser | Deep debugging | LOW |
+  <category name="control_flow">
+    <principle>Guard clauses & early returns > deep nesting</principle>
+    <principle>Avoid complex ternaries inside JSX</principle>
+    <principle>Use `switch` only when semantically appropriate</principle>
+    <principle>Use map (object) based logic for complicated logic (strategy pattern)</principle>
+    <principle>Use `VALUES.includes` pattern over multi OR conditions</principle>
+  </category>
 
-### Workflow Integration
-- **Study workflow**: octocode + memory + aid
-- **Documentation**: context7 + augments + gh_grep
-- **Development**: next-devtools + playwright
-- **Research**: ddg-search + gh_grep
+  <category name="performance_sensitive">
+    <principle>Avoid unnecessary allocations or object churn</principle>
+    <principle>Prefer `Set` for `.has()` lookups</principle>
+    <principle>Don't use `.forEach`/`.map` in critical paths — use `for`</principle>
+    <principle>Avoid closures in hot loops</principle>
+    <principle>Profile before micro-optimizing</principle>
+  </category>
 
-### Octocode Workflows
-**Repository Discovery**:
-1. `githubSearchRepositories`: Find repos by topic/keywords
-2. `githubViewRepoStructure`: Get directory tree (depth=1 for overview, depth=2 for deep dive)
-3. `githubSearchCode`: Search for code patterns (match="path" for files, match="file" for content)
-4. `githubGetFileContent`: Read specific files (use `matchString` for targeted extraction)
-
-**Best Practices**:
-- Start with `githubViewRepoStructure` (depth=1) for overview
-- Use `match="path"` for fast file discovery
-- Use `match="file"` with `limit=5` for detailed matches
-- Always scope searches with owner/repo to avoid rate limits
-- Use `matchString` with `matchStringContextLines` for precise content extraction
-
-### Server Categories
-
-#### Documentation & Research
-- **context7**: Fetch up-to-date library/framework docs (e.g., React, Next.js, MongoDB)
-  - Use when: Need official API docs or examples
-  - Example: "Get Next.js App Router documentation"
-
-- **augments**: Framework documentation and code examples
-  - Use when: Need framework-specific patterns
-  - Example: "Show TailwindCSS grid examples"
-
-- **gh_grep**: Search GitHub code repositories for real-world examples
-  - Use when: Need production code patterns
-  - Example: "Find useState patterns in popular React repos"
-
-#### Code Analysis & GitHub
-- **octocode**: Advanced GitHub operations (search code, PRs, repo structure)
-  - Use when: Deep GitHub codebase analysis
-  - Example: "Search for auth patterns in facebook/react"
-
-- **aid**: AI Distiller - extract code structure, generate analysis prompts
-  - Use when: Need code signatures, bug hunting, refactoring suggestions
-  - Example: "Distill API signatures from src/"
-
-#### Development Tools
-- **next-devtools**: Next.js runtime debugging, cache components, upgrades
-  - Use when: Working with Next.js projects
-  - Example: "Check Next.js dev server errors"
-
-- **playwright**: Browser automation for testing and verification
-  - Use when: Need to test web apps or verify UI
-  - Example: "Navigate to localhost:3000 and test login flow"
-
-- **chrome-devtools**: Chrome DevTools protocol for browser inspection
-  - Use when: Need deep browser debugging
-  - Example: "Inspect network requests on page load"
-
-#### File & System Operations
-- **desktop-commander**: Advanced file operations, process management, search
-  - Use when: Need file manipulation beyond basic tools
-  - Example: "Search for 'validateUser' in src/"
-
-- **mindpilot**: Generate Mermaid diagrams (flowcharts, sequences, architecture)
-  - Use when: Need visual documentation
-  - Example: "Create architecture diagram for auth flow"
-
-#### Utilities
-- **ddg-search**: DuckDuckGo web search for general information
-  - Use when: Need external knowledge or documentation
-  - Example: "Search for TypeScript best practices"
-
-- **sequential-thinking**: Structured reasoning for complex problems
-  - Use when: Need systematic problem-solving
-  - Example: "Break down multi-step refactoring task"
-
-- **memory**: Persistent context storage across sessions
-  - Use when: Need to remember facts long-term
-  - Example: "Remember user prefers Zod for validation"
-
-- **mcp-compass**: Discover and recommend MCP servers
-  - Use when: Looking for new MCP capabilities
-  - Example: "Find MCP server for AWS Lambda"
-
-### Usage Guidelines
-- **Prefer specialized tools**: Use MCP servers over generic bash commands when available
-- **Check enabled status**: Only enabled servers are accessible
-- **Context efficiency**: Use Task tool for exploratory searches to reduce token usage
-- **Parallel execution**: Batch independent MCP calls in a single message
-
-## Git Usage
-
-- Always study the git diff before committing.
-- **NEVER** commit unless you are ASKED to.
-- You may ask the user to use the gh cli if it is relevant (Creating PR or reading linked issue)
-- If the branch named contains a number, it is the issue number, you can use gh to study the linked issue
-- Keep the commit message short and descriptive, follow the [conventional commits](https://www.conventionalcommits.org/en/v1.0.0/) guidelines.
-- If there is extra detail regarding the commit, it should be in the commit description.
-- When the user asks you to review changes, you must ask them for the base branch and then study the relevant diff.
-
-### Code Review Workflow
-
-**Before Committing**:
-1. Review your changes: `git diff`
-2. Run CodeRabbit: `coderabbit review --plain`
-3. Apply feedback (security, performance, best practices)
-4. Stage changes: `git add <files>`
-5. Commit with conventional format
-
-**CodeRabbit Focus Areas**:
-- Security vulnerabilities
-- Performance issues
-- Best practice violations
-- Code smells and anti-patterns
-- Type safety improvements
+  <category name="quality_maintainability">
+    <principle>Clear, meaningful names (no abbreviations)</principle>
+    <principle>Prefer clarity over comments — self-documenting code</principle>
+    <principle>Functions should be **short, composable, <30 lines** unless justified</principle>
+    <principle>Prefer object-based params if >2 arguments</principle>
+    <principle>Destructure params in function signatures, not inside function bodies</principle>
+    <principle>Follow https://refactoring.guru/refactoring guidelines</principle>
+  </category>
+</coding_principles>
 
 ---
 
-## Engineer's Mindset
+<opencode_customization>
+<custom_tools location=".opencode/tool/">
+<guideline>Use TypeScript with `@opencode-ai/plugin` SDK</guideline>
+<guideline>Export with `tool()` helper for type-safety and validation</guideline>
+<guideline>Tools auto-load from `.opencode/tool/` or `~/.config/opencode/tool/`</guideline>
+<guideline>Filename becomes tool name (e.g., `list-mcp.ts` → `list-mcp` tool)</guideline>
+<guideline>Cannot be invoked directly with Node.js — only through OpenCode</guideline>
+<guideline>Use `tool.schema` (Zod) for argument validation</guideline>
+</custom_tools>
 
-- Ship code you'd trust your **future self** to maintain.
-- Don't chase speed at the expense of stability.
-- AI-generated code must **pass your quality checks**, not the other way around.
+<custom_agents location=".opencode/agent/">
+<guideline>Markdown files with YAML frontmatter</guideline>
+<guideline>Specify: name, description, mode (primary/subagent), temperature</guideline>
+
+    <mcp_server_selection>
+      <subagents>
+        <description>2-3 focused servers</description>
+        <example>git agent: octocode, context7</example>
+      </subagents>
+      <primary_agents>
+        <description>5-10 servers</description>
+        <example>sales agent: 7 servers</example>
+      </primary_agents>
+    </mcp_server_selection>
+
+    <temperature_guide>
+      <range value="0.0-0.2">Deterministic (git, code generation)</range>
+      <range value="0.4-0.6">Balanced (general coding)</range>
+      <range value="0.6-0.8">Creative (writing, proposals)</range>
+    </temperature_guide>
+
+</custom_agents>
+
+<custom_commands location=".opencode/command/">
+<guideline>Markdown files with YAML frontmatter</guideline>
+<guideline>Can route to agents with `agent: <name>` field</guideline>
+<guideline>Use `$ARGUMENTS` for user input</guideline>
+<guideline>Set `subtask: true` to invoke subagents</guideline>
+<guideline>Commands are invoked with `/command-name`</guideline>
+</custom_commands>
+</opencode_customization>
+
+---
+
+<tool_strategy>
+<file_operations>
+<priority level="1" tool="Read">
+<use_case>Direct file access (FASTEST)</use_case>
+<examples>
+<example>Known file paths, configuration files</example>
+<example>Read package.json, tsconfig.json</example>
+</examples>
+</priority>
+
+    <priority level="2" tool="Octocode">
+      <use_case>GitHub repo access</use_case>
+      <examples>
+        <example>Remote repos, no local clone needed</example>
+        <example>Study public repos without cloning</example>
+      </examples>
+    </priority>
+
+    <priority level="3" tool="Desktop Commander">
+      <use_case>Advanced file operations</use_case>
+      <examples>
+        <example>Search, process management, system operations</example>
+        <example>Search for patterns, manage processes</example>
+      </examples>
+    </priority>
+
+</file_operations>
+
+<task_tool_strategy>
+<when_to_use>
+<case>Open-ended searches (don't know exact file/pattern)</case>
+<case>Exploratory codebase analysis</case>
+<case>Multi-step research workflows</case>
+<case>When you need multiple search attempts</case>
+</when_to_use>
+
+    <when_not_to_use>
+      <case>Know exact file path → Use Read tool</case>
+      <case>Know class/function name → Use Glob/Grep directly</case>
+      <case>Simple file operations → Use basic tools</case>
+    </when_not_to_use>
+
+    <examples>
+      <bad_example>Task("Find the UserController class")</bad_example>
+      <good_example>grep("class UserController", include="*.ts")</good_example>
+      <bad_example>Task("Read package.json")</bad_example>
+      <good_example>read("package.json")</good_example>
+    </examples>
+
+</task_tool_strategy>
+
+<memory_mcp_usage>
+<when_to_use>
+<case>Store project-specific facts across sessions</case>
+<case>Remember user preferences and coding style</case>
+<case>Track codebase architecture and patterns</case>
+<case>Link agents to codebases they work with</case>
+</when_to_use>
+
+    <entity_design>
+      <entity type="codebases">Store project metadata (type, language, architecture)</entity>
+      <entity type="modules">Store component/module information</entity>
+      <entity type="agents">Store agent context and capabilities</entity>
+      <entity type="relations">Link entities with meaningful relations</entity>
+    </entity_design>
+
+    <best_practices>
+      <practice>Use descriptive entity types: `codebase`, `module`, `agent`, `pattern`</practice>
+      <practice>Store observations as facts (not prose)</practice>
+      <practice>Create relations for discoverability: `contains`, `uses`, `depends_on`, `operates_on`</practice>
+      <practice>Update agents when studying new codebases</practice>
+    </best_practices>
+
+</memory_mcp_usage>
+</tool_strategy>
+
+---
+
+<mcp_servers>
+<quick_reference>
+<server name="context7" type="Docs" use_case="Latest framework docs" priority="HIGH"/>
+<server name="octocode" type="GitHub" use_case="Repo analysis" priority="HIGH"/>
+<server name="memory" type="Storage" use_case="Cross-session memory" priority="HIGH"/>
+<server name="aid" type="Analysis" use_case="Code structure" priority="MEDIUM"/>
+<server name="gh_grep" type="Search" use_case="Real-world patterns" priority="MEDIUM"/>
+<server name="augments" type="Docs" use_case="Framework examples" priority="MEDIUM"/>
+<server name="playwright" type="Browser" use_case="UI testing" priority="AS_NEEDED"/>
+<server name="next-devtools" type="Dev" use_case="Next.js debugging" priority="AS_NEEDED"/>
+<server name="desktop-commander" type="System" use_case="File ops" priority="AS_NEEDED"/>
+<server name="mindpilot" type="Viz" use_case="Diagrams" priority="AS_NEEDED"/>
+<server name="ddg-search" type="Search" use_case="Web search" priority="LOW"/>
+<server name="sequential-thinking" type="Reasoning" use_case="Complex problems" priority="LOW"/>
+<server name="mcp-compass" type="Discovery" use_case="Find MCP servers" priority="LOW"/>
+<server name="chrome-devtools" type="Browser" use_case="Deep debugging" priority="LOW"/>
+</quick_reference>
+
+<workflow_integration>
+<workflow name="study">octocode + memory + aid</workflow>
+<workflow name="documentation">context7 + augments + gh_grep</workflow>
+<workflow name="development">next-devtools + playwright</workflow>
+<workflow name="research">ddg-search + gh_grep</workflow>
+</workflow_integration>
+
+<octocode_workflows>
+<repository_discovery>
+<step number="1" function="githubSearchRepositories">Find repos by topic/keywords</step>
+<step number="2" function="githubViewRepoStructure">Get directory tree (depth=1 for overview, depth=2 for deep dive)</step>
+<step number="3" function="githubSearchCode">Search for code patterns (match="path" for files, match="file" for content)</step>
+<step number="4" function="githubGetFileContent">Read specific files (use `matchString` for targeted extraction)</step>
+</repository_discovery>
+
+    <best_practices>
+      <practice>Start with `githubViewRepoStructure` (depth=1) for overview</practice>
+      <practice>Use `match="path"` for fast file discovery</practice>
+      <practice>Use `match="file"` with `limit=5` for detailed matches</practice>
+      <practice>Always scope searches with owner/repo to avoid rate limits</practice>
+      <practice>Use `matchString` with `matchStringContextLines` for precise content extraction</practice>
+    </best_practices>
+
+</octocode_workflows>
+
+<server_categories>
+<category name="documentation_research">
+<server name="context7">
+<use_when>Need official API docs or examples</use_when>
+<example>Get Next.js App Router documentation</example>
+</server>
+<server name="augments">
+<use_when>Need framework-specific patterns</use_when>
+<example>Show TailwindCSS grid examples</example>
+</server>
+<server name="gh_grep">
+<use_when>Need production code patterns</use_when>
+<example>Find useState patterns in popular React repos</example>
+</server>
+</category>
+
+    <category name="code_analysis_github">
+      <server name="octocode">
+        <use_when>Deep GitHub codebase analysis</use_when>
+        <example>Search for auth patterns in facebook/react</example>
+      </server>
+      <server name="aid">
+        <use_when>Need code signatures, bug hunting, refactoring suggestions</use_when>
+        <example>Distill API signatures from src/</example>
+      </server>
+    </category>
+
+    <category name="development_tools">
+      <server name="next-devtools">
+        <use_when>Working with Next.js projects</use_when>
+        <example>Check Next.js dev server errors</example>
+      </server>
+      <server name="playwright">
+        <use_when>Need to test web apps or verify UI</use_when>
+        <example>Navigate to localhost:3000 and test login flow</example>
+      </server>
+      <server name="chrome-devtools">
+        <use_when>Need deep browser debugging</use_when>
+        <example>Inspect network requests on page load</example>
+      </server>
+    </category>
+
+    <category name="file_system_operations">
+      <server name="desktop-commander">
+        <use_when>Need file manipulation beyond basic tools</use_when>
+        <example>Search for 'validateUser' in src/</example>
+      </server>
+      <server name="mindpilot">
+        <use_when>Need visual documentation</use_when>
+        <example>Create architecture diagram for auth flow</example>
+      </server>
+    </category>
+
+    <category name="utilities">
+      <server name="ddg-search">
+        <use_when>Need external knowledge or documentation</use_when>
+        <example>Search for TypeScript best practices</example>
+      </server>
+      <server name="sequential-thinking">
+        <use_when>Need systematic problem-solving</use_when>
+        <example>Break down multi-step refactoring task</example>
+      </server>
+      <server name="memory">
+        <use_when>Need to remember facts long-term</use_when>
+        <example>Remember user prefers Zod for validation</example>
+      </server>
+      <server name="mcp-compass">
+        <use_when>Looking for new MCP capabilities</use_when>
+        <example>Find MCP server for AWS Lambda</example>
+      </server>
+    </category>
+
+</server_categories>
+
+<usage_guidelines>
+<guideline>Prefer specialized tools: Use MCP servers over generic bash commands when available</guideline>
+<guideline>Check enabled status: Only enabled servers are accessible</guideline>
+<guideline>Context efficiency: Use Task tool for exploratory searches to reduce token usage</guideline>
+<guideline>Parallel execution: Batch independent MCP calls in a single message</guideline>
+</usage_guidelines>
+</mcp_servers>
+
+---
+
+<git_usage>
+<rules>
+<rule>Always study the git diff before committing</rule>
+<rule>**NEVER** commit unless you are ASKED to</rule>
+<rule>You may ask the user to use the gh cli if it is relevant (Creating PR or reading linked issue)</rule>
+<rule>If the branch named contains a number, it is the issue number, you can use gh to study the linked issue</rule>
+<rule>Keep the commit message short and descriptive, follow the [conventional commits](https://www.conventionalcommits.org/en/v1.0.0/) guidelines</rule>
+<rule>If there is extra detail regarding the commit, it should be in the commit description</rule>
+<rule>When the user asks you to review changes, you must ask them for the base branch and then study the relevant diff</rule>
+</rules>
+
+<code_review_workflow>
+<before_committing>
+<step number="1">Review your changes: `git diff`</step>
+<step number="2">Run CodeRabbit: `coderabbit review --plain`</step>
+<step number="3">Apply feedback (security, performance, best practices)</step>
+<step number="4">Stage changes: `git add <files>`</step>
+<step number="5">Commit with conventional format</step>
+</before_committing>
+
+    <coderabbit_focus_areas>
+      <area>Security vulnerabilities</area>
+      <area>Performance issues</area>
+      <area>Best practice violations</area>
+      <area>Code smells and anti-patterns</area>
+      <area>Type safety improvements</area>
+    </coderabbit_focus_areas>
+
+</code_review_workflow>
+</git_usage>
+
+---
+
+<engineers_mindset>
+<principle>Ship code you'd trust your **future self** to maintain</principle>
+<principle>Don't chase speed at the expense of stability</principle>
+<principle>AI-generated code must **pass your quality checks**, not the other way around</principle>
+</engineers_mindset>
