@@ -233,29 +233,68 @@ context7_get-library-docs(context7CompatibleLibraryID: "/facebook/react")
 <guideline>Filename becomes tool name (e.g., `list-mcp.ts` → `list-mcp` tool)</guideline>
 <guideline>Cannot be invoked directly with Node.js — only through OpenCode</guideline>
 <guideline>Use `tool.schema` (Zod) for argument validation</guideline>
+
+<available_tools>
+<tool name="list-mcp">
+<purpose>List all enabled MCP servers with capabilities</purpose>
+<usage>Use to discover available MCP functionality</usage>
+<when_to_use>Before using MCP servers, to check what's available</when_to_use>
+</tool>
+</available_tools>
 </custom_tools>
 
 <custom_agents location=".opencode/agent/">
 <guideline>Markdown files with YAML frontmatter</guideline>
 <guideline>Specify: name, description, mode (primary/subagent), temperature</guideline>
 
-    <mcp_server_selection>
-      <subagents>
-        <description>2-3 focused servers</description>
-        <example>git agent: octocode, context7</example>
-      </subagents>
-      <primary_agents>
-        <description>5-10 servers</description>
-        <example>sales agent: 7 servers</example>
-      </primary_agents>
-    </mcp_server_selection>
+<mcp_server_selection>
+<subagents>
+<description>2-3 focused servers</description>
+<example>git agent: octocode, context7</example>
+</subagents>
+<primary_agents>
+<description>5-10 servers</description>
+<example>sales agent: 7 servers</example>
+</primary_agents>
+</mcp_server_selection>
 
-    <temperature_guide>
-      <range value="0.0-0.2">Deterministic (git, code generation)</range>
-      <range value="0.4-0.6">Balanced (general coding)</range>
-      <range value="0.6-0.8">Creative (writing, proposals)</range>
-    </temperature_guide>
+<temperature_guide>
+<range value="0.0-0.2">Deterministic (git, code generation)</range>
+<range value="0.4-0.6">Balanced (general coding)</range>
+<range value="0.6-0.8">Creative (writing, proposals)</range>
+</temperature_guide>
 
+<available_agents>
+<category name="primary">
+<agent name="openagent">Main orchestrator agent with full capabilities</agent>
+<agent name="codebase-agent">Specialized in codebase analysis and understanding</agent>
+<agent name="system-builder">Builds and organizes agent systems and workflows</agent>
+<agent name="git">Git operations with conventional commits (temperature: 0.1)</agent>
+<agent name="sales">Sales and business operations (temperature: 0.7)</agent>
+</category>
+
+<category name="code_subagents">
+<agent name="coder-agent">Code generation and implementation</agent>
+<agent name="reviewer">Code review and quality checks</agent>
+<agent name="tester">Test creation and validation</agent>
+<agent name="build-agent">Build processes and CI/CD</agent>
+<agent name="codebase-pattern-analyst">Pattern detection and analysis</agent>
+</category>
+
+<category name="core_subagents">
+<agent name="task-manager">Task planning and tracking</agent>
+<agent name="documentation">Documentation generation</agent>
+</category>
+
+<category name="system_builder_subagents">
+<agent name="domain-analyzer">Domain-driven analysis</agent>
+<agent name="agent-generator">Generate new agents</agent>
+<agent name="context-organizer">Organize context files</agent>
+<agent name="workflow-designer">Design workflows</agent>
+<agent name="command-creator">Create custom commands</agent>
+</category>
+
+</available_agents>
 </custom_agents>
 
 <custom_commands location=".opencode/command/">
@@ -264,6 +303,51 @@ context7_get-library-docs(context7CompatibleLibraryID: "/facebook/react")
 <guideline>Use `$ARGUMENTS` for user input</guideline>
 <guideline>Set `subtask: true` to invoke subagents</guideline>
 <guideline>Commands are invoked with `/command-name`</guideline>
+
+<available_commands>
+<command name="/commit">
+<purpose>Commit workflow with CodeRabbit review</purpose>
+<agent>git</agent>
+<workflow>Review diff → CodeRabbit analysis → Conventional commit</workflow>
+<usage>Always use this instead of manual git commit</usage>
+</command>
+<command name="/study">
+<purpose>Deep codebase analysis with MCP tools</purpose>
+<workflow>Uses octocode, memory, and aid for comprehensive study</workflow>
+<usage>Study repos, analyze patterns, understand architecture</usage>
+</command>
+<command name="/test">
+<purpose>Run tests with comprehensive reporting</purpose>
+<agent>tester</agent>
+<usage>Execute test suites and validate functionality</usage>
+</command>
+<command name="/context">
+<purpose>Build and organize context files</purpose>
+<agent>context-organizer</agent>
+<usage>Create structured context for agents</usage>
+</command>
+<command name="/clean">
+<purpose>Clean up codebase (dead code, unused imports)</purpose>
+<usage>Refactor and optimize code quality</usage>
+</command>
+<command name="/optimize">
+<purpose>Performance optimization analysis</purpose>
+<usage>Identify and fix performance bottlenecks</usage>
+</command>
+<command name="/prompt-enchancer">
+<purpose>Enhance and improve user prompts</purpose>
+<usage>Get better results by improving prompt quality</usage>
+</command>
+<command name="/worktrees">
+<purpose>Git worktree management</purpose>
+<usage>Manage multiple working directories</usage>
+</command>
+<command name="/build-context-system">
+<purpose>Build complete context system for project</purpose>
+<agent>system-builder</agent>
+<usage>Initialize OpenAgents framework for project</usage>
+</command>
+</available_commands>
 </custom_commands>
 </opencode_customization>
 
@@ -483,7 +567,81 @@ context7_get-library-docs(context7CompatibleLibraryID: "/facebook/react")
 <rule>Keep the commit message short and descriptive, follow the [conventional commits](https://www.conventionalcommits.org/en/v1.0.0/) guidelines</rule>
 <rule>If there is extra detail regarding the commit, it should be in the commit description</rule>
 <rule>When the user asks you to review changes, you must ask them for the base branch and then study the relevant diff</rule>
+<rule>Use the `/commit` command for committing changes (invokes commit workflow with CodeRabbit review)</rule>
 </rules>
+
+<branching_strategy>
+<user_info>
+<name>elhaam</name>
+<git_author>Elhaam / Elhaam Basheer Chaudhry</git_author>
+</user_info>
+
+<branch_naming_convention>
+<rule>Check commit authors BEFORE creating branch</rule>
+<workflow>
+<step number="1">Run: `git log --all --format='%an' | sort | uniq -c`</step>
+<step number="2">Analyze if commits contain ONLY user's commits or mixed authors</step>
+<step number="3">Apply naming convention based on analysis</step>
+</workflow>
+
+<solo_work>
+<condition>All commits in history are by elhaam only</condition>
+<format>type/short-desc</format>
+<examples>
+<example>feat/setup-script</example>
+<example>feat/vi-mode</example>
+<example>fix/tmux-config</example>
+<example>chore/update-deps</example>
+<example>perf/optimize-loading</example>
+<example>refactor/clean-scripts</example>
+</examples>
+</solo_work>
+
+<collaborative_work>
+<condition>Commits contain multiple authors OR working with others</condition>
+<format>type/elhaam/short-desc</format>
+<examples>
+<example>feat/elhaam/add-auth</example>
+<example>fix/elhaam/resolve-conflict</example>
+<example>refactor/elhaam/cleanup-api</example>
+</examples>
+<rationale>Namespace prevents branch name conflicts when multiple developers work on same feature type</rationale>
+</collaborative_work>
+
+<conventional_types>
+<type name="feat">New feature or functionality</type>
+<type name="fix">Bug fix</type>
+<type name="chore">Maintenance tasks (deps, configs, tooling)</type>
+<type name="perf">Performance improvements</type>
+<type name="refactor">Code restructuring without behavior change</type>
+<type name="docs">Documentation only changes</type>
+<type name="style">Formatting, whitespace, style changes</type>
+<type name="test">Adding or updating tests</type>
+</conventional_types>
+
+<short_desc_guidelines>
+<guideline>Use kebab-case (lowercase with hyphens)</guideline>
+<guideline>Be descriptive but concise (2-4 words max)</guideline>
+<guideline>Avoid redundancy (don't repeat type in description)</guideline>
+<guideline>Use imperative mood (add, not adding)</guideline>
+<examples>
+<good>feat/openagents-integration</good>
+<good>fix/api-timeout</good>
+<good>perf/reduce-bundle-size</good>
+<bad>feat/adding-new-feature</bad>
+<bad>fix/fix-the-bug</bad>
+<bad>feat/IMPLEMENT_OAUTH</bad>
+</examples>
+</short_desc_guidelines>
+</branch_naming_convention>
+
+<branch_creation_workflow>
+<step number="1">Check commit history: `git log --all --format='%an' | sort | uniq -c`</step>
+<step number="2">Determine if solo (all elhaam) or collaborative (mixed authors)</step>
+<step number="3">Create branch with appropriate naming convention</step>
+<step number="4">Verify branch created: `git branch --show-current`</step>
+</branch_creation_workflow>
+</branching_strategy>
 
 <code_review_workflow>
 <before_committing>
@@ -494,14 +652,28 @@ context7_get-library-docs(context7CompatibleLibraryID: "/facebook/react")
 <step number="5">Commit with conventional format</step>
 </before_committing>
 
-    <coderabbit_focus_areas>
-      <area>Security vulnerabilities</area>
-      <area>Performance issues</area>
-      <area>Best practice violations</area>
-      <area>Code smells and anti-patterns</area>
-      <area>Type safety improvements</area>
-    </coderabbit_focus_areas>
+<using_commit_command>
+<preferred_method>Use `/commit` command instead of manual git commit</preferred_method>
+<benefits>
+<benefit>Automatic CodeRabbit review integration</benefit>
+<benefit>Enforces conventional commit format</benefit>
+<benefit>Validates changes before committing</benefit>
+<benefit>Consistent commit workflow across all tasks</benefit>
+</benefits>
+<usage>
+<example>User: "commit these changes"</example>
+<example>Agent: Uses `/commit` command (routes to commit agent)</example>
+<example>Commit agent: Reviews diff → CodeRabbit → Conventional commit</example>
+</usage>
+</using_commit_command>
 
+<coderabbit_focus_areas>
+<area>Security vulnerabilities</area>
+<area>Performance issues</area>
+<area>Best practice violations</area>
+<area>Code smells and anti-patterns</area>
+<area>Type safety improvements</area>
+</coderabbit_focus_areas>
 </code_review_workflow>
 </git_usage>
 
