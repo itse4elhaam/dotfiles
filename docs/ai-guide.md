@@ -103,3 +103,82 @@ Important: Run `coderabbit review --plain` to get comprehensive code analysis an
 - Keep the commit message short and descriptive, follow the [conventional commits](https://www.conventionalcommits.org/en/v1.0.0/) guidelines.
 - If there is extra detail regarding the commit, it should be in the commit description.
 - When the user asks you to review changes, you must ask them for the base branch and then study the relevant diff.
+
+---
+
+## MCP Servers
+
+OpenCode integrates with Model Context Protocol (MCP) servers for extended capabilities. Below are ALL enabled servers in your configuration:
+
+### **Documentation & Research**
+
+- **context7**: Fetch up-to-date library/framework docs (e.g., React, Next.js, MongoDB)
+  - Use when: Need official API docs or examples
+  - Example: "Get Next.js App Router documentation"
+
+- **augments**: Framework documentation and code examples
+  - Use when: Need framework-specific patterns
+  - Example: "Show TailwindCSS grid examples"
+
+- **gh_grep**: Search GitHub code repositories for real-world examples
+  - Use when: Need production code patterns
+  - Example: "Find useState patterns in popular React repos"
+
+### **Code Analysis & GitHub**
+
+- **octocode**: Advanced GitHub operations (search code, PRs, repo structure)
+  - Use when: Deep GitHub codebase analysis
+  - Example: "Search for auth patterns in facebook/react"
+
+- **aid**: AI Distiller - extract code structure, generate analysis prompts
+  - Use when: Need code signatures, bug hunting, refactoring suggestions
+  - Example: "Distill API signatures from src/"
+
+### **Development Tools**
+
+- **next-devtools**: Next.js runtime debugging, cache components, upgrades
+  - Use when: Working with Next.js projects
+  - Example: "Check Next.js dev server errors"
+
+- **playwright**: Browser automation for testing and verification
+  - Use when: Need to test web apps or verify UI
+  - Example: "Navigate to localhost:3000 and test login flow"
+
+- **chrome-devtools**: Chrome DevTools protocol for browser inspection
+  - Use when: Need deep browser debugging
+  - Example: "Inspect network requests on page load"
+
+### **File & System Operations**
+
+- **desktop-commander**: Advanced file operations, process management, search
+  - Use when: Need file manipulation beyond basic tools
+  - Example: "Search for 'validateUser' in src/"
+
+- **mindpilot**: Generate Mermaid diagrams (flowcharts, sequences, architecture)
+  - Use when: Need visual documentation
+  - Example: "Create architecture diagram for auth flow"
+
+### **Utilities**
+
+- **ddg-search**: DuckDuckGo web search for general information
+  - Use when: Need external knowledge or documentation
+  - Example: "Search for TypeScript best practices"
+
+- **sequential-thinking**: Structured reasoning for complex problems
+  - Use when: Need systematic problem-solving
+  - Example: "Break down multi-step refactoring task"
+
+- **memory**: Persistent context storage across sessions
+  - Use when: Need to remember facts long-term
+  - Example: "Remember user prefers Zod for validation"
+
+- **mcp-compass**: Discover and recommend MCP servers
+  - Use when: Looking for new MCP capabilities
+  - Example: "Find MCP server for AWS Lambda"
+
+### **Usage Guidelines**
+
+- **Prefer specialized tools**: Use MCP servers over generic bash commands when available
+- **Check enabled status**: Only enabled servers are accessible
+- **Context efficiency**: Use Task tool for exploratory searches to reduce token usage
+- **Parallel execution**: Batch independent MCP calls in a single message
