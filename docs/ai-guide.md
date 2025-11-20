@@ -1,5 +1,89 @@
 **⚠️ CRITICAL: NEVER COMMIT CHANGES UNLESS EXPLICITLY ASKED BY THE USER ⚠️**
 
+---
+
+## Technology Documentation Lookup Protocol
+
+**MANDATORY: When the user mentions ANY technology, library, framework, or tool, you MUST look up current documentation FIRST before providing guidance.**
+
+### Lookup Priority Order
+
+1. **context7** (HIGHEST PRIORITY) - Official up-to-date library/framework docs
+   ```
+   Example: context7_resolve-library-id(libraryName: "react")
+            context7_get-library-docs(context7CompatibleLibraryID: "/facebook/react")
+   ```
+
+2. **webfetch** - Official documentation websites
+   ```
+   Example: webfetch(url: "https://nextjs.org/docs", format: "markdown")
+   ```
+
+3. **gh_grep** - Real-world production code examples
+   ```
+   Example: gh_grep_searchGitHub(query: "useState(", language: ["TypeScript", "TSX"])
+   ```
+
+### When to Use Each Tool
+
+| Technology Mentioned | Action Required | Tool to Use | Example |
+|---------------------|-----------------|-------------|---------|
+| Framework/Library | Get official API docs | context7 | "React hooks" → context7(react) |
+| Configuration | Fetch current syntax | webfetch | "Tailwind config" → webfetch(tailwindcss.com/docs/configuration) |
+| Best Practices | Find real implementations | gh_grep | "Error boundaries" → gh_grep("ErrorBoundary", language=["TSX"]) |
+| Version-specific | Check current docs | context7 + webfetch | "Next.js 15 API" → context7(/vercel/next.js/v15) |
+
+### Workflow Example
+
+```
+User mentions: "Add authentication with NextAuth"
+
+REQUIRED STEPS:
+1. context7_resolve-library-id(libraryName: "next-auth")
+2. context7_get-library-docs(context7CompatibleLibraryID: "/nextauthjs/next-auth", topic: "authentication")
+3. gh_grep_searchGitHub(query: "NextAuth(", language: ["TypeScript"], repo: "nextauthjs/next-auth-example")
+4. Only THEN provide implementation guidance based on CURRENT documentation
+```
+
+### Critical Rules
+
+- ❌ **NEVER** rely on training data knowledge for technology guidance
+- ✅ **ALWAYS** verify current API syntax, configuration, and patterns
+- ✅ **CHECK** for version-specific changes (especially major versions)
+- ✅ **VALIDATE** deprecated patterns before suggesting them
+- ✅ **SEARCH** for production examples when patterns are unclear
+
+### Technologies Requiring Immediate Lookup
+
+**Always lookup before advising on:**
+- JavaScript/TypeScript frameworks (React, Vue, Angular, Svelte, Next.js)
+- Build tools (Vite, Webpack, Turbopack, esbuild)
+- State management (Redux, Zustand, Jotai, Recoil)
+- UI libraries (Tailwind, MUI, Chakra, shadcn/ui)
+- Backend frameworks (Express, Fastify, NestJS, Hono)
+- ORMs (Prisma, Drizzle, TypeORM)
+- Testing tools (Vitest, Jest, Playwright, Cypress)
+- AI/ML libraries (LangChain, OpenAI SDK, Anthropic SDK)
+
+**Example of CORRECT workflow:**
+
+```
+User: "Help me set up Drizzle ORM with PostgreSQL"
+
+Assistant MUST do:
+1. context7_resolve-library-id(libraryName: "drizzle-orm")
+2. context7_get-library-docs(context7CompatibleLibraryID: "/drizzle-team/drizzle-orm", topic: "postgresql setup")
+3. gh_grep_searchGitHub(query: "drizzle(", language: ["TypeScript"])
+4. Provide setup guidance based on CURRENT docs (not training data)
+
+Assistant MUST NOT do:
+❌ Suggest setup steps from memory/training data
+❌ Use outdated API patterns
+❌ Skip documentation lookup
+```
+
+---
+
 ## Quick Start
 
 ### Code Review Workflow
