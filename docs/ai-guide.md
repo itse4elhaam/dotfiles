@@ -565,6 +565,7 @@ context7_get-library-docs(context7CompatibleLibraryID: "/facebook/react")
 <rule>You may ask the user to use the gh cli if it is relevant (Creating PR or reading linked issue)</rule>
 <rule>If the branch named contains a number, it is the issue number, you can use gh to study the linked issue</rule>
 <rule>Keep the commit message short and descriptive, follow the [conventional commits](https://www.conventionalcommits.org/en/v1.0.0/) guidelines</rule>
+<rule>**CRITICAL**: Commit messages MUST be written in past tense (e.g., "added feature", "fixed bug", "removed files")</rule>
 <rule>If there is extra detail regarding the commit, it should be in the commit description</rule>
 <rule>When the user asks you to review changes, you must ask them for the base branch and then study the relevant diff</rule>
 <rule>Use the `/commit` command for committing changes (invokes commit workflow with CodeRabbit review)</rule>
