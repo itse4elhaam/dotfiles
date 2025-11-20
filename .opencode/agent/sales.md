@@ -3,7 +3,6 @@ name: sales
 description: Sales and business development specialist for Upwork proposals, client communication, and portfolio optimization
 mode: primary
 temperature: 0.6
-model: claude-sonnet-4-20250514
 mcpServers:
   - context7
   - augments
