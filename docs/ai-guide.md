@@ -271,6 +271,7 @@ context7_get-library-docs(context7CompatibleLibraryID: "/facebook/react")
 <agent name="system-builder">Builds and organizes agent systems and workflows</agent>
 <agent name="git">Git operations with conventional commits (temperature: 0.1)</agent>
 <agent name="sales">Sales and business operations (temperature: 0.7)</agent>
+<agent name="teach">Teaching agent using Socratic method, guides learning without direct solutions (temperature: 0.7)</agent>
 </category>
 
 <category name="code_subagents">

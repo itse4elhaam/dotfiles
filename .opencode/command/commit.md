@@ -19,30 +19,37 @@ Create a git commit following these STRICT rules:
 
    - Proceed with commit.
 
-2. **Analyze changes**: Study the actual changes below:
+2. **Study author's commit pattern**:
+   !`git log --author="<author>" --oneline -10`
+   
+   Analyze the author's commit message style (verb tense, formatting, scope usage).
+
+3. **Analyze changes**: Study the actual changes below:
    !`git diff --cached`
 
-3. **Commit message format** (Conventional Commits):
+4. **Commit message format** (Conventional Commits):
 
    - **Type**: feat|fix|docs|style|refactor|perf|test|chore|ci|build
    - **Scope**: Optional, e.g., `(api)`, `(auth)`
-   - **Subject**: Brief (<50 chars), imperative mood, no period
+   - **Subject**: Brief (<50 chars), PAST TENSE (e.g., "added feature", "fixed bug"), no period
    - **Body**: Use ONLY if changes need explanation (multi-line OK)
+   - **CRITICAL**: Study previous commits by the same author and follow their style/pattern
 
    NOTE: The git agent has access to context7 for Conventional Commits docs if needed.
 
-   Examples:
+   Examples (PAST TENSE):
 
-   - `feat(auth): add JWT token validation`
-   - `fix: resolve null pointer in user service`
-   - `docs: update API usage examples`
+   - `feat(auth): added JWT token validation`
+   - `fix: resolved null pointer in user service`
+   - `docs: updated API usage examples`
 
-4. **Quality checks**:
+5. **Quality checks**:
 
    - Subject is clear and specific (no vague "update" or "fix")
    - Body explains WHY if the change is non-obvious
    - Follows @docs/ai-guide.md: "Keep commit message short and descriptive"
+   - MATCHES the author's previous commit style (PAST TENSE)
 
-5. **Execute commit**: Use `git commit -m "<subject>" -m "<body>"` if body needed
+6. **Execute commit**: Use `git commit -m "<subject>" -m "<body>"` if body needed
 
 DO NOT commit unless changes are staged and analyzed. DO NOT ask for confirmation - execute the commit.

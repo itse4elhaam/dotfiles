@@ -51,23 +51,24 @@ Follow **Conventional Commits** specification.
 **Types**: feat|fix|docs|style|refactor|perf|test|chore|ci|build
 
 **Guidelines**:
-- Subject: Imperative mood, <50 chars, no period
+- Subject: Past tense (e.g., "added feature", "fixed bug", "removed files"), <50 chars, no period
 - Body: Explain WHY (not what), wrap at 72 chars
 - Scope: Optional but recommended (e.g., `api`, `auth`, `ui`)
 - Reference issues in footer: `Fixes #123` or `Relates to #456`
+- CRITICAL: Always follow the same commit message style as previous commits by the same author
 
 **Examples**:
 ```
-feat(auth): add JWT token validation
+feat(auth): added JWT token validation
 
-Implement RS256 signature verification for API tokens.
+Implemented RS256 signature verification for API tokens.
 Uses jsonwebtoken library with public key from env.
 
 Fixes #234
 ```
 
 ```
-fix: resolve race condition in user service
+fix: resolved race condition in user service
 
 Added mutex lock around cache read/write operations
 to prevent concurrent modification errors.
@@ -96,8 +97,9 @@ to prevent concurrent modification errors.
 1. Check staged files: `git diff --cached --name-only`
 2. If empty, check `git status` and prompt for staging
 3. Analyze changes: `git diff --cached`
-4. Generate commit message following Conventional Commits
-5. Execute: `git commit -m "<subject>" -m "<body>"`
+4. Study previous commits by the author: `git log --author="<author>" --oneline -10`
+5. Generate commit message following Conventional Commits AND the author's style (PAST TENSE)
+6. Execute: `git commit -m "<subject>" -m "<body>"`
 
 ### Interactive Rebase
 1. Verify clean working tree
