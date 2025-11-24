@@ -54,3 +54,10 @@ keybind = ctrl+shift+t=unbind
 
 keybind = ctrl+alt+u=unbind
 keybind = ctrl+alt+d=unbind
+
+# Unbind CTRL+arrow keys for shell navigation
+keybind = ctrl+left=unbind
+keybind = ctrl+right=unbind
+keybind = ctrl+up=unbind
+keybind = ctrl+down=unbind
+
