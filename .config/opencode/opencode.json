@@ -130,6 +130,5 @@
     "model_cycle_recent": "alt+l",
     "model_cycle_recent_reverse": "alt+h"
   },
-  "instructions": ["docs/ai-guide.md"],
-  "plugin": ["opencode-skills"]
+  "instructions": ["{env:HOME}/dotfiles/docs/ai-guide.md"]
 }
