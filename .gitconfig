@@ -150,5 +150,6 @@
 
 [url "git@github.com:itse4elhaam/dotfiles.git"]
     insteadOf = "el:"
-[coderabbit]
-	machineId = cli/63646765a8ea458eaf695cac131eff0e
+
+[include]
+  path = ~/.gitconfig.local
