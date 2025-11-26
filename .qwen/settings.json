@@ -1,12 +1,23 @@
 {
-  "preferredEditor": "neovim",
-  "vimMode": false,
-  "theme": "ANSI",
-  "hideTips": true,
-  "hideFooter": false,
-  "contextFileName": "QWEN.md",
-  "selectedAuthType": "qwen-oauth",
+  "context": {
+    "fileName": "QWEN.md"
+  },
+  "ui": {
+    "hideTips": true,
+    "hideFooter": false,
+    "theme": "ANSI"
+  },
+  "general": {
+    "preferredEditor": "neovim",
+    "vimMode": false
+  },
+  "security": {
+    "auth": {
+      "selectedType": "qwen-oauth"
+    }
+  },
   "tools": {
     "useRipgrep": true
-  }
+  },
+  "$version": 2
 }
