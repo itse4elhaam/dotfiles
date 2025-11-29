@@ -1,7 +1,5 @@
 {
   "$schema": "https://opencode.ai/config.json",
-  "plugin": ["opencode-alibaba-qwen3-auth"],
-  "model": "alibaba/coder-model",
   "mcp": {
     "context7": {
       "type": "remote",
@@ -19,10 +17,6 @@
       "type": "remote",
       "url": "https://mcp.chonkie.ai/better-auth/better-auth-builder/mcp",
       "enabled": false
-    },
-    "augments": {
-      "type": "remote",
-      "url": "https://mcp.augments.dev/mcp"
     },
     "playwright": {
       "type": "local",
@@ -61,15 +55,6 @@
       "environment": {
         "MEMORY_BANK_ROOT": "~/.memory/memory.jsonl"
       },
-      "enabled": true
-    },
-    "mindpilot": {
-      "type": "local",
-      "command": [
-        "npx",
-        "-y",
-        "@mindpilot/mcp@latest"
-      ],
       "enabled": true
     },
     "aid": {
