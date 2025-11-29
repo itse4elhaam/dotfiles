@@ -1,5 +1,3 @@
-**⚠️ CRITICAL: NEVER COMMIT CHANGES UNLESS EXPLICITLY ASKED BY THE USER ⚠️**
-
 ---
 
 ## Technology Documentation Lookup Protocol
@@ -415,7 +413,7 @@ Assistant MUST NOT do:
 ## Git Usage
 
 - Always study the git diff before committing.
-- **NEVER** commit unless you are ASKED to.
+- When invoked via `/commit` command, commit immediately after analysis (no user confirmation needed).
 - You may ask the user to use the gh cli if it is relevant (Creating PR or reading linked issue)
 - If the branch named contains a number, it is the issue number, you can use gh to study the linked issue
 - Keep the commit message short and descriptive, follow the [conventional commits](https://www.conventionalcommits.org/en/v1.0.0/) guidelines.

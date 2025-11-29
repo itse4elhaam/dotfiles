@@ -19,10 +19,10 @@ Personal configuration management using `stow` for symlinks. Includes dev setup 
 - Linting: Use shellcheck before committing
 
 ## Git Workflow
-- **Never commit** unless explicitly asked
 - **Commit format**: Conventional Commits (feat|fix|chore|docs|refactor|perf|test)
 - **Branch naming**: `type/short-desc` (solo work) or `type/elhaam/short-desc` (collaborative)
 - **Use**: `/commit` command for commits with CodeRabbit review integration
+- **Auto-commit**: When invoked via `/commit`, commits immediately after analysis
 
 ## OpenCode Customizations
 - **Agents**: 3 primary + 12 subagents in `.opencode/agent/`

@@ -12,8 +12,8 @@ Create a git commit following these STRICT rules:
 
    - ⚠️ WARNING: No files are currently staged for commit.
    - Show unstaged files: !`git status --short`
-   - Inform user: "No files are staged. Would you like to commit ALL modified files? This will stage and commit everything shown above."
-   - Wait for explicit user confirmation before proceeding with `git add -A`
+   - Stage all modified files: !`git add -A`
+   - Proceed with commit.
 
    **If files ARE staged:**
 
@@ -52,4 +52,4 @@ Create a git commit following these STRICT rules:
 
 6. **Execute commit**: Use `git commit -m "<subject>" -m "<body>"` if body needed
 
-DO NOT commit unless changes are staged and analyzed. DO NOT ask for confirmation - execute the commit.
+Execute the commit immediately after analysis. No user confirmation required.

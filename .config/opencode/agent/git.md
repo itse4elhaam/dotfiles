@@ -95,7 +95,7 @@ to prevent concurrent modification errors.
 
 ### Creating a Commit
 1. Check staged files: `git diff --cached --name-only`
-2. If empty, check `git status` and prompt for staging
+2. If empty, stage all changes: `git add -A`
 3. Analyze changes: `git diff --cached`
 4. Study previous commits by the author: `git log --author="<author>" --oneline -10`
 5. Generate commit message following Conventional Commits AND the author's style (PAST TENSE)
