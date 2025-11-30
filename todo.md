@@ -12,3 +12,4 @@
 - https://terminaltrove.com/yatto/
 - https://terminaltrove.com/ssm/
 - https://terminaltrove.com/hike/
+- https://github.com/bellicose100xp/jiq
