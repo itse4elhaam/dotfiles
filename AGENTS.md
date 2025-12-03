@@ -23,6 +23,7 @@ Personal configuration management using `stow` for symlinks. Includes dev setup 
 - **Branch naming**: `type/short-desc` (solo work) or `type/elhaam/short-desc` (collaborative)
 - **Use**: `/commit` command for commits with CodeRabbit review integration
 - **Auto-commit**: When invoked via `/commit`, commits immediately after analysis
+- **Staging logic**: Commit staged files if any exist; if nothing is staged, stage all changes with `git add -A`
 
 ## OpenCode Customizations
 - **Agents**: 3 primary + 12 subagents in `.opencode/agent/`

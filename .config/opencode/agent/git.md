@@ -95,11 +95,12 @@ to prevent concurrent modification errors.
 
 ### Creating a Commit
 1. Check staged files: `git diff --cached --name-only`
-2. If empty, stage all changes: `git add -A`
-3. Analyze changes: `git diff --cached`
-4. Study previous commits by the author: `git log --author="<author>" --oneline -10`
-5. Generate commit message following Conventional Commits AND the author's style (PAST TENSE)
-6. Execute: `git commit -m "<subject>" -m "<body>"`
+2. If files are staged: proceed with those files ONLY
+3. If nothing is staged: stage all changes with `git add -A`
+4. Analyze changes: `git diff --cached`
+5. Study previous commits by the author: `git log --author="<author>" --oneline -10`
+6. Generate commit message following Conventional Commits AND the author's style (PAST TENSE)
+7. Execute: `git commit -m "<subject>" -m "<body>"`
 
 ### Interactive Rebase
 1. Verify clean working tree

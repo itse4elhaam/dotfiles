@@ -8,15 +8,15 @@ Create a git commit following these STRICT rules:
 1. **Check staged files**:
    !`git diff --cached --name-only`
 
+   **If files ARE staged:**
+   
+   - Proceed with commit using ONLY the staged files.
+
    **If NO files are staged:**
 
    - ⚠️ WARNING: No files are currently staged for commit.
    - Show unstaged files: !`git status --short`
    - Stage all modified files: !`git add -A`
-   - Proceed with commit.
-
-   **If files ARE staged:**
-
    - Proceed with commit.
 
 2. **Study author's commit pattern**:

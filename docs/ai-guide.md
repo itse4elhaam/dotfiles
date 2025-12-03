@@ -559,6 +559,7 @@ context7_get-library-docs(context7CompatibleLibraryID: "/facebook/react")
 <rules>
 <rule>Always study the git diff before committing</rule>
 <rule>When invoked via `/commit` command, commit immediately after analysis (no user confirmation needed)</rule>
+<rule>**Staging logic**: Commit staged files if any exist; if nothing is staged, stage all changes with `git add -A`</rule>
 <rule>You may ask the user to use the gh cli if it is relevant (Creating PR or reading linked issue)</rule>
 <rule>If the branch named contains a number, it is the issue number, you can use gh to study the linked issue</rule>
 <rule>Keep the commit message short and descriptive, follow the [conventional commits](https://www.conventionalcommits.org/en/v1.0.0/) guidelines</rule>
