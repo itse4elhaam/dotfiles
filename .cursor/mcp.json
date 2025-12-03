@@ -1,34 +1,36 @@
 {
   "mcpServers": {
     "context7": {
-      "type": "remote",
       "url": "https://mcp.context7.com/mcp",
       "headers": {
-        "CONTEXT7_API_KEY": "{env:CONTEXT7_API_KEY}"
+        "CONTEXT7_API_KEY": "${env:CONTEXT7_API_KEY}"
       }
     },
     "memory": {
-      "type": "local",
-      "command": ["npx", "-y", "@modelcontextprotocol/server-memory"],
-      "environment": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-memory"],
+      "env": {
         "MEMORY_BANK_ROOT": "~/.memory/memory.jsonl"
       }
     },
     "aid": {
-      "type": "local",
-      "command": ["npx", "-y", "@janreges/ai-distiller-mcp"]
+      "command": "npx",
+      "args": ["-y", "@janreges/ai-distiller-mcp"]
     },
     "ddg-search": {
-      "type": "local",
-      "command": ["uvx", "duckduckgo-mcp-server"]
+      "command": "uvx",
+      "args": ["duckduckgo-mcp-server"]
     },
     "octocode": {
-      "type": "local",
-      "command": ["npx", "-y", "octocode-mcp@latest"]
+      "command": "npx",
+      "args": ["-y", "octocode-mcp@latest"]
     },
     "chrome-devtools": {
-      "type": "local",
-      "command": ["npx", "-y", "chrome-devtools-mcp@latest"]
+      "command": "npx",
+      "args": ["-y", "chrome-devtools-mcp@latest"]
+    },
+    "gh_grep": {
+      "url": "https://mcp.grep.app"
     }
   }
 }

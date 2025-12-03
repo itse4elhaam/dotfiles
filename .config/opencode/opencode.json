@@ -8,47 +8,73 @@
         "baseURL": "http://127.0.0.1:9876/v1"
       },
       "models": {
+        "composer-1": {
+          "name": "Composer 1",
+          "limit": { "context": 200000, "output": 65536 }
+        },
         "auto": {
           "name": "Auto (Cursor picks best)",
-          "limit": {
-            "context": 200000,
-            "output": 65536
-          }
+          "limit": { "context": 200000, "output": 65536 }
         },
-        "claude-4.5-opus-high-thinking": {
-          "name": "Claude 4.5 Opus High Thinking",
-          "limit": {
-            "context": 200000,
-            "output": 65536
-          }
+        "sonnet-4.5": {
+          "name": "Claude Sonnet 4.5",
+          "limit": { "context": 200000, "output": 65536 }
         },
-        "claude-4.5-sonnet-thinking": {
-          "name": "Claude 4.5 Sonnet Thinking",
-          "limit": {
-            "context": 200000,
-            "output": 65536
-          }
+        "sonnet-4.5-thinking": {
+          "name": "Claude Sonnet 4.5 Thinking",
+          "limit": { "context": 200000, "output": 65536 }
         },
-        "gpt-5.1-codex": {
-          "name": "GPT 5.1 Codex",
-          "limit": {
-            "context": 128000,
-            "output": 65536
-          }
+        "opus-4.5": {
+          "name": "Claude Opus 4.5",
+          "limit": { "context": 200000, "output": 65536 }
         },
-        "gpt-5.1-codex-high": {
-          "name": "GPT 5.1 Codex High",
-          "limit": {
-            "context": 128000,
-            "output": 65536
-          }
+        "opus-4.5-thinking": {
+          "name": "Claude Opus 4.5 Thinking",
+          "limit": { "context": 200000, "output": 65536 }
+        },
+        "opus-4.1": {
+          "name": "Claude Opus 4.1",
+          "limit": { "context": 200000, "output": 65536 }
         },
         "gemini-3-pro": {
           "name": "Gemini 3 Pro",
-          "limit": {
-            "context": 1000000,
-            "output": 65536
-          }
+          "limit": { "context": 1000000, "output": 65536 }
+        },
+        "grok": {
+          "name": "Grok",
+          "limit": { "context": 128000, "output": 65536 }
+        },
+        "gpt-5": {
+          "name": "GPT 5",
+          "limit": { "context": 128000, "output": 65536 }
+        },
+        "gpt-5.1": {
+          "name": "GPT 5.1",
+          "limit": { "context": 128000, "output": 65536 }
+        },
+        "gpt-5-high": {
+          "name": "GPT 5 High",
+          "limit": { "context": 128000, "output": 65536 }
+        },
+        "gpt-5.1-high": {
+          "name": "GPT 5.1 High",
+          "limit": { "context": 128000, "output": 65536 }
+        },
+        "gpt-5-codex": {
+          "name": "GPT 5 Codex",
+          "limit": { "context": 128000, "output": 65536 }
+        },
+        "gpt-5-codex-high": {
+          "name": "GPT 5 Codex High",
+          "limit": { "context": 128000, "output": 65536 }
+        },
+        "gpt-5.1-codex": {
+          "name": "GPT 5.1 Codex",
+          "limit": { "context": 128000, "output": 65536 }
+        },
+        "gpt-5.1-codex-high": {
+          "name": "GPT 5.1 Codex High",
+          "limit": { "context": 128000, "output": 65536 }
         }
       }
     }

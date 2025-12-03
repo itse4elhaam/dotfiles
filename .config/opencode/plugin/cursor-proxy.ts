@@ -4,6 +4,9 @@
  * Creates a local HTTP server that translates OpenAI-compatible requests
  * to cursor-agent CLI calls, allowing Cursor models to appear as native
  * providers in OpenCode's model switcher.
+ * 
+ * Supports all cursor-agent models including thinking variants with
+ * streamed reasoning content.
  */
 
 import { type Plugin } from "@opencode-ai/plugin";
@@ -19,25 +22,96 @@ interface IChatCompletionRequest {
 	max_tokens?: number;
 }
 
+interface IToolCallResult {
+	success?: Record<string, unknown>;
+	rejected?: { command?: string; reason?: string };
+}
+
+interface IToolCall {
+	shellToolCall?: {
+		args?: { command?: string };
+		result?: IToolCallResult & {
+			success?: { stdout?: string; stderr?: string; exitCode?: number };
+		};
+	};
+	readToolCall?: {
+		args?: { path?: string; offset?: number; limit?: number };
+		result?: {
+			success?: { content?: string; path?: string; totalLines?: number; totalChars?: number };
+		};
+	};
+	writeToolCall?: {
+		args?: { path?: string; fileText?: string };
+		result?: {
+			success?: { path?: string; linesCreated?: number; fileSize?: number };
+		};
+	};
+	editToolCall?: {
+		args?: { path?: string; oldText?: string; newText?: string };
+		result?: { success?: Record<string, unknown> };
+	};
+	grepToolCall?: {
+		args?: { pattern?: string; path?: string };
+		result?: {
+			success?: { workspaceResults?: Record<string, { content: { totalMatchedLines: number } }> };
+		};
+	};
+	globToolCall?: {
+		args?: { globPattern?: string; targetDirectory?: string };
+		result?: { success?: { totalFiles?: number } };
+	};
+	lsToolCall?: {
+		args?: { path?: string; ignore?: string[] };
+		result?: {
+			success?: {
+				directoryTreeRoot?: { childrenFiles?: unknown[]; childrenDirs?: unknown[] };
+			};
+		};
+	};
+	deleteToolCall?: {
+		args?: { path?: string };
+		result?: { success?: Record<string, unknown>; rejected?: { reason?: string } };
+	};
+	function?: { name?: string; arguments?: string };
+}
+
 interface IStreamEvent {
 	type: string;
 	subtype?: string;
+	text?: string;
+	call_id?: string;
 	message?: {
 		role: string;
 		content: Array<{ type: string; text: string }>;
 	};
 	result?: string;
 	is_error?: boolean;
+	tool_call?: IToolCall;
 }
 
-// Available Cursor models
+// Available Cursor models (from cursor-agent --help)
 const CURSOR_MODELS = [
+	// Auto mode
+	"composer-1",
 	"auto",
-	"claude-4.5-opus-high-thinking",
-	"claude-4.5-sonnet-thinking",
+	// Claude models
+	"sonnet-4.5",
+	"sonnet-4.5-thinking",
+	"opus-4.5",
+	"opus-4.5-thinking",
+	"opus-4.1",
+	// Google & xAI
+	"gemini-3-pro",
+	"grok",
+	// GPT models
+	"gpt-5",
+	"gpt-5.1",
+	"gpt-5-high",
+	"gpt-5.1-high",
+	"gpt-5-codex",
+	"gpt-5-codex-high",
 	"gpt-5.1-codex",
 	"gpt-5.1-codex-high",
-	"gemini-3-pro",
 ];
 
 export const CursorProxy: Plugin = async ({ $, directory }) => {
@@ -55,9 +129,117 @@ export const CursorProxy: Plugin = async ({ $, directory }) => {
 		const logMessage = `[${timestamp}] ${message}\n`;
 		try {
 			fs.appendFileSync(logPath, logMessage);
-		} catch (error) {
+		} catch {
 			// Silent fail
 		}
+	}
+
+	/**
+	 * Format tool call started event into markdown
+	 */
+	function formatToolStarted(toolCall: IToolCall): string {
+		if (toolCall.shellToolCall?.args?.command) {
+			return `\n**Tool Use: bash**\n\`\`\`bash\n${toolCall.shellToolCall.args.command}\n\`\`\`\n`;
+		}
+		if (toolCall.readToolCall?.args?.path) {
+			const args = toolCall.readToolCall.args;
+			let info = args.path;
+			if (args.offset !== undefined || args.limit !== undefined) {
+				info += ` (offset: ${args.offset ?? 0}, limit: ${args.limit ?? "all"})`;
+			}
+			return `\n**Tool Use: read**\n\`${info}\`\n`;
+		}
+		if (toolCall.writeToolCall?.args?.path) {
+			const args = toolCall.writeToolCall.args;
+			const preview = args.fileText?.slice(0, 100) ?? "";
+			const truncated = (args.fileText?.length ?? 0) > 100 ? "..." : "";
+			return `\n**Tool Use: write**\n\`${args.path}\` (${args.fileText?.length ?? 0} chars)\n\`\`\`\n${preview}${truncated}\n\`\`\`\n`;
+		}
+		if (toolCall.editToolCall?.args?.path) {
+			return `\n**Tool Use: edit**\n\`${toolCall.editToolCall.args.path}\`\n`;
+		}
+		if (toolCall.grepToolCall?.args) {
+			const args = toolCall.grepToolCall.args;
+			return `\n**Tool Use: grep**\n\`${args.pattern}\` in \`${args.path ?? "."}\`\n`;
+		}
+		if (toolCall.globToolCall?.args) {
+			const args = toolCall.globToolCall.args;
+			return `\n**Tool Use: glob**\n\`${args.globPattern}\` in \`${args.targetDirectory ?? "."}\`\n`;
+		}
+		if (toolCall.lsToolCall?.args) {
+			const args = toolCall.lsToolCall.args;
+			let info = args.path ?? ".";
+			if (args.ignore?.length) {
+				info += ` (ignore: ${args.ignore.join(", ")})`;
+			}
+			return `\n**Tool Use: list**\n\`${info}\`\n`;
+		}
+		if (toolCall.deleteToolCall?.args?.path) {
+			return `\n**Tool Use: delete**\n\`${toolCall.deleteToolCall.args.path}\`\n`;
+		}
+		if (toolCall.function?.name) {
+			return `\n**Tool Use: ${toolCall.function.name}**\n`;
+		}
+		return "";
+	}
+
+	/**
+	 * Format tool call completed event into markdown
+	 */
+	function formatToolCompleted(toolCall: IToolCall): string {
+		if (toolCall.shellToolCall) {
+			const tc = toolCall.shellToolCall;
+			if (tc.result?.rejected) {
+				return `\n**Result:** Rejected${tc.result.rejected.reason ? ` (${tc.result.rejected.reason})` : ""}\n`;
+			}
+			if (tc.result?.success) {
+				const { stdout, stderr, exitCode } = tc.result.success;
+				const output = stdout || stderr || "";
+				let result = `\n**Result:** Exit ${exitCode ?? 0}\n`;
+				if (output.trim()) {
+					result += `\`\`\`\n${output.slice(0, 2000)}${output.length > 2000 ? "\n... (truncated)" : ""}\n\`\`\`\n`;
+				}
+				return result;
+			}
+		}
+		if (toolCall.readToolCall?.result?.success) {
+			const s = toolCall.readToolCall.result.success;
+			return `\n**Result:** Read ${s.totalLines ?? "?"} lines (${s.totalChars ?? "?"} chars)\n`;
+		}
+		if (toolCall.writeToolCall?.result?.success) {
+			const s = toolCall.writeToolCall.result.success;
+			return `\n**Result:** Wrote ${s.linesCreated ?? "?"} lines (${s.fileSize ?? "?"} bytes) to \`${s.path}\`\n`;
+		}
+		if (toolCall.editToolCall?.result?.success) {
+			return `\n**Result:** Edit applied\n`;
+		}
+		if (toolCall.grepToolCall?.result?.success) {
+			const results = toolCall.grepToolCall.result.success.workspaceResults;
+			if (results) {
+				const firstKey = Object.keys(results)[0];
+				const matches = results[firstKey]?.content?.totalMatchedLines ?? 0;
+				return `\n**Result:** Found ${matches} matches\n`;
+			}
+			return `\n**Result:** Grep completed\n`;
+		}
+		if (toolCall.globToolCall?.result?.success) {
+			return `\n**Result:** Found ${toolCall.globToolCall.result.success.totalFiles ?? 0} files\n`;
+		}
+		if (toolCall.lsToolCall?.result?.success) {
+			const root = toolCall.lsToolCall.result.success.directoryTreeRoot;
+			const files = root?.childrenFiles?.length ?? 0;
+			const dirs = root?.childrenDirs?.length ?? 0;
+			return `\n**Result:** Listed ${files} files, ${dirs} directories\n`;
+		}
+		if (toolCall.deleteToolCall) {
+			if (toolCall.deleteToolCall.result?.success) {
+				return `\n**Result:** Deleted\n`;
+			}
+			if (toolCall.deleteToolCall.result?.rejected) {
+				return `\n**Result:** Delete rejected${toolCall.deleteToolCall.result.rejected.reason ? `: ${toolCall.deleteToolCall.result.rejected.reason}` : ""}\n`;
+			}
+		}
+		return `\n**Result:** Completed\n`;
 	}
 
 	/**
@@ -84,8 +266,7 @@ export const CursorProxy: Plugin = async ({ $, directory }) => {
 				if (event.type === "result" && event.result) {
 					text += event.result;
 				}
-			} catch (error) {
-				// Skip malformed JSON
+			} catch {
 				continue;
 			}
 		}
@@ -129,6 +310,7 @@ export const CursorProxy: Plugin = async ({ $, directory }) => {
 
 				// If streaming is requested
 				if (request.stream) {
+					log(`[STREAM START] Starting streaming response for model=${model}`);
 					res.writeHead(200, {
 						"Content-Type": "text/event-stream",
 						"Cache-Control": "no-cache",
@@ -136,8 +318,9 @@ export const CursorProxy: Plugin = async ({ $, directory }) => {
 					});
 
 					// Spawn cursor-agent process
+					log(`[SPAWN] Spawning cursor-agent with --force and --approve-mcps flags`);
 					const proc = Bun.spawn(
-						["cursor-agent", "-p", "--model", model, "--output-format", "stream-json", "--stream-partial-output", prompt],
+						["cursor-agent", "-p", "--force", "--model", model, "--output-format", "stream-json", "--stream-partial-output", "--approve-mcps", prompt],
 						{
 							stdout: "pipe",
 							stderr: "pipe",
@@ -145,8 +328,28 @@ export const CursorProxy: Plugin = async ({ $, directory }) => {
 					);
 
 					let accumulatedText = "";
+					let fullRawOutput = "";
+					
+					log(`[CAPTURE] Starting output capture`);
 					const reader = proc.stdout.getReader();
 					const decoder = new TextDecoder();
+
+					const sendChunk = (content: string) => {
+						if (!content) return;
+						accumulatedText += content;
+						const chunk = {
+							id: `cursor-${Date.now()}`,
+							object: "chat.completion.chunk",
+							created: Math.floor(Date.now() / 1000),
+							model: request.model,
+							choices: [{
+								index: 0,
+								delta: { content },
+								finish_reason: null,
+							}],
+						};
+						res.write(`data: ${JSON.stringify(chunk)}\n\n`);
+					};
 
 					// Read stream line by line
 					let buffer = "";
@@ -155,9 +358,11 @@ export const CursorProxy: Plugin = async ({ $, directory }) => {
 						
 						if (done) break;
 						
-						buffer += decoder.decode(value, { stream: true });
+						const chunk = decoder.decode(value, { stream: true });
+						fullRawOutput += chunk;
+						buffer += chunk;
 						const lines = buffer.split("\n");
-						buffer = lines.pop() || ""; // Keep incomplete line in buffer
+						buffer = lines.pop() || "";
 
 						for (const line of lines) {
 							if (!line.trim()) continue;
@@ -165,30 +370,33 @@ export const CursorProxy: Plugin = async ({ $, directory }) => {
 							try {
 								const event: IStreamEvent = JSON.parse(line);
 
+								// Handle thinking events (for thinking models like sonnet-4.5-thinking)
+								if (event.type === "thinking" && event.subtype === "delta" && event.text) {
+									// Format thinking as a distinct block
+									sendChunk(`\n> **Thinking:** ${event.text}`);
+								}
+
+								// Handle tool calls (started)
+								if (event.type === "tool_call" && event.subtype === "started" && event.tool_call) {
+									const formatted = formatToolStarted(event.tool_call);
+									sendChunk(formatted);
+								}
+
+								// Handle tool calls (completed)
+								if (event.type === "tool_call" && event.subtype === "completed" && event.tool_call) {
+									const formatted = formatToolCompleted(event.tool_call);
+									sendChunk(formatted);
+								}
+
 								// Extract text from assistant messages
 								if (event.type === "assistant" && event.message?.content) {
 									for (const content of event.message.content) {
 										if (content.type === "text" && content.text) {
-											accumulatedText += content.text;
-											
-											// Send SSE chunk
-											const chunk = {
-												id: `cursor-${Date.now()}`,
-												object: "chat.completion.chunk",
-												created: Math.floor(Date.now() / 1000),
-												model: request.model,
-												choices: [{
-													index: 0,
-													delta: { content: content.text },
-													finish_reason: null,
-												}],
-											};
-											res.write(`data: ${JSON.stringify(chunk)}\n\n`);
+											sendChunk(content.text);
 										}
 									}
 								}
-							} catch (parseError) {
-								// Skip malformed JSON
+							} catch {
 								continue;
 							}
 						}
@@ -211,9 +419,12 @@ export const CursorProxy: Plugin = async ({ $, directory }) => {
 					res.end();
 
 					log(`Streaming complete: ${accumulatedText.length} chars`);
+					log(`===== COMPLETE RAW CURSOR OUTPUT START =====`);
+					log(fullRawOutput);
+					log(`===== COMPLETE RAW CURSOR OUTPUT END =====`);
 				} else {
 					// Non-streaming response
-					const output = await $`cursor-agent -p --model ${model} --output-format stream-json ${prompt}`.text();
+					const output = await $`cursor-agent -p --force --model ${model} --output-format stream-json --approve-mcps ${prompt}`.text();
 					const responseText = parseCursorOutput(output);
 					
 					if (!responseText) {
@@ -296,7 +507,7 @@ export const CursorProxy: Plugin = async ({ $, directory }) => {
 	// Start server
 	server.listen(PORT, "127.0.0.1", () => {
 		log(`Cursor proxy server started on http://127.0.0.1:${PORT}`);
-		console.log(`✅ Cursor proxy running on http://127.0.0.1:${PORT}`);
+		console.log(`Cursor proxy running on http://127.0.0.1:${PORT}`);
 	});
 
 	// Cleanup on exit
