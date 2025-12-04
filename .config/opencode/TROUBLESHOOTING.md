@@ -58,6 +58,25 @@ tail -20 .opencode/cursor-proxy.log
 2. Wait 2-3 seconds for server to start
 3. Try Cursor model again
 
+### `[object Object]` in Responses
+
+**Symptoms**: When using `@file.js` references, Cursor responds with:
+```
+[object Object],[object Object],[object Object]
+```
+
+**Cause**: File diagnostics (lint errors, type errors) were being sent as objects but not properly serialized.
+
+**Fix**:
+1. Update to commit `ef917ab` or later
+2. Restart OpenCode
+3. Use `@file.js` references again - diagnostics will now be properly formatted
+
+**Expected behavior after fix**:
+- Text content is extracted properly
+- Diagnostics are serialized as formatted JSON
+- File information is preserved and readable
+
 ## Tool Import Errors
 
 ### "Cannot find module '@opencode-ai/plugin'"
@@ -146,6 +165,7 @@ curl -s http://127.0.0.1:9876/v1/models | jq .
 | Port conflict | "EADDRINUSE" | `lsof -ti:9876 \| xargs kill` |
 | Premature shutdown | Server stops after 1-2s | Update to latest commit, restart |
 | Wrong workspace | Using old directory | Restart OpenCode (auto-updates) |
+| `[object Object]` | File diagnostics not sent | Update to commit `ef917ab`, restart |
 
 ## Getting Help
 
@@ -156,6 +176,7 @@ curl -s http://127.0.0.1:9876/v1/models | jq .
 
 ## Recent Fixes
 
+- **2025-12-04**: Fixed `[object Object]` error with @ file references (commit `ef917ab`)
 - **2025-12-04**: Fixed premature server shutdown (commit `eefc9d6`)
 - **2025-12-04**: Fixed plugin import errors (commit `94ac37a`)
 
