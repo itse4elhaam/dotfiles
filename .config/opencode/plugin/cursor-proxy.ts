@@ -5,8 +5,12 @@
  * to cursor-agent CLI calls, allowing Cursor models to appear as native
  * providers in OpenCode's model switcher.
  * 
- * Supports all cursor-agent models including thinking variants with
- * streamed reasoning content.
+ * Features:
+ * - Supports all cursor-agent models including thinking variants
+ * - Streams reasoning content in real-time
+ * - Automatically approves MCP servers (--approve-mcps)
+ * - Uses workspace directory context (--workspace)
+ * - Forces command execution without prompts (--force)
  */
 
 import { type Plugin } from "@opencode-ai/plugin";
@@ -318,9 +322,9 @@ export const CursorProxy: Plugin = async ({ $, directory }) => {
 					});
 
 					// Spawn cursor-agent process
-					log(`[SPAWN] Spawning cursor-agent with --force and --approve-mcps flags`);
+					log(`[SPAWN] Spawning cursor-agent with --force, --approve-mcps, and --workspace flags`);
 					const proc = Bun.spawn(
-						["cursor-agent", "-p", "--force", "--model", model, "--output-format", "stream-json", "--stream-partial-output", "--approve-mcps", prompt],
+						["cursor-agent", "-p", "--force", "--model", model, "--output-format", "stream-json", "--stream-partial-output", "--approve-mcps", "--workspace", directory, prompt],
 						{
 							stdout: "pipe",
 							stderr: "pipe",
@@ -424,7 +428,7 @@ export const CursorProxy: Plugin = async ({ $, directory }) => {
 					log(`===== COMPLETE RAW CURSOR OUTPUT END =====`);
 				} else {
 					// Non-streaming response
-					const output = await $`cursor-agent -p --force --model ${model} --output-format stream-json --approve-mcps ${prompt}`.text();
+					const output = await $`cursor-agent -p --force --model ${model} --output-format stream-json --approve-mcps --workspace ${directory} ${prompt}`.text();
 					const responseText = parseCursorOutput(output);
 					
 					if (!responseText) {
