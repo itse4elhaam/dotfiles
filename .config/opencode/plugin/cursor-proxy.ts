@@ -11,12 +11,24 @@
  * - Automatically approves MCP servers (--approve-mcps)
  * - Uses workspace directory context (--workspace)
  * - Forces command execution without prompts (--force)
+ * - Singleton server that persists across plugin reloads
+ * - Auto-restarts if crashed
  */
 
 import { type Plugin } from "@opencode-ai/plugin";
 import * as http from "node:http";
 import * as fs from "node:fs";
 import * as path from "node:path";
+
+// Global singleton to persist server across plugin reloads
+const GLOBAL_KEY = Symbol.for("opencode.cursor-proxy.server");
+type GlobalWithServer = typeof globalThis & {
+	[GLOBAL_KEY]?: {
+		server: http.Server;
+		port: number;
+		directory: string;
+	};
+};
 
 interface IChatCompletionRequest {
 	model: string;
@@ -121,6 +133,7 @@ const CURSOR_MODELS = [
 export const CursorProxy: Plugin = async ({ $, directory }) => {
 	const PORT = 9876;
 	const logPath = path.join(directory, ".opencode", "cursor-proxy.log");
+	const globalWithServer = globalThis as GlobalWithServer;
 	
 	// Ensure log directory exists
 	const logDir = path.dirname(logPath);
@@ -135,6 +148,18 @@ export const CursorProxy: Plugin = async ({ $, directory }) => {
 			fs.appendFileSync(logPath, logMessage);
 		} catch {
 			// Silent fail
+		}
+	}
+
+	// Check if server is already running
+	if (globalWithServer[GLOBAL_KEY]) {
+		const existing = globalWithServer[GLOBAL_KEY];
+		if (existing.port === PORT) {
+			log(`Cursor proxy already running on port ${PORT} (plugin reload detected)`);
+			console.log(`Cursor proxy already running on http://127.0.0.1:${PORT}`);
+			// Update directory in case workspace changed
+			existing.directory = directory;
+			return {};
 		}
 	}
 
@@ -310,7 +335,9 @@ export const CursorProxy: Plugin = async ({ $, directory }) => {
 					return;
 				}
 
-				log(`Executing: cursor-agent with model=${model}`);
+				// Get current workspace directory from global state
+				const currentDirectory = globalWithServer[GLOBAL_KEY]?.directory || directory;
+				log(`Executing: cursor-agent with model=${model}, workspace=${currentDirectory}`);
 
 				// If streaming is requested
 				if (request.stream) {
@@ -324,7 +351,7 @@ export const CursorProxy: Plugin = async ({ $, directory }) => {
 					// Spawn cursor-agent process
 					log(`[SPAWN] Spawning cursor-agent with --force, --approve-mcps, and --workspace flags`);
 					const proc = Bun.spawn(
-						["cursor-agent", "-p", "--force", "--model", model, "--output-format", "stream-json", "--stream-partial-output", "--approve-mcps", "--workspace", directory, prompt],
+						["cursor-agent", "-p", "--force", "--model", model, "--output-format", "stream-json", "--stream-partial-output", "--approve-mcps", "--workspace", currentDirectory, prompt],
 						{
 							stdout: "pipe",
 							stderr: "pipe",
@@ -428,7 +455,7 @@ export const CursorProxy: Plugin = async ({ $, directory }) => {
 					log(`===== COMPLETE RAW CURSOR OUTPUT END =====`);
 				} else {
 					// Non-streaming response
-					const output = await $`cursor-agent -p --force --model ${model} --output-format stream-json --approve-mcps --workspace ${directory} ${prompt}`.text();
+					const output = await $`cursor-agent -p --force --model ${model} --output-format stream-json --approve-mcps --workspace ${currentDirectory} ${prompt}`.text();
 					const responseText = parseCursorOutput(output);
 					
 					if (!responseText) {
@@ -508,17 +535,57 @@ export const CursorProxy: Plugin = async ({ $, directory }) => {
 		}
 	});
 
-	// Start server
+	// Create and start the server
+	log(`Starting Cursor proxy server on port ${PORT}`);
+	
 	server.listen(PORT, "127.0.0.1", () => {
 		log(`Cursor proxy server started on http://127.0.0.1:${PORT}`);
 		console.log(`Cursor proxy running on http://127.0.0.1:${PORT}`);
 	});
 
-	// Cleanup on exit
-	process.on("exit", () => {
-		log("Cursor proxy server shutting down");
-		server.close();
+	// Handle server errors (e.g., port already in use)
+	server.on("error", (err: NodeJS.ErrnoException) => {
+		if (err.code === "EADDRINUSE") {
+			log(`Port ${PORT} already in use - another instance may be running`);
+			console.log(`Cursor proxy: Port ${PORT} already in use`);
+		} else {
+			log(`Server error: ${err.message}`);
+			console.error(`Cursor proxy error: ${err.message}`);
+		}
 	});
+
+	// Store server in global state to persist across plugin reloads
+	globalWithServer[GLOBAL_KEY] = {
+		server,
+		port: PORT,
+		directory,
+	};
+
+	// Only register cleanup handlers once (check if already registered)
+	if (!process.listenerCount("SIGINT")) {
+		process.on("SIGINT", () => {
+			log("Cursor proxy server shutting down (SIGINT)");
+			if (globalWithServer[GLOBAL_KEY]) {
+				globalWithServer[GLOBAL_KEY].server.close();
+				delete globalWithServer[GLOBAL_KEY];
+			}
+			process.exit(0);
+		});
+	}
+
+	if (!process.listenerCount("SIGTERM")) {
+		process.on("SIGTERM", () => {
+			log("Cursor proxy server shutting down (SIGTERM)");
+			if (globalWithServer[GLOBAL_KEY]) {
+				globalWithServer[GLOBAL_KEY].server.close();
+				delete globalWithServer[GLOBAL_KEY];
+			}
+			process.exit(0);
+		});
+	}
+
+	// Don't register process.on("exit") - it causes premature shutdowns
+	// The server will stay alive until SIGINT/SIGTERM or process termination
 
 	return {};
 };
