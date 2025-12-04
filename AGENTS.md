@@ -28,9 +28,10 @@ Personal configuration management using `stow` for symlinks. Includes dev setup 
 ## OpenCode Customizations
 - **Agents**: 3 primary + 12 subagents in `.opencode/agent/`
 - **Commands**: 9 custom commands in `.opencode/command/` (commit, study, test, etc.)
-- **Tools**: Custom MCP tools in `.opencode/tool/`
+- **Tools**: Custom MCP tools in `.opencode/tool/` (requires `@opencode-ai/plugin` dependency)
 - **Plugins**: Cursor CLI plugin in `.config/opencode/plugin/` (symlinked to `~/.config/opencode/plugin/`)
 - **Context**: Structured guides in `.opencode/context/`
+- **Dependencies**: `.config/opencode/package.json` - Install with `cd .config/opencode && npm install`
 
 ## Cursor AI Provider
 - **Location**: `.config/opencode/plugin/cursor-proxy.ts`
