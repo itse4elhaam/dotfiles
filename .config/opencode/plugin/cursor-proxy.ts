@@ -172,111 +172,102 @@ export const CursorProxy: Plugin = async ({ $, directory }) => {
 	}
 
 	/**
-	 * Format tool call started event into markdown
+	 * Format tool call started event into markdown (OpenCode native style)
 	 */
 	function formatToolStarted(toolCall: IToolCall): string {
 		if (toolCall.shellToolCall?.args?.command) {
-			return `\n**Tool Use: bash**\n\`\`\`bash\n${toolCall.shellToolCall.args.command}\n\`\`\`\n`;
+			return `\nTool Use: bash\n${toolCall.shellToolCall.args.command}\n`;
 		}
 		if (toolCall.readToolCall?.args?.path) {
 			const args = toolCall.readToolCall.args;
-			let info = args.path;
-			if (args.offset !== undefined || args.limit !== undefined) {
-				info += ` (offset: ${args.offset ?? 0}, limit: ${args.limit ?? "all"})`;
-			}
-			return `\n**Tool Use: read**\n\`${info}\`\n`;
+			return `\nTool Use: read\n${args.path}\n`;
 		}
 		if (toolCall.writeToolCall?.args?.path) {
 			const args = toolCall.writeToolCall.args;
-			const preview = args.fileText?.slice(0, 100) ?? "";
-			const truncated = (args.fileText?.length ?? 0) > 100 ? "..." : "";
-			return `\n**Tool Use: write**\n\`${args.path}\` (${args.fileText?.length ?? 0} chars)\n\`\`\`\n${preview}${truncated}\n\`\`\`\n`;
+			return `\nTool Use: write\n${args.path}\n`;
 		}
 		if (toolCall.editToolCall?.args?.path) {
-			return `\n**Tool Use: edit**\n\`${toolCall.editToolCall.args.path}\`\n`;
+			return `\nTool Use: edit\n${toolCall.editToolCall.args.path}\n`;
 		}
 		if (toolCall.grepToolCall?.args) {
 			const args = toolCall.grepToolCall.args;
-			return `\n**Tool Use: grep**\n\`${args.pattern}\` in \`${args.path ?? "."}\`\n`;
+			return `\nTool Use: grep\n${args.pattern} in ${args.path ?? "."}\n`;
 		}
 		if (toolCall.globToolCall?.args) {
 			const args = toolCall.globToolCall.args;
-			return `\n**Tool Use: glob**\n\`${args.globPattern}\` in \`${args.targetDirectory ?? "."}\`\n`;
+			return `\nTool Use: glob\n${args.globPattern} in ${args.targetDirectory ?? "."}\n`;
 		}
 		if (toolCall.lsToolCall?.args) {
 			const args = toolCall.lsToolCall.args;
-			let info = args.path ?? ".";
-			if (args.ignore?.length) {
-				info += ` (ignore: ${args.ignore.join(", ")})`;
-			}
-			return `\n**Tool Use: list**\n\`${info}\`\n`;
+			return `\nTool Use: list\n${args.path ?? "."}\n`;
 		}
 		if (toolCall.deleteToolCall?.args?.path) {
-			return `\n**Tool Use: delete**\n\`${toolCall.deleteToolCall.args.path}\`\n`;
+			return `\nTool Use: delete\n${toolCall.deleteToolCall.args.path}\n`;
 		}
 		if (toolCall.function?.name) {
-			return `\n**Tool Use: ${toolCall.function.name}**\n`;
+			return `\nTool Use: ${toolCall.function.name}\n`;
 		}
 		return "";
 	}
 
 	/**
-	 * Format tool call completed event into markdown
+	 * Format tool call completed event into markdown (OpenCode native style)
 	 */
 	function formatToolCompleted(toolCall: IToolCall): string {
 		if (toolCall.shellToolCall) {
 			const tc = toolCall.shellToolCall;
 			if (tc.result?.rejected) {
-				return `\n**Result:** Rejected${tc.result.rejected.reason ? ` (${tc.result.rejected.reason})` : ""}\n`;
+				return `\nResult: Rejected${tc.result.rejected.reason ? ` (${tc.result.rejected.reason})` : ""}\n`;
 			}
 			if (tc.result?.success) {
 				const { stdout, stderr, exitCode } = tc.result.success;
 				const output = stdout || stderr || "";
-				let result = `\n**Result:** Exit ${exitCode ?? 0}\n`;
+				let result = `\nResult: Exit ${exitCode ?? 0}`;
 				if (output.trim()) {
-					result += `\`\`\`\n${output.slice(0, 2000)}${output.length > 2000 ? "\n... (truncated)" : ""}\n\`\`\`\n`;
+					const truncated = output.length > 2000 ? "\n... (truncated)" : "";
+					result += `\n${output.slice(0, 2000)}${truncated}`;
 				}
-				return result;
+				return result + "\n";
 			}
 		}
 		if (toolCall.readToolCall?.result?.success) {
 			const s = toolCall.readToolCall.result.success;
-			return `\n**Result:** Read ${s.totalLines ?? "?"} lines (${s.totalChars ?? "?"} chars)\n`;
+			return `\nResult: Read ${s.totalLines ?? "?"} lines (${s.totalChars ?? "?"} chars)\n`;
 		}
 		if (toolCall.writeToolCall?.result?.success) {
 			const s = toolCall.writeToolCall.result.success;
-			return `\n**Result:** Wrote ${s.linesCreated ?? "?"} lines (${s.fileSize ?? "?"} bytes) to \`${s.path}\`\n`;
+			return `\nResult: Wrote ${s.linesCreated ?? "?"} lines (${s.fileSize ?? "?"} bytes) to ${s.path}\n`;
 		}
 		if (toolCall.editToolCall?.result?.success) {
-			return `\n**Result:** Edit applied\n`;
+			return `\nResult: Edit applied\n`;
 		}
 		if (toolCall.grepToolCall?.result?.success) {
 			const results = toolCall.grepToolCall.result.success.workspaceResults;
 			if (results) {
 				const firstKey = Object.keys(results)[0];
 				const matches = results[firstKey]?.content?.totalMatchedLines ?? 0;
-				return `\n**Result:** Found ${matches} matches\n`;
+				return `\nResult: Found ${matches} matches\n`;
 			}
-			return `\n**Result:** Grep completed\n`;
+			return `\nResult: Grep completed\n`;
 		}
 		if (toolCall.globToolCall?.result?.success) {
-			return `\n**Result:** Found ${toolCall.globToolCall.result.success.totalFiles ?? 0} files\n`;
+			return `\nResult: Found ${toolCall.globToolCall.result.success.totalFiles ?? 0} files\n`;
 		}
 		if (toolCall.lsToolCall?.result?.success) {
 			const root = toolCall.lsToolCall.result.success.directoryTreeRoot;
 			const files = root?.childrenFiles?.length ?? 0;
 			const dirs = root?.childrenDirs?.length ?? 0;
-			return `\n**Result:** Listed ${files} files, ${dirs} directories\n`;
+			return `\nResult: Listed ${files} files, ${dirs} directories\n`;
 		}
 		if (toolCall.deleteToolCall) {
 			if (toolCall.deleteToolCall.result?.success) {
-				return `\n**Result:** Deleted\n`;
+				return `\nResult: Deleted\n`;
 			}
 			if (toolCall.deleteToolCall.result?.rejected) {
-				return `\n**Result:** Delete rejected${toolCall.deleteToolCall.result.rejected.reason ? `: ${toolCall.deleteToolCall.result.rejected.reason}` : ""}\n`;
+				return `\nResult: Delete rejected${toolCall.deleteToolCall.result.rejected.reason ? `: ${toolCall.deleteToolCall.result.rejected.reason}` : ""}\n`;
 			}
 		}
-		return `\n**Result:** Completed\n`;
+		return `\nResult: Completed\n`;
 	}
 
 	/**
