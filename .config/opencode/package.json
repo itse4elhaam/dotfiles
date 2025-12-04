@@ -1,0 +1,8 @@
+{
+  "name": "opencode-dotfiles",
+  "version": "1.0.0",
+  "type": "module",
+  "dependencies": {
+    "@opencode-ai/plugin": "^1.0.132"
+  }
+}
