@@ -77,6 +77,28 @@ tail -20 .opencode/cursor-proxy.log
 - Diagnostics are serialized as formatted JSON
 - File information is preserved and readable
 
+### Verbose Thinking Output
+
+**Symptoms**: When using thinking models (e.g., `sonnet-4.5-thinking`), seeing:
+```
+> Thinking: word
+> Thinking: by
+> Thinking: word
+```
+
+**Cause**: Thinking tokens were being sent individually with formatting on each word.
+
+**Fix**:
+1. Update to commit `0707569` or later
+2. Restart OpenCode
+3. Thinking now appears in a single collapsible section
+
+**Expected behavior after fix**:
+- Thinking appears in `<details>` block with 💭 emoji
+- Can be collapsed/expanded in UI
+- Cleaner, faster response
+- Thinking is separated from main response
+
 ## Tool Import Errors
 
 ### "Cannot find module '@opencode-ai/plugin'"
@@ -176,6 +198,7 @@ curl -s http://127.0.0.1:9876/v1/models | jq .
 
 ## Recent Fixes
 
+- **2025-12-04**: Improved thinking token handling and formatting (commit `0707569`)
 - **2025-12-04**: Fixed `[object Object]` error with @ file references (commit `ef917ab`)
 - **2025-12-04**: Fixed premature server shutdown (commit `eefc9d6`)
 - **2025-12-04**: Fixed plugin import errors (commit `94ac37a`)
