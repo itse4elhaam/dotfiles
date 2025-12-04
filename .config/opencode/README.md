@@ -51,7 +51,17 @@ The Cursor proxy plugin (`plugin/cursor-proxy.ts`) provides native Cursor AI int
 - **Port**: 9876
 - **Models**: Auto, Claude 4.5, GPT-5.1, Gemini 3 Pro, etc.
 - **Requirements**: Cursor Pro subscription
+- **Lifecycle**: Singleton server that persists for the entire OpenCode session
+- **Auto-reload**: Survives plugin reloads, never shuts down while OpenCode is running
 - **Docs**: See `plugin/README-cursor-plugin.md`
+
+### How It Works
+
+The proxy uses a global singleton pattern to ensure:
+1. Server starts once when OpenCode launches
+2. Persists across plugin reloads (doesn't restart unnecessarily)
+3. Only shuts down when OpenCode terminates or receives SIGINT/SIGTERM
+4. Automatically updates workspace directory when you switch projects
 
 ## Troubleshooting
 
@@ -69,6 +79,21 @@ npm install
 1. Check that `package.json` exists
 2. Verify `node_modules/@opencode-ai/plugin` is installed
 3. Restart OpenCode
+
+### Cursor Proxy Not Responding
+
+If the Cursor proxy server isn't responding:
+
+1. **Check if running**: `lsof -i :9876` (should show a process)
+2. **Check logs**: `tail -f .opencode/cursor-proxy.log` in your project
+3. **Restart OpenCode**: The server will auto-start on next launch
+4. **Port conflict**: If port 9876 is in use, kill the process: `lsof -ti:9876 | xargs kill`
+
+The proxy server should:
+- ✅ Start automatically when OpenCode launches
+- ✅ Stay running for the entire OpenCode session
+- ✅ Never shut down mid-request
+- ✅ Survive plugin reloads without restarting
 
 ### Testing Setup
 
