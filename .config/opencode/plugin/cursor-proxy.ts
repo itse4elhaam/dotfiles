@@ -32,7 +32,15 @@ type GlobalWithServer = typeof globalThis & {
 
 interface IChatCompletionRequest {
 	model: string;
-	messages: Array<{ role: string; content: string }>;
+	messages: Array<{ 
+		role: string; 
+		content: string | Array<{
+			type: string;
+			text?: string;
+			image_url?: { url: string };
+			[key: string]: any;
+		}>;
+	}>;
 	stream?: boolean;
 	temperature?: number;
 	max_tokens?: number;
@@ -272,6 +280,35 @@ export const CursorProxy: Plugin = async ({ $, directory }) => {
 	}
 
 	/**
+	 * Extract text content from OpenAI message format
+	 * Handles both string content and array of content parts
+	 */
+	function extractMessageContent(content: string | Array<{ type: string; text?: string; [key: string]: any }>): string {
+		if (typeof content === "string") {
+			return content;
+		}
+		
+		if (Array.isArray(content)) {
+			return content
+				.map(part => {
+					if (part.type === "text" && part.text) {
+						return part.text;
+					}
+					// Handle other content types (images, etc.) by serializing
+					if (part.type && part.type !== "text") {
+						return JSON.stringify(part, null, 2);
+					}
+					return "";
+				})
+				.filter(Boolean)
+				.join("\n\n");
+		}
+		
+		// Fallback: try to stringify
+		return JSON.stringify(content, null, 2);
+	}
+
+	/**
 	 * Parse cursor-agent NDJSON output and extract text
 	 */
 	function parseCursorOutput(output: string): string {
@@ -323,7 +360,15 @@ export const CursorProxy: Plugin = async ({ $, directory }) => {
 
 				// Extract the last user message as the prompt
 				const lastMessage = request.messages[request.messages.length - 1];
-				const prompt = lastMessage?.content || "Hello";
+				const prompt = lastMessage?.content 
+					? extractMessageContent(lastMessage.content)
+					: "Hello";
+				
+				// Log prompt preview for debugging
+				const promptPreview = prompt.length > 200 
+					? prompt.substring(0, 200) + "..." 
+					: prompt;
+				log(`Prompt preview: ${promptPreview.replace(/\n/g, " ")}`);
 
 				// Map model name (handle both with/without cursor/ prefix)
 				const model = request.model.replace("cursor/", "");
