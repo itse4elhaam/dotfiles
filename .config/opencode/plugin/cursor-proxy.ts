@@ -431,8 +431,8 @@ export const CursorProxy: Plugin = async ({ $, directory }) => {
 
 					const flushThinking = () => {
 						if (thinkingBuffer) {
-							// Send accumulated thinking as a single formatted block
-							sendChunk(`\n<details>\n<summary>💭 Thinking</summary>\n\n${thinkingBuffer}\n</details>\n\n`);
+							// Send accumulated thinking in OpenCode's tool use format
+							sendChunk(`\n**Thinking:**\n${thinkingBuffer.trim()}\n\n`);
 							thinkingBuffer = "";
 						}
 						isThinking = false;
