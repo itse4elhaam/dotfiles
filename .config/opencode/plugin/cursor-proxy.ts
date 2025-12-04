@@ -405,6 +405,8 @@ export const CursorProxy: Plugin = async ({ $, directory }) => {
 
 					let accumulatedText = "";
 					let fullRawOutput = "";
+					let thinkingBuffer = ""; // Buffer for thinking tokens
+					let isThinking = false;
 					
 					log(`[CAPTURE] Starting output capture`);
 					const reader = proc.stdout.getReader();
@@ -427,6 +429,15 @@ export const CursorProxy: Plugin = async ({ $, directory }) => {
 						res.write(`data: ${JSON.stringify(chunk)}\n\n`);
 					};
 
+					const flushThinking = () => {
+						if (thinkingBuffer) {
+							// Send accumulated thinking as a single formatted block
+							sendChunk(`\n<details>\n<summary>💭 Thinking</summary>\n\n${thinkingBuffer}\n</details>\n\n`);
+							thinkingBuffer = "";
+						}
+						isThinking = false;
+					};
+
 					// Read stream line by line
 					let buffer = "";
 					while (true) {
@@ -446,14 +457,24 @@ export const CursorProxy: Plugin = async ({ $, directory }) => {
 							try {
 								const event: IStreamEvent = JSON.parse(line);
 
-								// Handle thinking events (for thinking models like sonnet-4.5-thinking)
-								if (event.type === "thinking" && event.subtype === "delta" && event.text) {
-									// Format thinking as a distinct block
-									sendChunk(`\n> **Thinking:** ${event.text}`);
+								// Handle thinking events (for thinking models)
+								if (event.type === "thinking") {
+									if (event.subtype === "delta" && event.text) {
+										// Accumulate thinking text
+										if (!isThinking) {
+											isThinking = true;
+										}
+										thinkingBuffer += event.text;
+									} else if (event.subtype === "completed") {
+										// Flush accumulated thinking when complete
+										flushThinking();
+									}
 								}
 
 								// Handle tool calls (started)
 								if (event.type === "tool_call" && event.subtype === "started" && event.tool_call) {
+									// Flush any pending thinking before tool output
+									flushThinking();
 									const formatted = formatToolStarted(event.tool_call);
 									sendChunk(formatted);
 								}
@@ -466,6 +487,8 @@ export const CursorProxy: Plugin = async ({ $, directory }) => {
 
 								// Extract text from assistant messages
 								if (event.type === "assistant" && event.message?.content) {
+									// Flush any pending thinking before assistant response
+									flushThinking();
 									for (const content of event.message.content) {
 										if (content.type === "text" && content.text) {
 											sendChunk(content.text);
@@ -477,6 +500,9 @@ export const CursorProxy: Plugin = async ({ $, directory }) => {
 							}
 						}
 					}
+
+					// Flush any remaining thinking
+					flushThinking();
 
 					// Send final chunk
 					const finalChunk = {
