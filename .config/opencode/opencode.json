@@ -25,7 +25,7 @@
         "-y",
         "@playwright/mcp@latest"
       ],
-      "enabled": false
+      "enabled": true
     },
     "next-devtools": {
       "type": "local",
