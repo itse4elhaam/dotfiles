@@ -13,3 +13,6 @@
 - https://terminaltrove.com/ssm/
 - https://terminaltrove.com/hike/
 - https://github.com/bellicose100xp/jiq
+
+- Include read issue/create pr in the opencode
+- include it the prompt that a person is working alongside the AI as well
