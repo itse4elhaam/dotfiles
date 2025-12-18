@@ -107,6 +107,7 @@ alias killport='f() { sudo kill -9 $(sudo lsof -t -i:$1); }; f'
 alias vi=vim
 alias vim=nvim
 alias tai=tmuxai
+alias oc="opencode --continue"
 ai() {
   sudo apt install "$1" -y
 }
