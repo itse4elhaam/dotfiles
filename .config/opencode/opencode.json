@@ -25,6 +25,16 @@
         "-y",
         "@playwright/mcp@latest"
       ],
+      "enabled": false
+    },
+    "linear": {
+      "type": "local",
+      "command": [
+        "npx",
+        "-y",
+        "mcp-remote",
+        "https://mcp.linear.app/mcp"
+      ],
       "enabled": true
     },
     "next-devtools": {
@@ -64,7 +74,7 @@
         "-y",
         "@janreges/ai-distiller-mcp"
       ],
-      "enabled": true
+      "enabled": false
     },
     "ddg-search": {
       "type": "local",
@@ -90,7 +100,7 @@
         "-y",
         "chrome-devtools-mcp@latest"
       ],
-      "enabled": true
+      "enabled": false
     }
   },
   "keybinds": {
