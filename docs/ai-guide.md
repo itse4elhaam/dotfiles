@@ -262,33 +262,162 @@ context7_get-library-docs(context7CompatibleLibraryID: "/facebook/react")
 
 <available_agents>
 <category name="primary">
-<agent name="openagent">Main orchestrator agent with full capabilities</agent>
-<agent name="codebase-agent">Specialized in codebase analysis and understanding</agent>
-<agent name="system-builder">Builds and organizes agent systems and workflows</agent>
-<agent name="git">Git operations with conventional commits (temperature: 0.1)</agent>
-<agent name="sales">Sales and business operations (temperature: 0.7)</agent>
-<agent name="teach">Teaching agent using Socratic method, guides learning without direct solutions (temperature: 0.7)</agent>
+<agent name="openagent">
+<description>Main orchestrator agent with full capabilities</description>
+<temperature>0.5</temperature>
+<capabilities>General coding, coordination, complex reasoning</capabilities>
+<when_to_use>Default agent for most tasks, delegates to specialists when needed</when_to_use>
+<mcp_servers>10+ servers (comprehensive toolkit)</mcp_servers>
+</agent>
+
+<agent name="codebase-agent">
+<description>Specialized in codebase analysis and understanding</description>
+<temperature>0.5</temperature>
+<capabilities>Code navigation, pattern detection, architecture analysis, dependency mapping</capabilities>
+<when_to_use>Deep codebase exploration, understanding project structure, analyzing relationships</when_to_use>
+<mcp_servers>octocode, aid, memory, context7</mcp_servers>
+</agent>
+
+<agent name="system-builder">
+<description>Builds and organizes agent systems and workflows</description>
+<temperature>0.5</temperature>
+<capabilities>Agent creation, context organization, workflow design, command generation</capabilities>
+<when_to_use>Building new agent systems, organizing OpenCode setups, designing multi-agent workflows</when_to_use>
+<mcp_servers>memory, context7</mcp_servers>
+<delegates_to>domain-analyzer, agent-generator, context-organizer, workflow-designer, command-creator</delegates_to>
+</agent>
+
+<agent name="git">
+<description>Git operations with conventional commits</description>
+<temperature>0.1</temperature>
+<capabilities>Commits, branching, PR creation, conventional commits, CodeRabbit integration</capabilities>
+<when_to_use>All git operations, especially via /commit command</when_to_use>
+<mcp_servers>octocode, linear</mcp_servers>
+</agent>
+
+<agent name="sales">
+<description>Sales and business operations</description>
+<temperature>0.7</temperature>
+<capabilities>Proposals, outreach, business writing, stakeholder communication</capabilities>
+<when_to_use>Sales materials, business documents, client-facing content</when_to_use>
+<mcp_servers>7 servers for comprehensive business tasks</mcp_servers>
+</agent>
+
+<agent name="teach">
+<description>Teaching agent using Socratic method</description>
+<temperature>0.7</temperature>
+<capabilities>Guided learning, questioning, concept explanation, skill development</capabilities>
+<when_to_use>Learning new concepts, understanding without direct answers, skill building</when_to_use>
+<mcp_servers>context7, ddg-search, gh_grep</mcp_servers>
+<note>Never provides direct solutions, only guides through questions</note>
+</agent>
+
+<agent name="ask">
+<description>Interactive Q&A agent</description>
+<temperature>0.5</temperature>
+<capabilities>Answering questions, providing information, clarification</capabilities>
+<when_to_use>Direct questions requiring factual answers</when_to_use>
+<mcp_servers>context7, ddg-search, memory</mcp_servers>
+</agent>
 </category>
 
 <category name="code_subagents">
-<agent name="coder-agent">Code generation and implementation</agent>
-<agent name="reviewer">Code review and quality checks</agent>
-<agent name="tester">Test creation and validation</agent>
-<agent name="build-agent">Build processes and CI/CD</agent>
-<agent name="codebase-pattern-analyst">Pattern detection and analysis</agent>
+<agent name="coder-agent">
+<description>Code generation and implementation</description>
+<temperature>0.2</temperature>
+<capabilities>Writing code, implementing features, following patterns, type-safe implementations</capabilities>
+<when_to_use>Implementing features, writing new code, following specifications</when_to_use>
+<invocation>Via task tool or direct delegation from primary agents</invocation>
+</agent>
+
+<agent name="reviewer">
+<description>Code review and quality checks</description>
+<temperature>0.3</temperature>
+<capabilities>Security analysis, performance review, best practices validation, code smells detection</capabilities>
+<when_to_use>Code review, quality assurance, pre-commit validation</when_to_use>
+<integrates_with>CodeRabbit for enhanced analysis</integrates_with>
+</agent>
+
+<agent name="tester">
+<description>Test creation and validation</description>
+<temperature>0.2</temperature>
+<capabilities>Unit tests, integration tests, edge case identification, test coverage analysis</capabilities>
+<when_to_use>Writing tests, validating functionality, TDD workflows</when_to_use>
+<invocation>Via /test command or direct delegation</invocation>
+</agent>
+
+<agent name="build-agent">
+<description>Build processes and CI/CD</description>
+<temperature>0.2</temperature>
+<capabilities>Build configuration, CI/CD setup, deployment scripts, type checking</capabilities>
+<when_to_use>Build issues, CI/CD setup, deployment configuration</when_to_use>
+</agent>
+
+<agent name="codebase-pattern-analyst">
+<description>Pattern detection and analysis</description>
+<temperature>0.4</temperature>
+<capabilities>Identifying patterns, anti-patterns, refactoring opportunities, architecture analysis</capabilities>
+<when_to_use>Code refactoring, architecture review, pattern consistency checks</when_to_use>
+</agent>
 </category>
 
 <category name="core_subagents">
-<agent name="task-manager">Task planning and tracking</agent>
-<agent name="documentation">Documentation generation</agent>
+<agent name="task-manager">
+<description>Task planning and tracking</description>
+<temperature>0.3</temperature>
+<capabilities>Breaking down tasks, creating subtask lists, tracking progress, dependency mapping</capabilities>
+<when_to_use>Complex multi-step tasks, project planning, task organization</when_to_use>
+<invocation>Automatically or via explicit delegation</invocation>
+</agent>
+
+<agent name="documentation">
+<description>Documentation generation</description>
+<temperature>0.5</temperature>
+<capabilities>READMEs, API docs, guides, code comments, markdown formatting</capabilities>
+<when_to_use>Creating documentation, explaining code, writing guides</when_to_use>
+</agent>
 </category>
 
 <category name="system_builder_subagents">
-<agent name="domain-analyzer">Domain-driven analysis</agent>
-<agent name="agent-generator">Generate new agents</agent>
-<agent name="context-organizer">Organize context files</agent>
-<agent name="workflow-designer">Design workflows</agent>
-<agent name="command-creator">Create custom commands</agent>
+<agent name="domain-analyzer">
+<description>Domain-driven analysis</description>
+<temperature>0.4</temperature>
+<capabilities>Domain modeling, concept extraction, business rule identification, terminology mapping</capabilities>
+<when_to_use>Understanding domain requirements, building domain models</when_to_use>
+<invocation>Via system-builder agent</invocation>
+</agent>
+
+<agent name="agent-generator">
+<description>Generate new agents</description>
+<temperature>0.3</temperature>
+<capabilities>Creating agent files, XML optimization, capability definition, MCP server selection</capabilities>
+<when_to_use>Creating new specialized agents</when_to_use>
+<invocation>Via system-builder agent</invocation>
+</agent>
+
+<agent name="context-organizer">
+<description>Organize context files</description>
+<temperature>0.3</temperature>
+<capabilities>Context file structure, knowledge organization, modularity, dependency mapping</capabilities>
+<when_to_use>Organizing agent context, structuring knowledge bases</when_to_use>
+<invocation>Via system-builder agent or /context command</invocation>
+</agent>
+
+<agent name="workflow-designer">
+<description>Design workflows</description>
+<temperature>0.4</temperature>
+<capabilities>Multi-stage workflows, context dependencies, success criteria, checkpoint definition</capabilities>
+<when_to_use>Creating complex workflows, process automation</when_to_use>
+<invocation>Via system-builder agent</invocation>
+</agent>
+
+<agent name="command-creator">
+<description>Create custom commands</description>
+<temperature>0.3</temperature>
+<capabilities>Slash command creation, routing logic, parameter handling, documentation</capabilities>
+<when_to_use>Creating custom /commands for frequent tasks</when_to_use>
+<invocation>Via system-builder agent</invocation>
+</agent>
 </category>
 
 </available_agents>
@@ -346,6 +475,203 @@ context7_get-library-docs(context7CompatibleLibraryID: "/facebook/react")
 </command>
 </available_commands>
 </custom_commands>
+
+<parallel_execution>
+<capability>
+OpenCode supports concurrent/parallel execution of independent subagent tasks through multi-session capability and task tool batching
+</capability>
+
+<when_to_parallelize>
+<scenario>Multiple independent research tasks (e.g., analyze repo A + study docs for library B)</scenario>
+<scenario>Parallel code reviews (e.g., review security + review performance simultaneously)</scenario>
+<scenario>Multiple file operations with no dependencies (e.g., read 3 different config files)</scenario>
+<scenario>Concurrent documentation lookups (e.g., context7 + gh_grep + webfetch in parallel)</scenario>
+<scenario>Multi-agent delegation for complex workflows (e.g., coder-agent writes code while documentation agent prepares docs)</scenario>
+</when_to_parallelize>
+
+<how_to_parallelize>
+<method name="task_tool_batching">
+<description>Call multiple task tools in a single response block</description>
+<example>
+```
+task(subagent_type="explore", prompt="Find auth patterns in repo")
+task(subagent_type="documentation", prompt="Create API docs")
+```
+</example>
+<benefit>Both tasks run concurrently, reducing total execution time</benefit>
+</method>
+
+<method name="mcp_batching">
+<description>Call multiple MCP tools in a single function_calls block</description>
+<example>
+```
+context7_query-docs(libraryId="/facebook/react", query="hooks")
+gh_grep_searchGitHub(query="useState(", language=["TypeScript"])
+webfetch(url="https://react.dev/reference/react", format="markdown")
+```
+</example>
+<benefit>All MCP calls execute in parallel, fetching data faster</benefit>
+</method>
+
+<method name="multi_agent_coordination">
+<description>Delegate to multiple subagents for complex workflows</description>
+<example>
+```
+# Task 1: Write feature implementation
+task(subagent_type="subagents/code/coder-agent", prompt="Implement auth middleware")
+
+# Task 2: Write tests (can start immediately)
+task(subagent_type="subagents/code/tester", prompt="Create tests for auth middleware")
+
+# Task 3: Update documentation (can start immediately)
+task(subagent_type="subagents/core/documentation", prompt="Document auth middleware API")
+```
+</example>
+<benefit>Three subagents work simultaneously, completing the feature faster</benefit>
+</method>
+</how_to_parallelize>
+
+<when_not_to_parallelize>
+<case>Tasks have dependencies (e.g., must read file before editing it)</case>
+<case>Sequential logic required (e.g., analyze → plan → implement)</case>
+<case>Shared state modifications (e.g., multiple agents editing same file)</case>
+<case>Token budget concerns (parallel execution uses more tokens upfront)</case>
+</when_not_to_parallelize>
+
+<efficiency_guidelines>
+<guideline>Default to parallel execution when tasks are independent</guideline>
+<guideline>Use sequential execution when output of one task feeds into another</guideline>
+<guideline>Batch MCP calls whenever possible (research shows significant speedup)</guideline>
+<guideline>Delegate to subagents for specialized tasks rather than doing everything in main agent</guideline>
+<guideline>Monitor token usage: parallel execution is faster but uses more tokens initially</guideline>
+</efficiency_guidelines>
+
+<examples>
+<example name="parallel_research">
+<description>Research React hooks and Next.js patterns simultaneously</description>
+<code>
+# Both lookups happen in parallel
+context7_query-docs(libraryId="/facebook/react", query="useEffect cleanup")
+context7_query-docs(libraryId="/vercel/next.js", query="server actions")
+</code>
+</example>
+
+<example name="parallel_code_review">
+<description>Review security and performance concurrently</description>
+<code>
+task(subagent_type="subagents/code/reviewer", prompt="Review code for security vulnerabilities")
+task(subagent_type="subagents/code/reviewer", prompt="Review code for performance issues")
+</code>
+</example>
+
+<example name="parallel_implementation">
+<description>Implement feature + tests + docs simultaneously</description>
+<code>
+task(subagent_type="subagents/code/coder-agent", prompt="Implement user authentication")
+task(subagent_type="subagents/code/tester", prompt="Write unit tests for authentication")
+task(subagent_type="subagents/core/documentation", prompt="Document authentication API")
+</code>
+</example>
+
+<example name="sequential_required">
+<description>When NOT to parallelize (dependencies exist)</description>
+<code>
+# WRONG: Can't test before implementing
+task(subagent_type="subagents/code/coder-agent", prompt="Implement auth")
+task(subagent_type="subagents/code/tester", prompt="Test the auth implementation")
+
+# RIGHT: Sequential execution
+1. Implement auth (coder-agent)
+2. Wait for completion
+3. Then test auth (tester)
+</code>
+</example>
+</examples>
+</parallel_execution>
+
+<mcp_server_management>
+<default_state>
+All MCP servers are DISABLED by default in opencode.json for performance and cost optimization
+</default_state>
+
+<enabling_strategy>
+<when_to_enable>
+<case>Need specific functionality not available through basic tools</case>
+<case>Require specialized MCP capabilities (e.g., browser automation, GitHub deep analysis)</case>
+<case>Working on tasks that benefit from MCP server features</case>
+</when_to_enable>
+
+<how_to_enable>
+<step number="1">Identify which MCP server(s) you need for the task</step>
+<step number="2">Edit .config/opencode/opencode.json</step>
+<step number="3">Set `"enabled": true` for required servers</step>
+<step number="4">Restart OpenCode session if needed</step>
+<step number="5">Disable servers when done to reduce overhead</step>
+</how_to_enable>
+
+<server_priority_guide>
+<high_priority>
+<server>context7 - Enable when working with frameworks/libraries (docs lookup)</server>
+<server>octocode - Enable when analyzing GitHub repositories</server>
+<server>memory - Enable when need cross-session persistence</server>
+</high_priority>
+
+<medium_priority>
+<server>gh_grep - Enable when searching for production code patterns</server>
+<server>aid - Enable for advanced code analysis and refactoring</server>
+<server>augments - Enable for framework-specific examples</server>
+</medium_priority>
+
+<as_needed>
+<server>playwright - Enable only for UI testing tasks</server>
+<server>next-devtools - Enable only when debugging Next.js projects</server>
+<server>desktop-commander - Enable for advanced file operations</server>
+<server>mindpilot - Enable when creating diagrams</server>
+</as_needed>
+
+<low_priority>
+<server>ddg-search - Enable for web searches (use sparingly)</server>
+<server>sequential-thinking - Enable for complex problem-solving</server>
+<server>mcp-compass - Enable when discovering new MCP servers</server>
+<server>chrome-devtools - Enable for deep browser debugging</server>
+</low_priority>
+</server_priority_guide>
+
+<workflow_specific_enablement>
+<workflow name="study_codebase">
+<enable>octocode, memory, aid</enable>
+<reason>Deep repo analysis, pattern detection, cross-session memory</reason>
+</workflow>
+
+<workflow name="framework_development">
+<enable>context7, gh_grep, augments</enable>
+<reason>Official docs, real-world patterns, framework examples</reason>
+</workflow>
+
+<workflow name="ui_testing">
+<enable>playwright, chrome-devtools</enable>
+<reason>Browser automation, network inspection, UI validation</reason>
+</workflow>
+
+<workflow name="research_task">
+<enable>ddg-search, gh_grep, context7</enable>
+<reason>Web search, code patterns, documentation lookup</reason>
+</workflow>
+
+<workflow name="nextjs_debugging">
+<enable>next-devtools, playwright</enable>
+<reason>Next.js-specific errors, UI testing</reason>
+</workflow>
+</workflow_specific_enablement>
+
+<optimization_tips>
+<tip>Keep only necessary servers enabled to reduce token overhead</tip>
+<tip>Use basic tools (read, edit, glob) when MCP servers aren't required</tip>
+<tip>Enable servers at start of session, disable when done</tip>
+<tip>Group related tasks to minimize server enable/disable cycles</tip>
+<tip>Monitor performance: too many enabled servers can slow response time</tip>
+</optimization_tips>
+</mcp_server_management>
 </opencode_customization>
 
 ---
