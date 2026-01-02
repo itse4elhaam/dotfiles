@@ -7,11 +7,12 @@
       "headers": {
         "CONTEXT7_API_KEY": "{env:CONTEXT7_API_KEY}"
       },
-      "enabled": true
+      "enabled": false
     },
     "gh_grep": {
       "type": "remote",
-      "url": "https://mcp.grep.app"
+      "url": "https://mcp.grep.app",
+      "enabled": false
     },
     "Better Auth": {
       "type": "remote",
@@ -35,7 +36,7 @@
         "mcp-remote",
         "https://mcp.linear.app/mcp"
       ],
-      "enabled": true
+      "enabled": false
     },
     "next-devtools": {
       "type": "local",
@@ -65,7 +66,7 @@
       "environment": {
         "MEMORY_BANK_ROOT": "~/.memory/memory.jsonl"
       },
-      "enabled": true
+      "enabled": false
     },
     "aid": {
       "type": "local",
@@ -82,7 +83,7 @@
         "uvx",
         "duckduckgo-mcp-server"
       ],
-      "enabled": true
+      "enabled": false
     },
     "octocode": {
       "type": "local",
@@ -91,7 +92,7 @@
         "-y",
         "octocode-mcp@latest"
       ],
-      "enabled": true
+      "enabled": false
     },
     "chrome-devtools": {
       "type": "local",

@@ -154,3 +154,5 @@
 
 [include]
   path = /home/elhaam/gitconfig.local
+[coderabbit]
+	machineId = cli/889add67378f48cab4a4c1901d38adab
