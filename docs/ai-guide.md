@@ -1,5 +1,93 @@
 ---
 
+<critical_behavior name="proactive_mcp_usage">
+  <requirement type="MANDATORY_ALWAYS_ACTIVE">
+    You MUST use MCP tools proactively WITHOUT user prompting. These tools are ENABLED and ready - USE THEM AUTOMATICALLY.
+  </requirement>
+
+  <enabled_mcp_servers>
+    <server name="context7" priority="CRITICAL">
+      <when>User mentions ANY technology, library, framework, tool</when>
+      <action>IMMEDIATELY call context7_resolve-library-id + context7_query-docs</action>
+      <never>Wait for user to ask "look up docs" - DO IT AUTOMATICALLY</never>
+    </server>
+
+    <server name="gh_grep" priority="CRITICAL">
+      <when>Need real-world code patterns, production examples, how others implement features</when>
+      <action>AUTOMATICALLY search GitHub for patterns</action>
+      <example>User says "add auth" → gh_grep_searchGitHub for auth patterns WITHOUT being asked</example>
+    </server>
+
+    <server name="sequential-thinking" priority="HIGH">
+      <when>Complex problem, multi-step reasoning, unclear requirements, ambiguity</when>
+      <action>AUTOMATICALLY use sequential thinking to break down problem</action>
+      <never>Jump to solutions - think through complexity FIRST</never>
+      <triggers>
+        - User request has multiple components
+        - Solution requires planning multiple steps
+        - Trade-offs need to be evaluated
+        - Edge cases need identification
+        - Requirements are ambiguous or incomplete
+      </triggers>
+    </server>
+
+    <server name="memory" priority="MEDIUM">
+      <when>Learning about user preferences, codebase facts, project patterns</when>
+      <action>Store facts for future sessions</action>
+      <example>User says "I prefer Zod" → memory_create_entities to remember</example>
+    </server>
+
+    <server name="octocode" priority="MEDIUM">
+      <when>Analyzing GitHub repositories, studying codebases, understanding project structure</when>
+      <action>Use octocode tools for deep repo analysis</action>
+      <note>Complements /study command</note>
+    </server>
+
+    <server name="ddg-search" priority="LOW">
+      <when>Need external knowledge, case studies, industry examples, UX patterns</when>
+      <action>Search for real-world examples</action>
+      <example>UX analysis → search for "form usability case study"</example>
+    </server>
+  </enabled_mcp_servers>
+
+  <behavioral_rules>
+    <rule number="1" priority="CRITICAL">
+      When user mentions a technology/library → IMMEDIATELY use context7 (don't wait to be asked)
+    </rule>
+    <rule number="2" priority="CRITICAL">
+      When task is complex or multi-step → IMMEDIATELY use sequential-thinking (don't guess)
+    </rule>
+    <rule number="3" priority="HIGH">
+      When need code patterns → AUTOMATICALLY use gh_grep (don't rely on training data)
+    </rule>
+    <rule number="4" priority="MEDIUM">
+      When user shares preferences → AUTOMATICALLY use memory to remember
+    </rule>
+    <rule number="5" priority="LOW">
+      When need external knowledge → Use ddg-search for current information
+    </rule>
+  </behavioral_rules>
+
+  <anti_patterns>
+    <bad>User: "Add React hooks" → You: "Here's how to use hooks..." (WRONG - no context7 lookup!)</bad>
+    <good>User: "Add React hooks" → You: *calls context7* → Then provide current docs-based guidance</good>
+    
+    <bad>User: "Fix this complex bug" → You: *jumps to solution* (WRONG - no thinking!)</bad>
+    <good>User: "Fix this complex bug" → You: *uses sequential-thinking* → Analyzes systematically</good>
+    
+    <bad>User: "How do others handle auth?" → You: *describes from memory* (WRONG - no research!)</bad>
+    <good>User: "How do others handle auth?" → You: *uses gh_grep* → Shows real patterns</good>
+  </anti_patterns>
+
+  <user_expectation>
+    The user has ENABLED these MCP servers specifically so you will USE THEM AUTOMATICALLY.
+    DO NOT make the user ask for documentation lookups, searches, or thinking - that defeats the purpose.
+    BE PROACTIVE. USE THE TOOLS. That's why they're enabled.
+  </user_expectation>
+</critical_behavior>
+
+---
+
 <protocol name="technology_documentation_lookup">
   <requirement type="mandatory">
     When the user mentions ANY technology, library, framework, or tool, you MUST look up current documentation FIRST before providing guidance.
@@ -652,86 +740,107 @@ task(subagent_type="subagents/code/tester", prompt="Test the auth implementation
 </parallel_execution>
 
 <mcp_server_management>
-<default_state>
-All MCP servers are DISABLED by default in opencode.json for performance and cost optimization
-</default_state>
+<current_state>
+Core MCP servers are ENABLED for proactive use. Based on OpenCode documentation:
+"When you use an MCP server, it adds to the context" - servers consume tokens but provide critical functionality.
+
+Currently enabled servers (6):
+- context7 (CRITICAL - framework/library docs)
+- gh_grep (CRITICAL - real-world code patterns)
+- sequential-thinking (HIGH - complex problem solving)
+- memory (MEDIUM - cross-session persistence)
+- octocode (MEDIUM - GitHub analysis)
+- ddg-search (LOW - external research)
+
+Disabled by default (for optional workflows):
+- playwright, linear, next-devtools, aid, chrome-devtools, Better Auth
+</current_state>
+
+<rationale>
+Enabled servers support the MANDATORY proactive behavior:
+1. context7 + gh_grep: ALWAYS look up current docs and patterns (never rely on training data)
+2. sequential-thinking: AUTOMATICALLY use for complex multi-step problems
+3. memory: Store user preferences and project facts across sessions
+4. octocode: Deep codebase analysis when needed
+5. ddg-search: External research for UX case studies, industry examples
+
+The token cost is justified by:
+- Preventing outdated/incorrect advice (context7)
+- Finding production-ready patterns (gh_grep)
+- Structured problem-solving (sequential-thinking)
+- Cross-session continuity (memory)
+</rationale>
 
 <enabling_strategy>
-<when_to_enable>
-<case>Need specific functionality not available through basic tools</case>
-<case>Require specialized MCP capabilities (e.g., browser automation, GitHub deep analysis)</case>
-<case>Working on tasks that benefit from MCP server features</case>
-</when_to_enable>
+<when_to_enable_more>
+<case>UI testing workflows → Enable playwright, chrome-devtools</case>
+<case>Next.js debugging → Enable next-devtools</case>
+<case>Advanced code analysis → Enable aid</case>
+<case>Linear issue tracking → Enable linear</case>
+<case>Better Auth integration → Enable Better Auth</case>
+</when_to_enable_more>
 
-<how_to_enable>
-<step number="1">Identify which MCP server(s) you need for the task</step>
+<how_to_enable_additional>
+<step number="1">Identify which additional MCP server(s) you need</step>
 <step number="2">Edit .config/opencode/opencode.json</step>
 <step number="3">Set `"enabled": true` for required servers</step>
-<step number="4">Restart OpenCode session if needed</step>
-<step number="5">Disable servers when done to reduce overhead</step>
-</how_to_enable>
+<step number="4">Restart OpenCode session</step>
+<step number="5">Disable when done to reduce overhead</step>
+</how_to_enable_additional>
 
 <server_priority_guide>
-<high_priority>
-<server>context7 - Enable when working with frameworks/libraries (docs lookup)</server>
-<server>octocode - Enable when analyzing GitHub repositories</server>
-<server>memory - Enable when need cross-session persistence</server>
-</high_priority>
+<currently_enabled>
+<server status="ENABLED">context7 - Framework/library documentation (CRITICAL)</server>
+<server status="ENABLED">gh_grep - Production code patterns (CRITICAL)</server>
+<server status="ENABLED">sequential-thinking - Complex problem solving (HIGH)</server>
+<server status="ENABLED">memory - Cross-session persistence (MEDIUM)</server>
+<server status="ENABLED">octocode - GitHub repository analysis (MEDIUM)</server>
+<server status="ENABLED">ddg-search - External research (LOW)</server>
+</currently_enabled>
 
-<medium_priority>
-<server>gh_grep - Enable when searching for production code patterns</server>
-<server>aid - Enable for advanced code analysis and refactoring</server>
-<server>augments - Enable for framework-specific examples</server>
-</medium_priority>
-
-<as_needed>
-<server>playwright - Enable only for UI testing tasks</server>
-<server>next-devtools - Enable only when debugging Next.js projects</server>
-<server>desktop-commander - Enable for advanced file operations</server>
-<server>mindpilot - Enable when creating diagrams</server>
-</as_needed>
-
-<low_priority>
-<server>ddg-search - Enable for web searches (use sparingly)</server>
-<server>sequential-thinking - Enable for complex problem-solving</server>
-<server>mcp-compass - Enable when discovering new MCP servers</server>
-<server>chrome-devtools - Enable for deep browser debugging</server>
-</low_priority>
+<available_on_demand>
+<server status="DISABLED">playwright - UI testing (enable for browser automation)</server>
+<server status="DISABLED">linear - Issue tracking (enable for project management)</server>
+<server status="DISABLED">next-devtools - Next.js debugging (enable for Next.js projects)</server>
+<server status="DISABLED">aid - Advanced code analysis (enable for refactoring)</server>
+<server status="DISABLED">chrome-devtools - Browser debugging (enable for deep debugging)</server>
+<server status="DISABLED">Better Auth - Auth integration (enable for auth projects)</server>
+</available_on_demand>
 </server_priority_guide>
 
 <workflow_specific_enablement>
 <workflow name="study_codebase">
-<enable>octocode, memory, aid</enable>
-<reason>Deep repo analysis, pattern detection, cross-session memory</reason>
+<already_enabled>octocode, memory</already_enabled>
+<optional>aid (for advanced analysis)</optional>
 </workflow>
 
 <workflow name="framework_development">
-<enable>context7, gh_grep, augments</enable>
-<reason>Official docs, real-world patterns, framework examples</reason>
+<already_enabled>context7, gh_grep</already_enabled>
+<optional>None - core servers sufficient</optional>
 </workflow>
 
 <workflow name="ui_testing">
-<enable>playwright, chrome-devtools</enable>
-<reason>Browser automation, network inspection, UI validation</reason>
+<already_enabled>None</already_enabled>
+<must_enable>playwright, chrome-devtools</must_enable>
 </workflow>
 
 <workflow name="research_task">
-<enable>ddg-search, gh_grep, context7</enable>
-<reason>Web search, code patterns, documentation lookup</reason>
+<already_enabled>ddg-search, gh_grep, context7</already_enabled>
+<optional>None - core servers sufficient</optional>
 </workflow>
 
 <workflow name="nextjs_debugging">
-<enable>next-devtools, playwright</enable>
-<reason>Next.js-specific errors, UI testing</reason>
+<already_enabled>None</already_enabled>
+<must_enable>next-devtools, playwright</must_enable>
 </workflow>
 </workflow_specific_enablement>
 
 <optimization_tips>
-<tip>Keep only necessary servers enabled to reduce token overhead</tip>
+<tip>Core 6 servers are balanced for general development work</tip>
+<tip>Enable additional servers only for specific workflows</tip>
 <tip>Use basic tools (read, edit, glob) when MCP servers aren't required</tip>
-<tip>Enable servers at start of session, disable when done</tip>
-<tip>Group related tasks to minimize server enable/disable cycles</tip>
-<tip>Monitor performance: too many enabled servers can slow response time</tip>
+<tip>Monitor performance: if responses slow, disable optional servers</tip>
+<tip>The mandatory proactive behavior (context7, sequential-thinking) justifies token cost</tip>
 </optimization_tips>
 </mcp_server_management>
 </opencode_customization>
