@@ -135,7 +135,77 @@ context7_get-library-docs(context7CompatibleLibraryID: "/facebook/react")
 <principle>Fail Fast, Defend Early: Validate inputs, fail loudly with clear errors</principle>
 <principle>Edge-Case Driven: Consider null/undefined, empty arrays, out-of-range values</principle>
 <principle>Clarity > Cleverness: Code readable by new engineer in minutes, not hours</principle>
+<principle>Delegate Early: Preserve context by routing specialized tasks to subagents immediately</principle>
 </core_philosophy>
+
+<context_management>
+<critical_rule>
+ALWAYS delegate specialized tasks to subagents EARLY to prevent context exhaustion
+</critical_rule>
+
+<when_to_delegate_immediately>
+<scenario priority="CRITICAL">User requests multi-step task → Delegate to task-manager FIRST</scenario>
+<scenario priority="CRITICAL">Code implementation needed → Route to coder-agent (don't implement inline)</scenario>
+<scenario priority="CRITICAL">Code review requested → Route to reviewer (don't analyze inline)</scenario>
+<scenario priority="CRITICAL">Test creation needed → Route to tester (don't write tests inline)</scenario>
+<scenario priority="CRITICAL">Documentation writing → Route to documentation agent (don't write inline)</scenario>
+<scenario priority="CRITICAL">Git operations → Use /commit command or route to git agent</scenario>
+<scenario priority="CRITICAL">Deep codebase analysis → Route to codebase-agent or use /study</scenario>
+<scenario priority="HIGH">Pattern analysis needed → Route to codebase-pattern-analyst</scenario>
+<scenario priority="HIGH">Build/CI issues → Route to build-agent</scenario>
+</when_to_delegate_immediately>
+
+<delegation_pattern>
+<bad_approach>
+❌ Read 10 files, analyze patterns, write code, write tests, write docs (ALL in main agent)
+Result: Context exhausted, incomplete work, poor quality
+</bad_approach>
+
+<good_approach>
+✅ Step 1: Understand requirement (main agent)
+✅ Step 2: Delegate to task-manager for breakdown
+✅ Step 3: Route implementation to coder-agent
+✅ Step 4: Route tests to tester (parallel with step 3)
+✅ Step 5: Route docs to documentation (parallel with step 3)
+Result: Fresh context for each specialist, high quality, faster completion
+</good_approach>
+</delegation_pattern>
+
+<context_preservation_rules>
+<rule number="1">If task requires >3 file operations, delegate to specialized agent</rule>
+<rule number="2">If response length approaches 500 lines, delegate remaining work</rule>
+<rule number="3">If multiple independent subtasks exist, delegate ALL in parallel</rule>
+<rule number="4">If exploratory research needed, use task tool with "explore" agent</rule>
+<rule number="5">Keep main agent for: planning, coordinating, user communication only</rule>
+</context_preservation_rules>
+
+<efficiency_matrix>
+<task_type type="simple_question">Handle in main agent (1-2 tool calls)</task_type>
+<task_type type="file_read_edit">Handle in main agent (known paths only)</task_type>
+<task_type type="feature_implementation">DELEGATE to coder-agent immediately</task_type>
+<task_type type="code_review">DELEGATE to reviewer immediately</task_type>
+<task_type type="testing">DELEGATE to tester immediately</task_type>
+<task_type type="documentation">DELEGATE to documentation immediately</task_type>
+<task_type type="multi_step_workflow">DELEGATE to task-manager FIRST</task_type>
+<task_type type="codebase_exploration">DELEGATE to codebase-agent or /study</task_type>
+<task_type type="research_task">Use task tool with explore agent</task_type>
+</efficiency_matrix>
+
+<example_delegation>
+<user_request>Add authentication to the app with tests and docs</user_request>
+
+<optimal_flow>
+Step 1 (main agent): Understand requirements, plan approach
+Step 2 (main agent): Delegate in PARALLEL:
+  - task(subagent_type="subagents/code/coder-agent", prompt="Implement JWT authentication middleware")
+  - task(subagent_type="subagents/code/tester", prompt="Write comprehensive tests for auth")
+  - task(subagent_type="subagents/core/documentation", prompt="Document auth API and usage")
+Step 3 (main agent): Coordinate results, ensure integration
+</optimal_flow>
+
+<tokens_saved>~80% context preserved by delegating instead of doing inline</tokens_saved>
+</example_delegation>
+</context_management>
 
 <language_preferences>
 <preference>TypeScript (never plain JavaScript unless absolutely unavoidable)</preference>
@@ -226,17 +296,9 @@ context7_get-library-docs(context7CompatibleLibraryID: "/facebook/react")
 <guideline>Use TypeScript with `@opencode-ai/plugin` SDK</guideline>
 <guideline>Export with `tool()` helper for type-safety and validation</guideline>
 <guideline>Tools auto-load from `.opencode/tool/` or `~/.config/opencode/tool/`</guideline>
-<guideline>Filename becomes tool name (e.g., `list-mcp.ts` → `list-mcp` tool)</guideline>
+<guideline>Filename becomes tool name (e.g., `custom-tool.ts` → `custom-tool` tool)</guideline>
 <guideline>Cannot be invoked directly with Node.js — only through OpenCode</guideline>
 <guideline>Use `tool.schema` (Zod) for argument validation</guideline>
-
-<available_tools>
-<tool name="list-mcp">
-<purpose>List all enabled MCP servers with capabilities</purpose>
-<usage>Use to discover available MCP functionality</usage>
-<when_to_use>Before using MCP servers, to check what's available</when_to_use>
-</tool>
-</available_tools>
 </custom_tools>
 
 <custom_agents location=".opencode/agent/">
