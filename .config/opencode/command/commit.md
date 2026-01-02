@@ -10,14 +10,17 @@ Create a git commit following these STRICT rules:
 
    **If files ARE staged:**
    
-   - Proceed with commit using ONLY the staged files.
+   - ✅ STRICT: Commit ONLY the staged files.
+   - ❌ DO NOT stage additional files.
+   - ❌ DO NOT run `git add`.
+   - Proceed with commit using ONLY what is already staged.
 
    **If NO files are staged:**
 
    - ⚠️ WARNING: No files are currently staged for commit.
    - Show unstaged files: !`git status --short`
-   - Stage all modified files: !`git add -A`
-   - Proceed with commit.
+   - Stage ALL modified/untracked files: !`git add -A`
+   - Proceed with commit of all changes.
 
 2. **Study author's commit pattern**:
    !`git log --author="<author>" --oneline -10`

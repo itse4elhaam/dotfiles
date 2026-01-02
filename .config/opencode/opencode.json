@@ -7,12 +7,50 @@
       "headers": {
         "CONTEXT7_API_KEY": "{env:CONTEXT7_API_KEY}"
       },
-      "enabled": false
+      "enabled": true
     },
     "gh_grep": {
       "type": "remote",
       "url": "https://mcp.grep.app",
-      "enabled": false
+      "enabled": true
+    },
+    "sequential-thinking": {
+      "type": "local",
+      "command": [
+        "npx",
+        "-y",
+        "@modelcontextprotocol/server-sequential-thinking"
+      ],
+      "enabled": true
+    },
+    "memory": {
+      "type": "local",
+      "command": [
+        "npx",
+        "-y",
+        "@modelcontextprotocol/server-memory"
+      ],
+      "environment": {
+        "MEMORY_BANK_ROOT": "~/.memory/memory.jsonl"
+      },
+      "enabled": true
+    },
+    "octocode": {
+      "type": "local",
+      "command": [
+        "npx",
+        "-y",
+        "octocode-mcp@latest"
+      ],
+      "enabled": true
+    },
+    "ddg-search": {
+      "type": "local",
+      "command": [
+        "uvx",
+        "duckduckgo-mcp-server"
+      ],
+      "enabled": true
     },
     "Better Auth": {
       "type": "remote",
@@ -47,50 +85,12 @@
       ],
       "enabled": false
     },
-    "sequential-thinking": {
-      "type": "local",
-      "command": [
-        "npx",
-        "-y",
-        "@modelcontextprotocol/server-sequential-thinking"
-      ],
-      "enabled": false
-    },
-    "memory": {
-      "type": "local",
-      "command": [
-        "npx",
-        "-y",
-        "@modelcontextprotocol/server-memory"
-      ],
-      "environment": {
-        "MEMORY_BANK_ROOT": "~/.memory/memory.jsonl"
-      },
-      "enabled": false
-    },
     "aid": {
       "type": "local",
       "command": [
         "npx",
         "-y",
         "@janreges/ai-distiller-mcp"
-      ],
-      "enabled": false
-    },
-    "ddg-search": {
-      "type": "local",
-      "command": [
-        "uvx",
-        "duckduckgo-mcp-server"
-      ],
-      "enabled": false
-    },
-    "octocode": {
-      "type": "local",
-      "command": [
-        "npx",
-        "-y",
-        "octocode-mcp@latest"
       ],
       "enabled": false
     },
