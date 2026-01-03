@@ -111,5 +111,10 @@
     "model_cycle_recent_reverse": "alt+h",
     "input_newline": "alt+o"
   },
-  "instructions": ["{env:HOME}/dotfiles/docs/ai-guide.md"]
+  "plugin": [
+    "oh-my-opencode"
+  ],
+  "instructions": [
+    "{env:HOME}/dotfiles/docs/ai-guide.md"
+  ]
 }
