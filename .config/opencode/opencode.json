@@ -112,7 +112,8 @@
     "input_newline": "alt+o"
   },
   "plugin": [
-    "oh-my-opencode"
+    "oh-my-opencode",
+    "@tarquinen/opencode-dcp@latest"
   ],
   "instructions": [
     "{env:HOME}/dotfiles/docs/ai-guide.md"
