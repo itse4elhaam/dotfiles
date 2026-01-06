@@ -558,7 +558,7 @@ wtc() {
       # window 2: opencode (check if installed)
       if command -v opencode &> /dev/null; then
         tmux new-window -t "$session_name" -n "opencode" -c "$worktree_dir"
-        tmux send-keys -t "$session_name:opencode" "opencode --continue" Enter
+        tmux send-keys -t "$session_name:opencode" "opencode" Enter
       fi
       
       # window 3: dev server or shell (don't auto-start dev to avoid race condition)
