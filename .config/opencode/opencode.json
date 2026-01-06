@@ -31,7 +31,7 @@
         "@modelcontextprotocol/server-memory"
       ],
       "environment": {
-        "MEMORY_BANK_ROOT": "~/.memory/memory.jsonl"
+        "MEMORY_BANK_ROOT": "/home/elhaam/.memory/memory.jsonl"
       },
       "enabled": true
     },
@@ -50,7 +50,7 @@
         "uvx",
         "duckduckgo-mcp-server"
       ],
-      "enabled": false
+      "enabled": true
     },
     "Better Auth": {
       "type": "remote",
