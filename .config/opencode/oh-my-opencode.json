@@ -2,13 +2,13 @@
   "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/master/assets/oh-my-opencode.schema.json",
   "agents": {
     "Sisyphus": {
-      "model": "opencode/glm-4.7-free"
+      "model": "opencode/minimax-m2.1-free"
     },
     "librarian": {
-      "model": "github-copilot/claude-sonnet-4.5"
+      "model": "opencode/glm-4.7-free"
     },
     "explore": {
-      "model": "github-copilot/grok-code-fast-1"
+      "model": "opencode/grok-code-fast-1"
     },
     "oracle": {
       "model": "github-copilot/gpt-5.2"
