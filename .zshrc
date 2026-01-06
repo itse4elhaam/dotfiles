@@ -561,12 +561,13 @@ wtc() {
         tmux send-keys -t "$session_name:opencode" "opencode" Enter
       fi
       
-      # window 3: dev server or shell (don't auto-start dev to avoid race condition)
+      # window 3: dev server or shell
       local pkg_manager=$(_detect_package_manager "$original_path")
       
       if [[ -n "$pkg_manager" ]]; then
         tmux new-window -t "$session_name" -n "dev" -c "$worktree_dir"
-        tmux send-keys -t "$session_name:dev" "# Run when ready: $pkg_manager run dev" Enter
+        # Auto-start dev server (dependencies should be installed by now)
+        tmux send-keys -t "$session_name:dev" "$pkg_manager run dev" Enter
       else
         tmux new-window -t "$session_name" -n "shell" -c "$worktree_dir"
       fi
