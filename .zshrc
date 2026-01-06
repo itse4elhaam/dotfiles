@@ -450,6 +450,190 @@ bindkey '^@' zff-widget # Ctrl + space
 # opencode
 export PATH=/home/$USER/.opencode/bin:$PATH
 
+# wtc - worktree code: parallel development with git worktrees
+wtc() {
+  # colors
+  RED='\033[0;31m'
+  GREEN='\033[0;32m'
+  YELLOW='\033[1;33m'
+  BLUE='\033[0;34m'
+  NC='\033[0m' # no color
+
+  # validate we're in a git repo
+  if ! git rev-parse --git-dir > /dev/null 2>&1; then
+    echo -e "${RED}❌ Not a git repository${NC}"
+    return 1
+  fi
+
+  # get branch name from argument or fzf
+  local branch_name="$1"
+  
+  if [[ -z "$branch_name" ]]; then
+    # check if fzf is available
+    if ! command -v fzf &> /dev/null; then
+      echo -e "${RED}❌ fzf is not installed. Provide branch name as argument.${NC}"
+      return 1
+    fi
+    
+    echo -e "${BLUE}🔍 Select a branch...${NC}"
+    
+    # get all branches (local + remote) and let user select
+    branch_name=$(git branch -a | \
+      sed 's/^[* ]*//g' | \
+      sed 's/remotes\/origin\///g' | \
+      grep -v 'HEAD ->' | \
+      sort -u | \
+      fzf --height=40% \
+          --border=rounded \
+          --prompt="Select branch: " \
+          --preview="git log --oneline --graph --date=short --pretty='format:%C(auto)%cd %h%d %s' {} | head -50" \
+          --preview-window=right:60%:wrap)
+    
+    # check if user cancelled fzf
+    if [[ -z "$branch_name" ]]; then
+      echo -e "${YELLOW}⚠️  No branch selected. Cancelled.${NC}"
+      return 0
+    fi
+    
+    echo -e "${GREEN}✓ Selected: $branch_name${NC}"
+  fi
+
+  # get project name (current directory basename)
+  local project_name=$(basename "$(git rev-parse --show-toplevel)")
+  local original_path=$(git rev-parse --show-toplevel)
+  
+  # create ~/worktrees if it doesn't exist
+  local worktrees_dir="$HOME/worktrees"
+  if [[ ! -d "$worktrees_dir" ]]; then
+    echo -e "${BLUE}📁 Creating $worktrees_dir${NC}"
+    mkdir -p "$worktrees_dir"
+  fi
+
+  # prune dead worktrees before creating new ones
+  if git worktree prune -v 2>/dev/null | grep -q "Pruning"; then
+    echo -e "${BLUE}🧹 Pruned dead worktrees${NC}"
+  fi
+  
+  # sanitize branch name for directory (replace / with -)
+  local sanitized_branch=$(echo "$branch_name" | sed 's/\//-/g')
+  local worktree_dir="$worktrees_dir/${project_name}-${sanitized_branch}"
+  local session_name="${project_name}-${sanitized_branch}"
+  
+  # check if worktree directory already exists
+  if [[ -d "$worktree_dir" ]]; then
+    echo -e "${YELLOW}⚠️  Worktree directory already exists: $worktree_dir${NC}"
+    
+    if tmux has-session -t "$session_name" 2>/dev/null; then
+      echo -e "${GREEN}✅ Using existing session '$session_name'...${NC}"
+      if [ -n "$TMUX" ]; then
+        echo -e "${BLUE}🔀 Switching client to '$session_name'...${NC}"
+        tmux switch-client -t "$session_name"
+      else
+        echo -e "${BLUE}📎 Attaching to '$session_name'...${NC}"
+        tmux attach -t "$session_name"
+      fi
+    else
+      echo -e "${RED}❌ Directory exists but no tmux session found${NC}"
+      echo -e "${YELLOW}💡 Remove directory manually: rm -rf $worktree_dir${NC}"
+    fi
+    return
+  fi
+
+  # create git worktree
+  echo -e "${BLUE}🌿 Creating git worktree for branch: $branch_name${NC}"
+  
+  # check if branch exists
+  if git rev-parse --verify "$branch_name" >/dev/null 2>&1; then
+    # branch exists, use it
+    if ! git worktree add "$worktree_dir" "$branch_name"; then
+      echo -e "${RED}❌ Failed to create worktree${NC}"
+      return 1
+    fi
+    echo -e "${GREEN}✓ Worktree created (existing branch)${NC}"
+  else
+    # branch doesn't exist, create it
+    echo -e "${YELLOW}⚠️  Branch doesn't exist, creating new branch...${NC}"
+    if ! git worktree add -b "$branch_name" "$worktree_dir"; then
+      echo -e "${RED}❌ Failed to create worktree${NC}"
+      return 1
+    fi
+    echo -e "${GREEN}✓ Worktree created (new branch)${NC}"
+  fi
+
+  # copy .env files
+  echo -e "${BLUE}📋 Copying .env files...${NC}"
+  local env_files_found=0
+  setopt nullglob  # don't error if no matches
+  for env_file in "$original_path"/.env*; do
+    if [[ -f "$env_file" ]]; then
+      cp "$env_file" "$worktree_dir/"
+      echo -e "   ${GREEN}✓ Copied $(basename "$env_file")${NC}"
+      env_files_found=1
+    fi
+  done
+  unsetopt nullglob  # restore default behavior
+  if [[ $env_files_found -eq 0 ]]; then
+    echo -e "   ${YELLOW}⚠️  No .env files found${NC}"
+  fi
+
+  # detect package manager
+  local pkg_manager=""
+  if [[ -f "$original_path/bun.lockb" ]]; then
+    pkg_manager="bun"
+  elif [[ -f "$original_path/pnpm-lock.yaml" ]]; then
+    pkg_manager="pnpm"
+  elif [[ -f "$original_path/yarn.lock" ]]; then
+    pkg_manager="yarn"
+  elif [[ -f "$original_path/package-lock.json" ]]; then
+    pkg_manager="npm"
+  fi
+
+  # install dependencies if package manager detected
+  if [[ -n "$pkg_manager" ]]; then
+    echo -e "${BLUE}📦 Installing dependencies with $pkg_manager...${NC}"
+    (cd "$worktree_dir" && $pkg_manager install)
+    echo -e "${GREEN}✓ Dependencies installed${NC}"
+  else
+    echo -e "${YELLOW}⚠️  No lock file found, skipping dependency installation${NC}"
+  fi
+
+  # create tmux session
+  echo -e "${BLUE}🚀 Creating tmux session '$session_name'...${NC}"
+  
+  # window 1: neovim (use send-keys so window survives if nvim exits)
+  tmux new-session -d -s "$session_name" -n "nvim" -c "$worktree_dir"
+  tmux send-keys -t "$session_name:nvim" "nvim" Enter
+  echo -e "   ${GREEN}✓ Window 'nvim' created${NC}"
+  
+  # window 2: opencode (use send-keys so window survives if opencode exits)
+  tmux new-window -t "$session_name" -n "opencode" -c "$worktree_dir"
+  tmux send-keys -t "$session_name:opencode" "opencode --continue" Enter
+  echo -e "   ${GREEN}✓ Window 'opencode' created${NC}"
+  
+  # window 3: dev server (only if package manager exists)
+  if [[ -n "$pkg_manager" ]]; then
+    tmux new-window -t "$session_name" -n "dev" -c "$worktree_dir"
+    tmux send-keys -t "$session_name:dev" "$pkg_manager run dev" Enter
+    echo -e "   ${GREEN}✓ Window 'dev' created${NC}"
+  else
+    tmux new-window -t "$session_name" -n "shell" -c "$worktree_dir"
+    echo -e "   ${GREEN}✓ Window 'shell' created${NC}"
+  fi
+  
+  # select first window
+  tmux select-window -t "$session_name:1"
+  echo -e "${GREEN}✅ All windows ready! Starting in 'nvim'.${NC}"
+  
+  # attach or switch to session
+  if [ -n "$TMUX" ]; then
+    echo -e "${BLUE}🔀 Switching client to '$session_name'...${NC}"
+    tmux switch-client -t "$session_name"
+  else
+    echo -e "${BLUE}📎 Attaching to '$session_name'...${NC}"
+    tmux attach -t "$session_name"
+  fi
+}
+
 autoload -Uz edit-command-line
 
 # Create a function to handle double-tab
