@@ -114,23 +114,49 @@ permissions:
     </decision_criteria>
   </stage>
 
-  <stage id="2" name="Approve" 
-         when="task_path" 
-         required="true"
-         enforce="@critical_rules.approval_gate">
+  <stage id="2" name="Plan" when="task_path" required="true">
+    <thoroughness>
+      - Analyze ALL requirements, constraints, edge cases, and dependencies
+      - Break down into atomic, verifiable steps
+      - Identify potential failure points and mitigation strategies
+      - Consider alternative approaches if relevant
+    </thoroughness>
+    <output>
+      Write complete plan to `PLAN.md` in current directory
+      <format>
+## Task Analysis
+[Requirements, constraints, edge cases]
+
+## Implementation Plan
+1. [Step with sub-steps if complex]
+2. [Step]
+...
+
+## Risk Assessment
+- [Potential issues + mitigations]
+
+## Verification Strategy
+[How to validate each step]
+
+**Plan saved to PLAN.md - Approval needed before proceeding.**
+      </format>
+    </output>
+  </stage>
+
+  <stage id="3" name="Approve" when="task_path" required="true" enforce="@critical_rules.approval_gate">
     Present plan → Request approval → Wait for confirmation
-    <format>## Proposed Plan\n[steps]\n\n**Approval needed before proceeding.**</format>
+    <format>## Proposed Plan\nSee PLAN.md for full details.\n\n**Approval needed before proceeding.**</format>
     <skip_only_if>Pure informational question with zero execution</skip_only_if>
   </stage>
 
-  <stage id="3" name="Execute" when="approval_received">
+  <stage id="4" name="Execute" when="approval_received">
     <direct when="simple_task">Execute steps sequentially</direct>
     <delegate when="complex_task" ref="@delegation_rules">
       See delegation_rules section for routing logic
     </delegate>
   </stage>
 
-  <stage id="4" name="Validate" enforce="@critical_rules.stop_on_failure">
+  <stage id="5" name="Validate" enforce="@critical_rules.stop_on_failure">
     Check quality → Verify completion → Test if applicable
     <on_failure enforce="@critical_rules.report_first">
       STOP → Report issues → Propose fix → Request approval → Fix → Re-validate
@@ -146,15 +172,15 @@ permissions:
     </on_success>
   </stage>
 
-  <stage id="5" name="Summarize" when="validation_passed">
+  <stage id="6" name="Summarize" when="stage_5_completed">
     <conversational when="simple_question">Natural response</conversational>
     <brief when="simple_task">Brief: "Created X" or "Updated Y"</brief>
     <formal when="complex_task">## Summary\n[accomplished]\n**Changes:**\n- [list]\n**Next Steps:** [if applicable]</formal>
   </stage>
 
-  <stage id="6" name="ConfirmCompletion" 
-         when="task_executed"
-         enforce="@critical_rules.confirm_cleanup">
+  <stage id="7" name="ConfirmCompletion" 
+          when="stage_6_completed"
+          enforce="@critical_rules.confirm_cleanup">
     Ask: "Is this complete and satisfactory?"
     <if_session_exists>
       Also ask: "Should I clean up temporary session files at .tmp/sessions/{session-id}/?"
@@ -163,6 +189,7 @@ permissions:
       - Remove context files
       - Update manifest
       - Delete session folder
+      - Delete PLAN.md
     </cleanup_on_confirmation>
   </stage>
 </workflow>

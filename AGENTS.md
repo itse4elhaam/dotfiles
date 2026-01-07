@@ -1,32 +1,59 @@
-# Dotfiles Repository - Agent Guide
+# PROJECT KNOWLEDGE BASE
 
-## Project Overview
-Personal configuration management using `stow` for symlinks. Includes dev setup scripts, shell configs, and OpenCode customizations.
+**Generated:** 2026-01-07
+**Context:** Dotfiles & Dev Environment
 
-## Build/Lint/Test Commands
-- **Setup**: `dev-setup/run.sh` - Runs all setup scripts in `dev-setup/runs/`
-- **Filter**: `dev-setup/run.sh <filter>` - Run specific scripts (e.g., `dev-setup/run.sh basic`)
-- **Lint**: `shellcheck **/*.sh` - Lint all shell scripts
-- **Tests**: No automated tests currently
+## OVERVIEW
+Personal configuration management using `stow` for symlinks. Includes dev setup scripts (`dev-setup/`), shell configs, and extensive OpenCode customizations (`.config/opencode/`).
 
-## Shell Script Style
-- Shebang: `#!/bin/bash`
-- Safety: Always use `set -euo pipefail`
-- Naming: `snake_case` for variables/functions (e.g., `script_dir`)
-- Quoting: Always quote variables: `"$variable"` not `$variable`
-- Conditionals: Use `[[ ]]` over `[ ]`
-- Arguments: Pass with `"$@"` to preserve spacing
-- Linting: Use shellcheck before committing
+## STRUCTURE
+```
+./
+├── dev-setup/     # Setup scripts & runner (idempotent)
+├── scripts/       # Standalone utility scripts
+├── docs/          # Documentation (AI guide, etc)
+├── .config/       # Application configurations
+│   └── opencode/  # AI Agents, Commands, Context
+└── .stow-local-ignore
+```
 
-## Git Workflow
-- **Commit format**: Conventional Commits (feat|fix|chore|docs|refactor|perf|test)
-- **Branch naming**: `type/short-desc` (solo work) or `type/elhaam/short-desc` (collaborative)
-- **Use**: `/commit` command for commits with CodeRabbit review integration
-- **Auto-commit**: When invoked via `/commit`, commits immediately after analysis
-- **Staging logic**: Commit staged files if any exist; if nothing is staged, stage all changes with `git add -A`
+## WHERE TO LOOK
+| Task | Location | Notes |
+|------|----------|-------|
+| **System Setup** | `dev-setup/run.sh` | Main entry point |
+| **Setup Scripts** | `dev-setup/runs/` | Individual setup units |
+| **AI Agents** | `.config/opencode/agent/` | Custom agent defs |
+| **AI Commands** | `.config/opencode/command/` | Slash commands |
+| **Shell Config** | `.bashrc`, `.zshrc` | Root level dotfiles |
 
-## OpenCode Customizations
-- **Agents**: 3 primary + 12 subagents in `.opencode/agent/`
-- **Commands**: 9 custom commands in `.opencode/command/` (commit, study, test, etc.)
-- **Tools**: Custom MCP tools in `.opencode/tool/`
-- **Context**: Structured guides in `.opencode/context/`
+## CODE MAP
+| Symbol | Type | Location | Role |
+|--------|------|----------|------|
+| `run.sh` | Script | `dev-setup/run.sh` | Orchestrates setup scripts |
+| `execute` | Func | `dev-setup/run.sh` | Wrapper for dry-run support |
+| `opencode.json` | Config | `.config/opencode/` | Main AI config |
+
+## CONVENTIONS
+- **Shell**: `#!/bin/bash`, `set -euo pipefail`, `snake_case` vars.
+- **Git**: Conventional Commits (`feat`, `fix`, `chore`).
+- **Safety**: Always quote variables `"$var"`. Use `[[ ]]` tests.
+- **Idempotency**: Setup scripts must be safe to re-run.
+
+## COMMANDS
+```bash
+# Run all setup scripts
+./dev-setup/run.sh
+
+# Run specific setup (grep filter)
+./dev-setup/run.sh basic
+
+# Lint scripts
+shellcheck **/*.sh
+
+# Commit with AI review
+/commit
+```
+
+## NOTES
+- **Stow**: Root files are symlinked to `$HOME`.
+- **OpenCode**: Custom agents stored in `.config/opencode` override defaults.
