@@ -113,7 +113,8 @@
   },
   "plugin": [
     "oh-my-opencode",
-    "@tarquinen/opencode-dcp@latest"
+    "@tarquinen/opencode-dcp@latest",
+    "opencode-supermemory@latest"
   ],
   "instructions": [
     "{env:HOME}/dotfiles/docs/ai-guide.md"
