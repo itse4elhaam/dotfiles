@@ -8,7 +8,7 @@
       "model": "opencode/glm-4.7-free"
     },
     "explore": {
-      "model": "opencode/grok-code-fast-1"
+      "model": "opencode/grok-code"
     },
     "oracle": {
       "model": "opencode/minimax-m2.1-free"
