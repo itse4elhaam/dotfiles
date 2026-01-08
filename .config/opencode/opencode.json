@@ -74,7 +74,7 @@
         "mcp-remote",
         "https://mcp.linear.app/mcp"
       ],
-      "enabled": false
+      "enabled": true
     },
     "next-devtools": {
       "type": "local",
