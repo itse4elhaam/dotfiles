@@ -114,7 +114,8 @@
   "plugin": [
     "oh-my-opencode",
     "@tarquinen/opencode-dcp@latest",
-    "opencode-supermemory@latest"
+    "opencode-supermemory@latest",
+    "opencode-anthropic-auth@0.0.8"
   ],
   "instructions": [
     "{env:HOME}/dotfiles/docs/ai-guide.md"
