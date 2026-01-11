@@ -499,15 +499,19 @@ wtc() {
     echo -e "${GREEN}✓ Selected: $branch_name${NC}"
   fi
 
-  # get project name (sanitized for special characters)
-  local project_name=$(basename "$(git rev-parse --show-toplevel)" | sed 's/[^a-zA-Z0-9_-]/-/g')
+  # get project name and path (sanitized for special characters)
   local original_path=$(git rev-parse --show-toplevel)
+  local project_name=$(basename "$original_path" | sed 's/[^a-zA-Z0-9_-]/-/g')
+  local parent_dir=$(basename "$(dirname "$original_path")" | sed 's/[^a-zA-Z0-9_-]/-/g')
   
   # create ~/worktrees if it doesn't exist
   local worktrees_dir="$HOME/worktrees"
   if [[ ! -d "$worktrees_dir" ]]; then
     echo -e "${BLUE}📁 Creating $worktrees_dir${NC}"
-    mkdir -p "$worktrees_dir"
+    if ! mkdir -p "$worktrees_dir"; then
+      echo -e "${RED}❌ Failed to create $worktrees_dir${NC}"
+      return 1
+    fi
   fi
 
   # prune dead worktrees before creating new ones
@@ -516,7 +520,8 @@ wtc() {
   # sanitize branch name comprehensively (handles /, $, :, spaces, special chars)
   local sanitized_branch=$(echo "$branch_name" | sed 's/[^a-zA-Z0-9_-]/-/g')
   local worktree_dir="$worktrees_dir/${project_name}-${sanitized_branch}"
-  local session_name="${project_name}-${sanitized_branch}"
+  # use parent-project-branch format to avoid session name collisions
+  local session_name="${parent_dir}-${project_name}-${sanitized_branch}"
   
   # helper function to detect package manager
   _detect_package_manager() {
@@ -548,10 +553,16 @@ wtc() {
       
       # window 1: neovim (check if installed)
       if command -v nvim &> /dev/null; then
-        tmux new-session -d -s "$session_name" -n "nvim" -c "$worktree_dir"
+        if ! tmux new-session -d -s "$session_name" -n "nvim" -c "$worktree_dir"; then
+          echo -e "${RED}❌ Failed to create tmux session${NC}"
+          return 1
+        fi
         tmux send-keys -t "$session_name:nvim" "nvim" Enter
       else
-        tmux new-session -d -s "$session_name" -n "shell" -c "$worktree_dir"
+        if ! tmux new-session -d -s "$session_name" -n "shell" -c "$worktree_dir"; then
+          echo -e "${RED}❌ Failed to create tmux session${NC}"
+          return 1
+        fi
         echo -e "${YELLOW}⚠️  nvim not found, using shell${NC}"
       fi
       
@@ -587,11 +598,21 @@ wtc() {
   
   # if worktree directory exists, validate and attach
   if [[ -d "$worktree_dir" ]]; then
+    # handle --force flag for worktree recreation
+    if [[ "$force_recreate" == "--force" ]]; then
+      echo -e "${YELLOW}🔄 Force recreating worktree...${NC}"
+      if git worktree list | grep -q "$worktree_dir"; then
+        git worktree remove "$worktree_dir" 2>/dev/null || rm -rf "$worktree_dir"
+      else
+        rm -rf "$worktree_dir"
+      fi
+      git worktree prune 2>/dev/null
+      # fall through to creation logic
     # verify it's a valid tracked worktree
-    if git worktree list | grep -q "$worktree_dir"; then
+    elif git worktree list | grep -q "$worktree_dir"; then
       echo -e "${GREEN}✅ Worktree exists: $worktree_dir${NC}"
       _setup_session
-      return
+      return 0
     else
       echo -e "${YELLOW}⚠️  Directory exists but is not a valid worktree. Recreating...${NC}"
       rm -rf "$worktree_dir" 2>/dev/null
@@ -638,25 +659,46 @@ wtc() {
 
   # copy .env files
   echo -e "${BLUE}📋 Copying .env files...${NC}"
+  local env_copied=0
   setopt nullglob
   for env_file in "$original_path"/.env*; do
     if [[ -f "$env_file" ]]; then
-      cp "$env_file" "$worktree_dir/" 2>/dev/null && echo -e "   ${GREEN}✓ $(basename "$env_file")${NC}"
+      if cp "$env_file" "$worktree_dir/" 2>/dev/null; then
+        echo -e "   ${GREEN}✓ $(basename "$env_file")${NC}"
+        env_copied=1
+      else
+        echo -e "   ${RED}✗ $(basename "$env_file") (permission denied)${NC}"
+      fi
     fi
   done
   unsetopt nullglob
+  
+  if [[ $env_copied -eq 0 ]]; then
+    echo -e "   ${YELLOW}⚠️  No .env files found${NC}"
+  fi
   
   # detect and install dependencies (synchronously to avoid race condition)
   local pkg_manager=$(_detect_package_manager "$original_path")
 
   if [[ -n "$pkg_manager" ]]; then
     echo -e "${BLUE}📦 Installing dependencies with $pkg_manager...${NC}"
-    (cd "$worktree_dir" && $pkg_manager install)
-    echo -e "${GREEN}✓ Dependencies installed${NC}"
+    if (cd "$worktree_dir" && $pkg_manager install); then
+      echo -e "${GREEN}✓ Dependencies installed${NC}"
+    else
+      echo -e "${RED}❌ Failed to install dependencies${NC}"
+      echo -e "${YELLOW}⚠️  Cleaning up incomplete worktree...${NC}"
+      rm -rf "$worktree_dir" 2>/dev/null
+      git worktree prune 2>/dev/null
+      return 1
+    fi
+  else
+    echo -e "${YELLOW}⚠️  No package manager detected${NC}"
   fi
 
   # setup tmux and attach
   _setup_session
+  return 0
+}
   
   # cleanup helper functions
   unset -f _setup_session _detect_package_manager
