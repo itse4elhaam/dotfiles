@@ -92,7 +92,6 @@ alias bn=bun
 alias cat="bat"
 alias tls="tmux ls"
 alias tmuxt="tmux set-option -g status \$(tmux show-option -gqv status | sed 's/on/off/;t;s/off/on/')"
-alias oc="code ."
 alias tmux="tmux -2"
 alias ov="vim .; clear"
 alias sp="supabase"
@@ -699,10 +698,6 @@ wtc() {
   _setup_session
   return 0
 }
-  
-  # cleanup helper functions
-  unset -f _setup_session _detect_package_manager
-}
 
 autoload -Uz edit-command-line
 
@@ -723,3 +718,6 @@ function double-tab-edit() {
 
 # zle -N double-tab-edit
 # bindkey '\t' double-tab-edit
+
+# Added by git-ai installer on Mon Jan 12 01:48:42 AM PKT 2026
+export PATH="/home/elhaam/.git-ai/bin:$PATH"
