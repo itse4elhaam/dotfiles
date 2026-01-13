@@ -2,19 +2,46 @@
   "context": {
     "fileName": "GEMINI.md"
   },
+  "general": {
+    "preferredEditor": "neovim",
+    "vimMode": false
+  },
+  "hooks": {
+    "AfterTool": [
+      {
+        "hooks": [
+          {
+            "command": "git-ai checkpoint gemini --hook-input stdin",
+            "type": "command"
+          }
+        ],
+        "matcher": "write_file|replace"
+      }
+    ],
+    "BeforeTool": [
+      {
+        "hooks": [
+          {
+            "command": "git-ai checkpoint gemini --hook-input stdin",
+            "type": "command"
+          }
+        ],
+        "matcher": "write_file|replace"
+      }
+    ]
+  },
   "mcpServers": {
     "context7": {
       "httpUrl": "https://mcp.context7.com/mcp"
     }
   },
-  "general": {
-    "preferredEditor": "neovim",
-    "vimMode": false
-  },
   "security": {
     "auth": {
       "selectedType": "gemini-api-key"
     }
+  },
+  "tools": {
+    "enableHooks": true
   },
   "ui": {
     "theme": "ANSI"
