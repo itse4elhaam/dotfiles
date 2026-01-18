@@ -1,5 +1,15 @@
 {
   "$schema": "https://opencode.ai/config.json",
+  "permission": {
+    "bash": {
+      "tmux kill-server": "deny",
+      "git push --force": "deny",
+      "git push -f": "deny",
+      "rm -rf /": "deny",
+      "rm -rf /home/elhaam/dotfiles": "deny",
+      "git reset --hard": "deny"
+    }
+  },
   "mcp": {
     "context7": {
       "type": "remote",
