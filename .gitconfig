@@ -1,6 +1,6 @@
 
 [user]
-	name = Elhaam
+	name = Elhaam Basheer Chaudhry
 	email = e4elhaam@gmail.com
   # todo: add your signing key here
 # [commit]
@@ -139,8 +139,8 @@
 [push]
   autoSetupRemote = true  # easier to push new branches
   followTags = true  # push also tags
-[pull]
-  ff = only
+; [pull]
+;   ff = only
 [submodule]
   fetchJobs = 16
 [rebase]

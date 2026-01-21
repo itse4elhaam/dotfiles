@@ -125,7 +125,9 @@
     "oh-my-opencode",
     "@tarquinen/opencode-dcp@latest",
     "opencode-supermemory@latest",
-    "opencode-anthropic-auth@0.0.8"
+    "opencode-anthropic-auth@0.0.8",
+    "@nick-vi/opencode-type-inject",
+    "opencode-pty"
   ],
   "instructions": [
     "{env:HOME}/dotfiles/docs/ai-guide.md"

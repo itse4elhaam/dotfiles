@@ -11,7 +11,7 @@
       "model": "opencode/minimax-m2.1-free"
     },
     "oracle": {
-      "model": "github-copilot/gpt-5.2-codex"
+      "model": "opencode/minimax-m2.1-free"
     },
     "frontend-ui-ux-engineer": {
       "model": "google/gemini-3-pro-preview"
