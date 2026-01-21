@@ -577,7 +577,7 @@ wtc() {
       if [[ -n "$pkg_manager" ]]; then
         tmux new-window -t "$session_name" -n "dev" -c "$worktree_dir"
         # Auto-start dev server (dependencies should be installed by now)
-        tmux send-keys -t "$session_name:dev" "$pkg_manager run dev" Enter
+        tmux send-keys -t "$session_name:dev" "$pkg_manager install && $pkg_manager run dev" Enter
       else
         tmux new-window -t "$session_name" -n "shell" -c "$worktree_dir"
       fi
@@ -721,3 +721,4 @@ function double-tab-edit() {
 
 # Added by git-ai installer on Mon Jan 12 01:48:42 AM PKT 2026
 export PATH="/home/elhaam/.git-ai/bin:$PATH"
+export PATH="$PATH:$HOME/.pub-cache/bin"
