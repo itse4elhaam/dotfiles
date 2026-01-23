@@ -4,14 +4,14 @@ background-opacity             = 0.99
 title                         = CodeCrypt
 window-title-font-family      = CodeCrypt
 
-cursor-style-blink            = true
+cursor-style-blink            = false
+shell-integration-features    = no-cursor
 confirm-close-surface         = false
 clipboard-read                = allow
 clipboard-write               = allow
 copy-on-select                = true
 
 mouse-hide-while-typing       = true
-cursor-style = block
 
 # these are the keybinds:
 keybind = ctrl+v=paste_from_clipboard
@@ -23,7 +23,6 @@ fullscreen = true
 font-thicken = false
 font-thicken-strength = 255
 font-synthetic-style =
-cursor-style=block
 
 # Unbinding ALT+(1-9) so that I can use it in tmux to switch windows
 
