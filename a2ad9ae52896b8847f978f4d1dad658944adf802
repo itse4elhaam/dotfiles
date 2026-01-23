@@ -1,0 +1,49 @@
+.config/ghostty/config
+  b4082e94aa99cffe 8
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.0.37",
+  "base_commit_sha": "a2ad9ae52896b8847f978f4d1dad658944adf802",
+  "prompts": {
+    "5ad08280074b0a69": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_4152885a1ffe6GwULMuXn54W3N-95b3ffd8-e81c-4e5d-bb98-b2ac79efdfaf",
+        "model": "unknown"
+      },
+      "human_author": "Elhaam Basheer Chaudhry <e4elhaam@gmail.com>",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 1,
+      "accepted_lines": 0,
+      "overriden_lines": 0
+    },
+    "b4082e94aa99cffe": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_4152885a1ffe6GwULMuXn54W3N-634a44e6-f2c2-421e-9c3f-e5335c86a447",
+        "model": "unknown"
+      },
+      "human_author": "Elhaam Basheer Chaudhry <e4elhaam@gmail.com>",
+      "messages": [],
+      "total_additions": 1,
+      "total_deletions": 0,
+      "accepted_lines": 1,
+      "overriden_lines": 0
+    },
+    "ebf79ee5b35b0f34": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_4152885a1ffe6GwULMuXn54W3N-4fe3da49-2307-408a-b3c9-ed5555826d7d",
+        "model": "unknown"
+      },
+      "human_author": "Elhaam Basheer Chaudhry <e4elhaam@gmail.com>",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 1,
+      "accepted_lines": 0,
+      "overriden_lines": 0
+    }
+  }
+}
