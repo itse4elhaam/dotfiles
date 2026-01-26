@@ -1,0 +1,36 @@
+.config/ghostty/config
+  9a3cd67c25b88ff0 63-66
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.0.37",
+  "base_commit_sha": "e623397c8e715385d2373f426fa9f633bcc5efea",
+  "prompts": {
+    "9a3cd67c25b88ff0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_403be6547ffe3v6mD8RBTTHD06-2b3b4a68-d4fb-4cb8-8e05-9c3a660662fc",
+        "model": "unknown"
+      },
+      "human_author": "Elhaam Basheer Chaudhry <e4elhaam@gmail.com>",
+      "messages": [],
+      "total_additions": 4,
+      "total_deletions": 0,
+      "accepted_lines": 4,
+      "overriden_lines": 0
+    },
+    "b4082e94aa99cffe": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_4152885a1ffe6GwULMuXn54W3N-634a44e6-f2c2-421e-9c3f-e5335c86a447",
+        "model": "unknown"
+      },
+      "human_author": "Elhaam Basheer Chaudhry <e4elhaam@gmail.com>",
+      "messages": [],
+      "total_additions": 1,
+      "total_deletions": 0,
+      "accepted_lines": 1,
+      "overriden_lines": 0
+    }
+  }
+}
