@@ -60,3 +60,7 @@ keybind = ctrl+right=unbind
 keybind = ctrl+up=unbind
 keybind = ctrl+down=unbind
 
+# Unbind CTRL+SHIFT+arrow keys for tmux window reordering
+keybind = ctrl+shift+left=unbind
+keybind = ctrl+shift+right=unbind
+
