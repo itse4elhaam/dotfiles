@@ -1,0 +1,36 @@
+.config/opencode/oh-my-opencode.json
+  236e6e402e261554 24-25,27-32
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.0.37",
+  "base_commit_sha": "76c57a15f9fb920a898eacf25b837ffd93155ad1",
+  "prompts": {
+    "236e6e402e261554": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_3fee19ad0ffe2r3ZyXCCc8gvGY-0ee5d7b1-35eb-4901-8e3f-11a535579085",
+        "model": "unknown"
+      },
+      "human_author": "Elhaam Basheer Chaudhry <e4elhaam@gmail.com>",
+      "messages": [],
+      "total_additions": 9,
+      "total_deletions": 0,
+      "accepted_lines": 8,
+      "overriden_lines": 1
+    },
+    "dab99798de8ae3a6": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_4036c763fffeoyg7foz0wmbHsi-e51cfe26-c26c-4489-bc5a-f38904c8b5cd",
+        "model": "unknown"
+      },
+      "human_author": "Elhaam Basheer Chaudhry <e4elhaam@gmail.com>",
+      "messages": [],
+      "total_additions": 102,
+      "total_deletions": 1179,
+      "accepted_lines": 102,
+      "overriden_lines": 0
+    }
+  }
+}
