@@ -10,6 +10,15 @@
       "git reset --hard": "deny"
     }
   },
+  "lsp": {
+    "typescript": {
+      "disabled": true
+    },
+    "tsgo": {
+      "command": ["tsgo", "--lsp", "--stdio"],
+      "extensions": [".ts", ".tsx", ".js", ".jsx"],
+    }
+  },
   "mcp": {
     "context7": {
       "type": "remote",
@@ -52,15 +61,7 @@
         "-y",
         "octocode-mcp@latest"
       ],
-      "enabled": true
-    },
-    "ddg-search": {
-      "type": "local",
-      "command": [
-        "uvx",
-        "duckduckgo-mcp-server"
-      ],
-      "enabled": true
+      "enabled": false
     },
     "Better Auth": {
       "type": "remote",
@@ -84,7 +85,7 @@
         "mcp-remote",
         "https://mcp.linear.app/mcp"
       ],
-      "enabled": true
+      "enabled": false
     },
     "next-devtools": {
       "type": "local",
@@ -104,15 +105,6 @@
       ],
       "enabled": false
     },
-    "chrome-devtools": {
-      "type": "local",
-      "command": [
-        "npx",
-        "-y",
-        "chrome-devtools-mcp@latest"
-      ],
-      "enabled": false
-    }
   },
   "keybinds": {
     "messages_half_page_down": "alt+j",
