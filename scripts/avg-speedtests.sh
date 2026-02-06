@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
 
-# lighthouse-perf-parallel.sh - Parallel Lighthouse testing with CPU throttling
-# Usage: ./lighthouse-perf-parallel.sh <url> [runs] [max-parallel]
+# lighthouse-perf-parallel.sh - Aggressive parallel Lighthouse testing
+# Usage: ./lighthouse-perf-parallel.sh <url> [runs] [max-parallel] [options]
+# Options: --fast       Skip throttling for quicker runs
+#          --cleanup    Auto-delete raw reports after (no prompt)
+#          --no-cleanup Keep raw reports (no prompt)
 
 set -euo pipefail
 
@@ -12,6 +15,17 @@ MAX_PARALLEL="${3:-}"
 REPORT_DIR="./lighthouse-reports"
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)
 
+# Parse flags from remaining args
+FAST_MODE=false
+CLEANUP_MODE="ask"  # ask | yes | no
+for arg in "${@:4}"; do
+    case "$arg" in
+        --fast) FAST_MODE=true ;;
+        --cleanup) CLEANUP_MODE="yes" ;;
+        --no-cleanup) CLEANUP_MODE="no" ;;
+    esac
+done
+
 # Colors
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -20,14 +34,9 @@ BLUE='\033[0;34m'
 CYAN='\033[0;36m'
 NC='\033[0m'
 
-# Auto-detect optimal parallelism
 detect_max_parallel() {
-    local cpu_cores
-    local available_mem_gb
-    local max_by_cpu
-    local max_by_mem
-    
-    # Get CPU cores
+    local cpu_cores available_mem_gb max_by_cpu max_by_mem
+
     if [[ "$OSTYPE" == "linux-gnu"* ]]; then
         cpu_cores=$(nproc 2>/dev/null || echo 4)
         available_mem_gb=$(free -g 2>/dev/null | awk '/^Mem:/{print $7}' || echo 8)
@@ -38,39 +47,23 @@ detect_max_parallel() {
         cpu_cores=4
         available_mem_gb=8
     fi
-    
-    # Leave 1-2 cores free for system
-    if [ "$cpu_cores" -le 4 ]; then
-        max_by_cpu=$((cpu_cores - 1))
-    else
-        max_by_cpu=$((cpu_cores - 2))
-    fi
-    
-    # Each Lighthouse instance uses ~1.5GB RAM
-    max_by_mem=$((available_mem_gb / 2))
-    
-    # Use the more conservative limit
-    local optimal=$max_by_cpu
-    if [ "$max_by_mem" -lt "$max_by_cpu" ]; then
-        optimal=$max_by_mem
-    fi
-    
-    # Minimum of 2, maximum of 12
-    if [ "$optimal" -lt 2 ]; then
-        optimal=2
-    elif [ "$optimal" -gt 12 ]; then
-        optimal=12
-    fi
-    
+
+    # Aggressive: use all cores, ~1GB per instance
+    max_by_cpu=$cpu_cores
+    max_by_mem=$((available_mem_gb > 1 ? available_mem_gb : 2))
+
+    local optimal=$((max_by_cpu < max_by_mem ? max_by_cpu : max_by_mem))
+    optimal=$((optimal < 2 ? 2 : (optimal > 16 ? 16 : optimal)))
+
     echo "$optimal"
 }
 
 # Validation
 if [ -z "$URL" ]; then
     echo -e "${RED}Error: URL required${NC}"
-    echo "Usage: $0 <url> [runs] [max-parallel]"
-    echo "Example: $0 https://allin1rentals.com 10"
-    echo "Example: $0 https://allin1rentals.com 10 4"
+    echo "Usage: $0 <url> [runs] [max-parallel] [--fast] [--cleanup|--no-cleanup]"
+    echo "Example: $0 https://example.com 10"
+    echo "Example: $0 https://example.com 10 4 --fast --cleanup"
     exit 1
 fi
 
@@ -83,14 +76,15 @@ if [ "$MAX_PARALLEL" -lt 1 ]; then
     MAX_PARALLEL=1
 fi
 
-# Setup
 mkdir -p "$REPORT_DIR"
 TEMP_DIR="$REPORT_DIR/temp_$TIMESTAMP"
 mkdir -p "$TEMP_DIR"
 
-# Progress tracking
 PROGRESS_FILE="$TEMP_DIR/progress.txt"
-touch "$PROGRESS_FILE"
+FAIL_FILE="$TEMP_DIR/failures.txt"
+touch "$PROGRESS_FILE" "$FAIL_FILE"
+
+CHROME_FLAGS="--headless=new --no-sandbox --disable-gpu --disable-dev-shm-usage --disable-extensions --disable-background-networking --disable-default-apps --disable-sync --disable-translate --metrics-recording-only --no-first-run --safebrowsing-disable-auto-update"
 
 echo -e "${BLUE}═══════════════════════════════════════════════════════${NC}"
 echo -e "${BLUE}  Parallel Lighthouse Performance Test${NC}"
@@ -99,92 +93,160 @@ echo -e "URL:              ${GREEN}$URL${NC}"
 echo -e "Total Runs:       ${GREEN}$RUNS${NC}"
 echo -e "Parallel Jobs:    ${GREEN}$MAX_PARALLEL${NC}"
 echo -e "CPU Cores:        ${CYAN}$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 'N/A')${NC}"
+echo -e "Mode:             ${CYAN}$( $FAST_MODE && echo "FAST (no throttling)" || echo "Standard" )${NC}"
 echo -e "Timestamp:        ${GREEN}$TIMESTAMP${NC}"
 echo ""
 
-# Single lighthouse run function
+# Pre-warm: resolve DNS + cache Chrome binary with a throwaway run
+echo -e "${YELLOW}Pre-warming Chrome & DNS...${NC}"
+lighthouse "$URL" \
+    --output=json \
+    --output-path=/dev/null \
+    --only-categories=performance \
+    --chrome-flags="$CHROME_FLAGS" \
+    --max-wait-for-load=5000 \
+    --quiet \
+    2>/dev/null || true
+echo -e "${GREEN}✓${NC} Warm-up done"
+echo ""
+
 run_lighthouse() {
     local run_number=$1
     local output_file="$TEMP_DIR/report_$run_number.json"
     local log_file="$TEMP_DIR/run_$run_number.log"
-    
+
+    local extra_flags=""
+    if [ "$FAST_MODE" = "true" ]; then
+        extra_flags="--throttling.cpuSlowdownMultiplier=1 --throttling.rttMs=0 --throttling.throughputKbps=0"
+    fi
+
     {
+        # shellcheck disable=SC2086
         lighthouse "$URL" \
             --output=json \
             --output-path="$output_file" \
             --only-categories=performance \
-            --chrome-flags="--headless=new --no-sandbox --disable-gpu --disable-dev-shm-usage" \
+            --chrome-flags="$CHROME_FLAGS" \
+            --max-wait-for-load=15000 \
+            $extra_flags \
             --quiet \
             2>&1 | grep -v "^$" || true
-        
-        echo "$run_number" >> "$PROGRESS_FILE"
+
+        if [ -f "$output_file" ] && [ -s "$output_file" ]; then
+            echo "$run_number" >> "$PROGRESS_FILE"
+        else
+            echo "$run_number" >> "$FAIL_FILE"
+        fi
     } > "$log_file" 2>&1
 }
 
-# Export function and variables
 export -f run_lighthouse
-export URL TEMP_DIR PROGRESS_FILE
+export URL TEMP_DIR PROGRESS_FILE FAIL_FILE CHROME_FLAGS FAST_MODE
 
-# Progress monitor function
+# Progress monitor function (aggressive: 200ms poll, failure tracking)
 monitor_progress() {
     local total=$1
-    local start_time=$(date +%s)
-    
+    local start_time
+    start_time=$(date +%s)
+
     while true; do
-        local completed=$(wc -l < "$PROGRESS_FILE" 2>/dev/null || echo 0)
-        local current_time=$(date +%s)
-        local elapsed=$((current_time - start_time))
-        
-        if [ "$completed" -ge "$total" ]; then
+        local completed failed done_total
+        completed=$(wc -l < "$PROGRESS_FILE" 2>/dev/null || echo 0)
+        failed=$(wc -l < "$FAIL_FILE" 2>/dev/null || echo 0)
+        done_total=$((completed + failed))
+
+        local current_time elapsed
+        current_time=$(date +%s)
+        elapsed=$((current_time - start_time))
+
+        if [ "$done_total" -ge "$total" ]; then
             break
         fi
-        
-        local percent=$((completed * 100 / total))
+
+        local percent=$((done_total * 100 / total))
         local bar_length=40
         local filled=$((percent * bar_length / 100))
         local empty=$((bar_length - filled))
-        
+
         local eta="calculating..."
-        if [ "$completed" -gt 0 ]; then
-            local avg_time=$((elapsed / completed))
-            local remaining=$((total - completed))
+        if [ "$done_total" -gt 0 ]; then
+            local avg_time=$((elapsed / done_total))
+            local remaining=$((total - done_total))
             local eta_seconds=$((avg_time * remaining))
             eta=$(printf "%02d:%02d" $((eta_seconds / 60)) $((eta_seconds % 60)))
         fi
-        
+
+        local fail_str=""
+        if [ "$failed" -gt 0 ]; then
+            fail_str=" | ${RED}✗${failed}${NC}"
+        fi
+
         printf "\r${YELLOW}Progress: ${NC}["
         printf "%${filled}s" | tr ' ' '█'
         printf "%${empty}s" | tr ' ' '░'
-        printf "] ${GREEN}%3d%%${NC} (%d/%d) | Elapsed: %02d:%02d | ETA: %s  " \
+        printf "] ${GREEN}%3d%%${NC} (${GREEN}✓%d${NC}${fail_str}/${CYAN}%d${NC}) | %02d:%02d | ETA: %s  " \
             "$percent" "$completed" "$total" \
             $((elapsed / 60)) $((elapsed % 60)) "$eta"
-        
-        sleep 0.5
+
+        sleep 0.2
     done
-    
+
     echo ""
 }
 
 echo -e "${YELLOW}Running $RUNS Lighthouse audits ($MAX_PARALLEL parallel jobs)...${NC}"
+if [ "$FAST_MODE" = "true" ]; then
+    echo -e "${CYAN}  ⚡ Fast mode: throttling disabled${NC}"
+fi
 echo ""
 
-# Start progress monitor
 monitor_progress "$RUNS" &
 MONITOR_PID=$!
 
-# Run parallel jobs
 START_TIME=$(date +%s)
 
+# Early abort wrapper: kills parallel jobs if >50% fail
+run_with_abort() {
+    local total=$1
+    shift
+
+    "$@" &
+    local job_pid=$!
+
+    while kill -0 "$job_pid" 2>/dev/null; do
+        local failed
+        failed=$(wc -l < "$FAIL_FILE" 2>/dev/null || echo 0)
+        local threshold=$(( (total + 1) / 2 ))
+        if [ "$failed" -ge "$threshold" ] && [ "$failed" -gt 1 ]; then
+            echo ""
+            echo -e "${RED}✗ Aborting: $failed/$total runs failed (>50%)${NC}"
+            kill "$job_pid" 2>/dev/null || true
+            wait "$job_pid" 2>/dev/null || true
+            return 1
+        fi
+        sleep 0.3
+    done
+    wait "$job_pid"
+}
+
+ABORT_FAILED=0
 if command -v parallel &> /dev/null; then
-    seq 1 "$RUNS" | parallel -j "$MAX_PARALLEL" --will-cite run_lighthouse {}
+    run_with_abort "$RUNS" parallel -j "$MAX_PARALLEL" --will-cite run_lighthouse -- $(seq 1 "$RUNS") || ABORT_FAILED=1
 else
-    seq 1 "$RUNS" | xargs -P "$MAX_PARALLEL" -I {} bash -c 'run_lighthouse "$@"' _ {}
+    run_with_abort "$RUNS" bash -c 'seq 1 "'"$RUNS"'" | xargs -P "'"$MAX_PARALLEL"'" -I {} bash -c '"'"'run_lighthouse "$@"'"'"' _ {}' || ABORT_FAILED=1
 fi
 
+kill $MONITOR_PID 2>/dev/null || true
 wait $MONITOR_PID 2>/dev/null || true
 
 END_TIME=$(date +%s)
 TOTAL_TIME=$((END_TIME - START_TIME))
+
+if [ "$ABORT_FAILED" -eq 1 ]; then
+    echo -e "${RED}✗ Aborted after ${TOTAL_TIME}s due to excessive failures${NC}"
+    rm -rf "$TEMP_DIR"
+    exit 1
+fi
 
 echo -e "${GREEN}✓ All tests completed in ${TOTAL_TIME}s${NC}"
 echo ""
@@ -367,12 +429,16 @@ echo -e "Raw reports:   ${BLUE}$TEMP_DIR/${NC}"
 echo -e "Logs:          ${BLUE}$TEMP_DIR/*.log${NC}"
 echo ""
 
-# Cleanup option
-read -p "Delete raw reports and logs? (y/N): " -n 1 -r
-echo
-if [[ $REPLY =~ ^[Yy]$ ]]; then
+if [ "$CLEANUP_MODE" = "yes" ]; then
     rm -rf "$TEMP_DIR"
-    echo -e "${GREEN}✓${NC} Temporary files deleted"
+    echo -e "${GREEN}✓${NC} Temporary files deleted (auto-cleanup)"
+elif [ "$CLEANUP_MODE" = "ask" ]; then
+    read -p "Delete raw reports and logs? (y/N): " -n 1 -r
+    echo
+    if [[ $REPLY =~ ^[Yy]$ ]]; then
+        rm -rf "$TEMP_DIR"
+        echo -e "${GREEN}✓${NC} Temporary files deleted"
+    fi
 fi
 
 echo ""
