@@ -2,29 +2,34 @@
 
 # lighthouse-perf-parallel.sh - Aggressive parallel Lighthouse testing
 # Usage: ./lighthouse-perf-parallel.sh <url> [runs] [max-parallel] [options]
-# Options: --fast       Skip throttling for quicker runs
-#          --cleanup    Auto-delete raw reports after (no prompt)
-#          --no-cleanup Keep raw reports (no prompt)
+# Options: --fast         Skip throttling for quicker runs
+#          --sequential   Disable parallelism (run one at a time)
+#          --cleanup      Auto-delete raw reports after (no prompt)
+#          --no-cleanup   Keep raw reports (no prompt)
 
 set -euo pipefail
 
-# Configuration
-URL="${1:-}"
-RUNS="${2:-5}"
-MAX_PARALLEL="${3:-}"
-REPORT_DIR="./lighthouse-reports"
-TIMESTAMP=$(date +%Y%m%d_%H%M%S)
-
-# Parse flags from remaining args
+# Parse flags and positional args (flags can appear anywhere)
 FAST_MODE=false
+SEQUENTIAL=false
 CLEANUP_MODE="ask"  # ask | yes | no
-for arg in "${@:4}"; do
+POSITIONAL=()
+for arg in "$@"; do
     case "$arg" in
         --fast) FAST_MODE=true ;;
+        --sequential) SEQUENTIAL=true ;;
         --cleanup) CLEANUP_MODE="yes" ;;
         --no-cleanup) CLEANUP_MODE="no" ;;
+        *) POSITIONAL+=("$arg") ;;
     esac
 done
+
+# Configuration
+URL="${POSITIONAL[0]:-}"
+RUNS="${POSITIONAL[1]:-5}"
+MAX_PARALLEL="${POSITIONAL[2]:-}"
+REPORT_DIR="./lighthouse-reports"
+TIMESTAMP=$(date +%Y%m%d_%H%M%S)
 
 # Colors
 RED='\033[0;31m'
@@ -61,14 +66,17 @@ detect_max_parallel() {
 # Validation
 if [ -z "$URL" ]; then
     echo -e "${RED}Error: URL required${NC}"
-    echo "Usage: $0 <url> [runs] [max-parallel] [--fast] [--cleanup|--no-cleanup]"
+    echo "Usage: $0 <url> [runs] [max-parallel] [--fast] [--sequential] [--cleanup|--no-cleanup]"
     echo "Example: $0 https://example.com 10"
     echo "Example: $0 https://example.com 10 4 --fast --cleanup"
+    echo "Example: $0 https://example.com 5 --sequential"
     exit 1
 fi
 
 # Set parallelism
-if [ -z "$MAX_PARALLEL" ]; then
+if [ "$SEQUENTIAL" = "true" ]; then
+    MAX_PARALLEL=1
+elif [ -z "$MAX_PARALLEL" ]; then
     MAX_PARALLEL=$(detect_max_parallel)
 fi
 
@@ -93,21 +101,24 @@ echo -e "URL:              ${GREEN}$URL${NC}"
 echo -e "Total Runs:       ${GREEN}$RUNS${NC}"
 echo -e "Parallel Jobs:    ${GREEN}$MAX_PARALLEL${NC}"
 echo -e "CPU Cores:        ${CYAN}$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 'N/A')${NC}"
-echo -e "Mode:             ${CYAN}$( $FAST_MODE && echo "FAST (no throttling)" || echo "Standard" )${NC}"
+echo -e "Mode:             ${CYAN}$( $FAST_MODE && echo "FAST (no throttling)" || echo "Standard" )$( $SEQUENTIAL && echo " | SEQUENTIAL" || echo "" )${NC}"
 echo -e "Timestamp:        ${GREEN}$TIMESTAMP${NC}"
 echo ""
 
-# Pre-warm: resolve DNS + cache Chrome binary with a throwaway run
-echo -e "${YELLOW}Pre-warming Chrome & DNS...${NC}"
-lighthouse "$URL" \
-    --output=json \
-    --output-path=/dev/null \
-    --only-categories=performance \
-    --chrome-flags="$CHROME_FLAGS" \
-    --max-wait-for-load=5000 \
-    --quiet \
-    2>/dev/null || true
-echo -e "${GREEN}✓${NC} Warm-up done"
+# Pre-warm: resolve DNS + cache Chrome binary with a throwaway run (skip in sequential mode)
+if [ "$SEQUENTIAL" = "false" ]; then
+    echo -e "${YELLOW}Pre-warming Chrome & DNS...${NC}"
+    lighthouse "$URL" \
+        --output=json \
+        --output-path=/dev/null \
+        --only-categories=performance \
+        --chrome-flags="$CHROME_FLAGS" \
+        --max-wait-for-load=5000 \
+        --quiet \
+        2>/dev/null || true
+    echo -e "${GREEN}✓${NC} Warm-up done"
+    echo ""
+fi
 echo ""
 
 run_lighthouse() {
@@ -230,7 +241,11 @@ run_with_abort() {
 }
 
 ABORT_FAILED=0
-if command -v parallel &> /dev/null; then
+if [ "$SEQUENTIAL" = "true" ]; then
+    for i in $(seq 1 "$RUNS"); do
+        run_lighthouse "$i"
+    done
+elif command -v parallel &> /dev/null; then
     run_with_abort "$RUNS" parallel -j "$MAX_PARALLEL" --will-cite run_lighthouse -- $(seq 1 "$RUNS") || ABORT_FAILED=1
 else
     run_with_abort "$RUNS" bash -c 'seq 1 "'"$RUNS"'" | xargs -P "'"$MAX_PARALLEL"'" -I {} bash -c '"'"'run_lighthouse "$@"'"'"' _ {}' || ABORT_FAILED=1
