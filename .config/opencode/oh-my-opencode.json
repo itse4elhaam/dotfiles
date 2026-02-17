@@ -5,34 +5,37 @@
       "model": "github-copilot/claude-opus-4.6"
     },
     "librarian": {
-      "model": "chutes/MiniMaxAI/MiniMax-M2.1-TEE"
+      "model": "opencode/kimi-k2.5-free"
     },
     "explore": {
-      "model": "chutes/MiniMaxAI/MiniMax-M2.1-TEE"
+      "model": "opencode/minimax-m2.5-free"
     },
     "oracle": {
       "model": "github-copilot/claude-opus-4.6"
     },
     "artistry": {
-      "model": "github-copilot/claude-opus-4.6"
+      "model": "opencode/glm-5-free"
     },
     "frontend-ui-ux-engineer": {
-      "model": "google/gemini-3-pro-preview"
+      "model": "opencode/kimi-k2.5-free"
     },
     "document-writer": {
-      "model": "github-copilot/gpt-4.1"
+      "model": "opencode/glm-5-free"
     },
     "multimodal-looker": {
-      "model": "google/gemini-3-flash-preview"
+      "model": "opencode/kimi-k2.5-free"
     },
     "prometheus": {
-      "model": "github-copilot/claude-opus-4.6"
+      "model": "github-copilot/gpt-5.2-codex"
     },
     "atlas": {
-      "model": "chutes/zai-org/GLM-4.7-TEE"
+      "model": "opencode/glm-5-free"
     },
     "sisyphus-junior": {
-      "model": "chutes/zai-org/GLM-4.7-FP8"
+      "model": "opencode/minimax-m2.5-free"
+    },
+    "hephaestus": {
+      "model": "github-copilot/gpt-5.2-codex"
     }
   }
 }
