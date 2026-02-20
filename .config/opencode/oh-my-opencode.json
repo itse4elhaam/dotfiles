@@ -35,7 +35,7 @@
       "model": "opencode/minimax-m2.5-free"
     },
     "hephaestus": {
-      "model": "github-copilot/gpt-5.2-codex"
+      "model": "github-copilot/gpt-5.3-codex"
     }
   }
 }
