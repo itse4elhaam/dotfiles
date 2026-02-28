@@ -77,7 +77,7 @@
     }; f"
 [core]
 	editor = nvim
-  pager = delta
+  pager = diffnav
   autocrlf = input  # keep newlines as in input
   compression = 9  # trade cpu for network
   fsync = none
