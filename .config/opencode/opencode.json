@@ -10,15 +10,6 @@
       "git reset --hard": "deny"
     }
   },
-  "lsp": {
-    "typescript": {
-      "disabled": true
-    },
-    "tsgo": {
-      "command": ["tsgo", "--lsp", "--stdio"],
-      "extensions": [".ts", ".tsx", ".js", ".jsx"],
-    }
-  },
   "mcp": {
     "context7": {
       "type": "remote",
@@ -105,13 +96,6 @@
       ],
       "enabled": false
     },
-  },
-  "keybinds": {
-    "messages_half_page_down": "alt+j",
-    "messages_half_page_up": "alt+k",
-    "model_cycle_recent": "alt+l",
-    "model_cycle_recent_reverse": "alt+h",
-    "input_newline": "alt+o"
   },
   "plugin": [
     "oh-my-opencode",
