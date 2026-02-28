@@ -107,6 +107,7 @@ alias vi=vim
 alias vim=nvim
 alias tai=tmuxai
 alias oc="opencode --continue"
+alias grep="rg"
 ai() {
   sudo apt install "$1" -y
 }
