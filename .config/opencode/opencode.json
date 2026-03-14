@@ -10,6 +10,8 @@
       "git reset --hard": "deny"
     }
   },
+
+  "autoupdate": false,
   "mcp": {
     "context7": {
       "type": "remote",
@@ -76,7 +78,7 @@
         "mcp-remote",
         "https://mcp.linear.app/mcp"
       ],
-      "enabled": false
+      "enabled": true
     },
     "next-devtools": {
       "type": "local",
