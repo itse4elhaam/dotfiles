@@ -1,3 +1,6 @@
+[post-start]
+copy = "wt step copy-ignored"
+
 [post-create]
 tmux = """
 W={{ worktree_path }}
