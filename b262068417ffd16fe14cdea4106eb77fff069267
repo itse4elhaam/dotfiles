@@ -1,0 +1,67 @@
+scripts/wt-setup
+  b4e25b8492ab4760 1-7,9-37
+  1f0f86ab9b8377c6 8
+.config/worktrunk/config.toml
+  586ed7ee1be66628 5,8
+.zshrc
+  f393611ed830f0f1 732-733
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.12",
+  "base_commit_sha": "b262068417ffd16fe14cdea4106eb77fff069267",
+  "prompts": {
+    "1f0f86ab9b8377c6": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_2e641a961ffemCVnCCs1F9vp50-4c384cda-2b7a-44fd-9b13-19dabd4dac66",
+        "model": "unknown"
+      },
+      "human_author": "Elhaam Basheer Chaudhry <e4elhaam@gmail.com>",
+      "messages": [],
+      "total_additions": 1,
+      "total_deletions": 1,
+      "accepted_lines": 1,
+      "overriden_lines": 0
+    },
+    "586ed7ee1be66628": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_2e641a961ffemCVnCCs1F9vp50-40c9486d-9d3e-47d1-ace3-06d2f246f619",
+        "model": "unknown"
+      },
+      "human_author": "Elhaam Basheer Chaudhry <e4elhaam@gmail.com>",
+      "messages": [],
+      "total_additions": 2,
+      "total_deletions": 10,
+      "accepted_lines": 2,
+      "overriden_lines": 0
+    },
+    "b4e25b8492ab4760": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_2e641a961ffemCVnCCs1F9vp50-549cf284-3ccd-4e7f-a6c0-7194971eb150",
+        "model": "unknown"
+      },
+      "human_author": "Elhaam Basheer Chaudhry <e4elhaam@gmail.com>",
+      "messages": [],
+      "total_additions": 37,
+      "total_deletions": 0,
+      "accepted_lines": 36,
+      "overriden_lines": 0
+    },
+    "f393611ed830f0f1": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_2e641a961ffemCVnCCs1F9vp50-154f821a-7e59-4673-9df1-2f900924d51d",
+        "model": "unknown"
+      },
+      "human_author": "Elhaam Basheer Chaudhry <e4elhaam@gmail.com>",
+      "messages": [],
+      "total_additions": 2,
+      "total_deletions": 30,
+      "accepted_lines": 2,
+      "overriden_lines": 0
+    }
+  }
+}
