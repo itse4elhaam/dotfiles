@@ -5,43 +5,43 @@
       "model": "github-copilot/claude-opus-4.6"
     },
     "librarian": {
-      "model": "opencode-go/minimax-m2.5"
+      "model": "opencode-go/minimax-m2.7"
     },
     "explore": {
-      "model": "opencode-go/minimax-m2.5"
+      "model": "opencode-go/minimax-m2.7"
     },
     "oracle": {
       "model": "github-copilot/claude-opus-4.6"
     },
     "artistry": {
-      "model": "opencode-go/glm-5"
+      "model": "opencode-go/kimi-k2.5"
     },
     "frontend-ui-ux-engineer": {
       "model": "github-copilot/claude-opus-4.6"
     },
     "document-writer": {
-      "model": "opencode-go/glm-5"
+      "model": "opencode-go/kimi-k2.5"
     },
     "multimodal-looker": {
-      "model": "opencode-go/minimax-m2.5"
+      "model": "opencode-go/minimax-m2.7"
     },
     "prometheus": {
       "model": "github-copilot/gpt-5.2-codex"
     },
     "atlas": {
-      "model": "opencode-go/glm-5"
+      "model": "opencode-go/kimi-k2.5"
     },
     "sisyphus-junior": {
-      "model": "opencode-go/minimax-m2.5"
+      "model": "opencode-go/minimax-m2.7"
     },
     "hephaestus": {
       "model": "github-copilot/gpt-5.4"
     },
     "momus": {
-      "model": "opencode-go/glm-5"
+      "model": "opencode-go/kimi-k2.5"
     },
     "metis": {
-      "model": "opencode-go/minimax-m2.5"
+      "model": "opencode-go/minimax-m2.7"
     }
   }
 }

@@ -24,7 +24,7 @@ import { dirname } from "path"
 const GIT_AI_BIN = "/home/elhaam/.git-ai/bin/git-ai"
 
 // Tools that modify files and should be tracked
-const FILE_EDIT_TOOLS = ["edit", "write"]
+const FILE_EDIT_TOOLS = ["edit", "write", "patch", "multiedit"]
 
 export const GitAiPlugin: Plugin = async (ctx) => {
   const { $ } = ctx

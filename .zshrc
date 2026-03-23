@@ -723,3 +723,5 @@ function double-tab-edit() {
 # Added by git-ai installer on Mon Jan 12 01:48:42 AM PKT 2026
 export PATH="/home/elhaam/.git-ai/bin:$PATH"
 export PATH="$PATH:$HOME/.pub-cache/bin"
+
+if command -v wt >/dev/null 2>&1; then eval "$(command wt config shell init zsh)"; fi

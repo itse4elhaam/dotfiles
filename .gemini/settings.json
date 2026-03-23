@@ -11,7 +11,7 @@
       {
         "hooks": [
           {
-            "command": "git-ai checkpoint gemini --hook-input stdin",
+            "command": "/home/elhaam/.git-ai/bin/git-ai checkpoint gemini --hook-input stdin",
             "type": "command"
           }
         ],
@@ -22,7 +22,7 @@
       {
         "hooks": [
           {
-            "command": "git-ai checkpoint gemini --hook-input stdin",
+            "command": "/home/elhaam/.git-ai/bin/git-ai checkpoint gemini --hook-input stdin",
             "type": "command"
           }
         ],
