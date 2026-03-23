@@ -17,24 +17,19 @@ fi
 TOP_LEFT=$(tmux display-message -p '#{pane_id}')
 
 # Split horizontally: left | right
-TOP_RIGHT=$(tmux split-window -h -t "$TOP_LEFT" -c "$W" -P -F '#{pane_id}')
+RIGHT=$(tmux split-window -h -t "$TOP_LEFT" -c "$W" -P -F '#{pane_id}')
 
 # Split left vertically: top 70% | bottom 30%
 BOTTOM_LEFT=$(tmux split-window -v -t "$TOP_LEFT" -c "$W" -p 30 -P -F '#{pane_id}')
 
-# Split right vertically: top 70% | bottom 30%
-BOTTOM_RIGHT=$(tmux split-window -v -t "$TOP_RIGHT" -c "$W" -p 30 -P -F '#{pane_id}')
-
 # Top-left: neovim
 tmux send-keys -t "$TOP_LEFT" 'nvim' Enter
-# Bottom-left: dev server
-tmux send-keys -t "$BOTTOM_LEFT" 'bun run dev' Enter
-# Top-right: opencode
-tmux send-keys -t "$TOP_RIGHT" 'opencode' Enter
-# Bottom-right: empty
+# Right: opencode (full height)
+tmux send-keys -t "$RIGHT" 'opencode' Enter
+# Bottom-left: empty shell
 
 # Focus opencode pane
-tmux select-pane -t "$TOP_RIGHT"
+tmux select-pane -t "$RIGHT"
 """
 
 [post-switch]
@@ -55,22 +50,17 @@ fi
 TOP_LEFT=$(tmux display-message -p '#{pane_id}')
 
 # Split horizontally: left | right
-TOP_RIGHT=$(tmux split-window -h -t "$TOP_LEFT" -c "$W" -P -F '#{pane_id}')
+RIGHT=$(tmux split-window -h -t "$TOP_LEFT" -c "$W" -P -F '#{pane_id}')
 
 # Split left vertically: top 70% | bottom 30%
 BOTTOM_LEFT=$(tmux split-window -v -t "$TOP_LEFT" -c "$W" -p 30 -P -F '#{pane_id}')
 
-# Split right vertically: top 70% | bottom 30%
-BOTTOM_RIGHT=$(tmux split-window -v -t "$TOP_RIGHT" -c "$W" -p 30 -P -F '#{pane_id}')
-
 # Top-left: neovim
 tmux send-keys -t "$TOP_LEFT" 'nvim' Enter
-# Bottom-left: dev server
-tmux send-keys -t "$BOTTOM_LEFT" 'bun run dev' Enter
-# Top-right: opencode
-tmux send-keys -t "$TOP_RIGHT" 'opencode' Enter
-# Bottom-right: empty
+# Right: opencode (full height)
+tmux send-keys -t "$RIGHT" 'opencode' Enter
+# Bottom-left: empty shell
 
 # Focus opencode pane
-tmux select-pane -t "$TOP_RIGHT"
+tmux select-pane -t "$RIGHT"
 """
