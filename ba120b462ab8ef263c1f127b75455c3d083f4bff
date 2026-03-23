@@ -1,0 +1,37 @@
+.config/worktrunk/config.toml
+  89434eb6476ac531 1-9,12,18,21,26,28-30,32
+  761a8d606a38fe56 10-11,13-14,16-17,19-20,22-25,27,31
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.12",
+  "base_commit_sha": "ba120b462ab8ef263c1f127b75455c3d083f4bff",
+  "prompts": {
+    "761a8d606a38fe56": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_2e641a961ffemCVnCCs1F9vp50-999d8f61-d84b-4090-8790-e31129c0ef5d",
+        "model": "unknown"
+      },
+      "human_author": "Elhaam Basheer Chaudhry <e4elhaam@gmail.com>",
+      "messages": [],
+      "total_additions": 14,
+      "total_deletions": 18,
+      "accepted_lines": 14,
+      "overriden_lines": 0
+    },
+    "89434eb6476ac531": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_2e641a961ffemCVnCCs1F9vp50-937857a6-433e-4056-b952-1fe7e90bf95e",
+        "model": "unknown"
+      },
+      "human_author": "Elhaam Basheer Chaudhry <e4elhaam@gmail.com>",
+      "messages": [],
+      "total_additions": 33,
+      "total_deletions": 0,
+      "accepted_lines": 17,
+      "overriden_lines": 0
+    }
+  }
+}
