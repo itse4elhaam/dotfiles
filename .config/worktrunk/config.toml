@@ -2,68 +2,7 @@
 copy = "wt step copy-ignored"
 
 [post-create]
-tmux = """
-W={{ worktree_path }}
-
-if [ -z "${TMUX:-}" ]; then
-  echo "Not in tmux — skipping layout setup"
-  exit 0
-fi
-
-# Skip if panes already set up (idempotency guard)
-PANE_COUNT=$(tmux list-panes | wc -l)
-if [ "$PANE_COUNT" -gt 1 ]; then
-  exit 0
-fi
-
-# Capture current pane as top-left
-TOP_LEFT=$(tmux display-message -p '#{pane_id}')
-
-# Split horizontally: left | right
-RIGHT=$(tmux split-window -h -t "$TOP_LEFT" -c "$W" -P -F '#{pane_id}')
-
-# Split left vertically: top 70% | bottom 30%
-BOTTOM_LEFT=$(tmux split-window -v -t "$TOP_LEFT" -c "$W" -p 30 -P -F '#{pane_id}')
-
-# Top-left: neovim
-tmux send-keys -t "$TOP_LEFT" 'nvim' Enter
-# Right: opencode (full height)
-tmux send-keys -t "$RIGHT" 'opencode' Enter
-# Bottom-left: empty shell
-
-# Focus opencode pane
-tmux select-pane -t "$RIGHT"
-"""
+tmux = "$HOME/dotfiles/scripts/wt-setup '{{ worktree_path }}'"
 
 [post-switch]
-tmux = """
-W={{ worktree_path }}
-
-if [ -z "${TMUX:-}" ]; then
-  exit 0
-fi
-
-# Skip if panes already set up (idempotency guard)
-PANE_COUNT=$(tmux list-panes | wc -l)
-if [ "$PANE_COUNT" -gt 1 ]; then
-  exit 0
-fi
-
-# Capture current pane as top-left
-TOP_LEFT=$(tmux display-message -p '#{pane_id}')
-
-# Split horizontally: left | right
-RIGHT=$(tmux split-window -h -t "$TOP_LEFT" -c "$W" -P -F '#{pane_id}')
-
-# Split left vertically: top 70% | bottom 30%
-BOTTOM_LEFT=$(tmux split-window -v -t "$TOP_LEFT" -c "$W" -p 30 -P -F '#{pane_id}')
-
-# Top-left: neovim
-tmux send-keys -t "$TOP_LEFT" 'nvim' Enter
-# Right: opencode (full height)
-tmux send-keys -t "$RIGHT" 'opencode' Enter
-# Bottom-left: empty shell
-
-# Focus opencode pane
-tmux select-pane -t "$RIGHT"
-"""
+tmux = "$HOME/dotfiles/scripts/wt-setup '{{ worktree_path }}'"

@@ -728,3 +728,6 @@ if command -v wt >/dev/null 2>&1; then eval "$(command wt config shell init zsh)
 
 # worktrunk: switch to branch, create if it doesn't exist
 wts() { wt switch "$@" 2>/dev/null || wt switch --create "$@"; }
+
+# worktrunk: tmux layout setup (wt-setup is source of truth)
+alias setup="$HOME/dotfiles/scripts/wt-setup"
