@@ -1,0 +1,23 @@
+.zshrc
+  7951ba211b23e225 728-730
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.12",
+  "base_commit_sha": "f777dccd95050d07b1c819154d93ae27e046b9bc",
+  "prompts": {
+    "7951ba211b23e225": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_2e641a961ffemCVnCCs1F9vp50-3ca5c791-8363-4f12-8c4f-2b9ecdea555d",
+        "model": "unknown"
+      },
+      "human_author": "Elhaam Basheer Chaudhry <e4elhaam@gmail.com>",
+      "messages": [],
+      "total_additions": 3,
+      "total_deletions": 0,
+      "accepted_lines": 3,
+      "overriden_lines": 0
+    }
+  }
+}
