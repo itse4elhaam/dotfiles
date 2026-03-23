@@ -1,0 +1,76 @@
+[post-create]
+tmux = """
+W={{ worktree_path }}
+
+if [ -z "${TMUX:-}" ]; then
+  echo "Not in tmux — skipping layout setup"
+  exit 0
+fi
+
+# Skip if panes already set up (idempotency guard)
+PANE_COUNT=$(tmux list-panes | wc -l)
+if [ "$PANE_COUNT" -gt 1 ]; then
+  exit 0
+fi
+
+# Capture current pane as top-left
+TOP_LEFT=$(tmux display-message -p '#{pane_id}')
+
+# Split horizontally: left | right
+TOP_RIGHT=$(tmux split-window -h -t "$TOP_LEFT" -c "$W" -P -F '#{pane_id}')
+
+# Split left vertically: top 70% | bottom 30%
+BOTTOM_LEFT=$(tmux split-window -v -t "$TOP_LEFT" -c "$W" -p 30 -P -F '#{pane_id}')
+
+# Split right vertically: top 70% | bottom 30%
+BOTTOM_RIGHT=$(tmux split-window -v -t "$TOP_RIGHT" -c "$W" -p 30 -P -F '#{pane_id}')
+
+# Top-left: neovim
+tmux send-keys -t "$TOP_LEFT" 'nvim' Enter
+# Bottom-left: dev server
+tmux send-keys -t "$BOTTOM_LEFT" 'bun run dev' Enter
+# Top-right: opencode
+tmux send-keys -t "$TOP_RIGHT" 'opencode' Enter
+# Bottom-right: empty
+
+# Focus opencode pane
+tmux select-pane -t "$TOP_RIGHT"
+"""
+
+[post-switch]
+tmux = """
+W={{ worktree_path }}
+
+if [ -z "${TMUX:-}" ]; then
+  exit 0
+fi
+
+# Skip if panes already set up (idempotency guard)
+PANE_COUNT=$(tmux list-panes | wc -l)
+if [ "$PANE_COUNT" -gt 1 ]; then
+  exit 0
+fi
+
+# Capture current pane as top-left
+TOP_LEFT=$(tmux display-message -p '#{pane_id}')
+
+# Split horizontally: left | right
+TOP_RIGHT=$(tmux split-window -h -t "$TOP_LEFT" -c "$W" -P -F '#{pane_id}')
+
+# Split left vertically: top 70% | bottom 30%
+BOTTOM_LEFT=$(tmux split-window -v -t "$TOP_LEFT" -c "$W" -p 30 -P -F '#{pane_id}')
+
+# Split right vertically: top 70% | bottom 30%
+BOTTOM_RIGHT=$(tmux split-window -v -t "$TOP_RIGHT" -c "$W" -p 30 -P -F '#{pane_id}')
+
+# Top-left: neovim
+tmux send-keys -t "$TOP_LEFT" 'nvim' Enter
+# Bottom-left: dev server
+tmux send-keys -t "$BOTTOM_LEFT" 'bun run dev' Enter
+# Top-right: opencode
+tmux send-keys -t "$TOP_RIGHT" 'opencode' Enter
+# Bottom-right: empty
+
+# Focus opencode pane
+tmux select-pane -t "$TOP_RIGHT"
+"""
