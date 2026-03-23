@@ -725,3 +725,6 @@ export PATH="/home/elhaam/.git-ai/bin:$PATH"
 export PATH="$PATH:$HOME/.pub-cache/bin"
 
 if command -v wt >/dev/null 2>&1; then eval "$(command wt config shell init zsh)"; fi
+
+# worktrunk: switch to branch, create if it doesn't exist
+wts() { wt switch "$@" 2>/dev/null || wt switch --create "$@"; }
