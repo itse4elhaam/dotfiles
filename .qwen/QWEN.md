@@ -1,1 +1,0 @@
-../docs/ai-guide.md
