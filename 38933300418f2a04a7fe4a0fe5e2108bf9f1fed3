@@ -1,0 +1,38 @@
+dev-setup/runs/skills.sh
+  250f0a3c846c00b9 1-13
+.stow-local-ignore
+  67b94891acb9876c 2
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.17",
+  "base_commit_sha": "38933300418f2a04a7fe4a0fe5e2108bf9f1fed3",
+  "prompts": {
+    "250f0a3c846c00b9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_2e23d2162ffeQH9oUP2qdgZpIh-27b471e3-4551-48cd-a848-6457b2c2ce33",
+        "model": "unknown"
+      },
+      "human_author": "Elhaam Basheer Chaudhry <e4elhaam@gmail.com>",
+      "messages": [],
+      "total_additions": 13,
+      "total_deletions": 0,
+      "accepted_lines": 13,
+      "overriden_lines": 0
+    },
+    "67b94891acb9876c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_2e23d4acdffeYe2hS5b7yD15zz-cce26866-9d0d-4dca-bc9d-dcbe729b2fad",
+        "model": "unknown"
+      },
+      "human_author": "Elhaam Basheer Chaudhry <e4elhaam@gmail.com>",
+      "messages": [],
+      "total_additions": 1,
+      "total_deletions": 0,
+      "accepted_lines": 1,
+      "overriden_lines": 0
+    }
+  }
+}
