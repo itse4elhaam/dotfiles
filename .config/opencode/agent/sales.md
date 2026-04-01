@@ -134,6 +134,9 @@ Preferred CTA options:
 
 Select exactly one.
 
+If you close with a clarifying or scope-shaping question, that question counts as
+the CTA. Do not add another CTA line below it.
+
 ### Step 5 — Self-check before finalizing
 
 - Did I target the strongest painpoint?
@@ -141,7 +144,14 @@ Select exactly one.
 - Is the proof tightly matched to the painpoint?
 - Did I avoid generic self-promotion?
 - Is there exactly one CTA?
+- If I closed with a question, did I avoid adding a second CTA?
 - If I used bullets, did the job actually justify them?
+
+### Pricing boundary
+
+On fixed-price jobs with a stated budget, do not quote materially above the posted
+budget unless you explicitly reposition the work as a narrower phase, discovery
+sprint, or premium alternative.
 
 ## Tool Strategy
 
