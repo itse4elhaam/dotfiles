@@ -10,15 +10,23 @@
       "git reset --hard": "deny"
     }
   },
-
   "autoupdate": false,
   "lsp": {
     "typescript": {
       "disabled": true
     },
     "tsgo": {
-      "command": ["tsgo", "--lsp", "--stdio"],
-      "extensions": [".ts", ".tsx", ".js", ".jsx"]
+      "command": [
+        "tsgo",
+        "--lsp",
+        "--stdio"
+      ],
+      "extensions": [
+        ".ts",
+        ".tsx",
+        ".js",
+        ".jsx"
+      ]
     }
   },
   "mcp": {
@@ -106,10 +114,10 @@
         "@janreges/ai-distiller-mcp"
       ],
       "enabled": false
-    },
+    }
   },
   "plugin": [
-    "oh-my-opencode",
+    "oh-my-openagent",
     "@tarquinen/opencode-dcp@latest",
     "opencode-supermemory@latest",
     "opencode-anthropic-auth@0.0.8",
