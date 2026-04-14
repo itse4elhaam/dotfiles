@@ -5,25 +5,25 @@
       "model": "github-copilot/claude-opus-4.6"
     },
     "librarian": {
-      "model": "opencode-go/minimax-m2.7"
+      "model": "openai/gpt-5.4-mini"
     },
     "explore": {
-      "model": "opencode-go/minimax-m2.7"
+      "model": "openai/gpt-5.4-mini"
     },
     "oracle": {
       "model": "github-copilot/gpt-5.4"
     },
     "artistry": {
-      "model": "opencode-go/kimi-k2.5"
+      "model": "openai/gpt-5.4-mini"
     },
     "frontend-ui-ux-engineer": {
       "model": "github-copilot/claude-opus-4.6"
     },
     "document-writer": {
-      "model": "opencode-go/kimi-k2.5"
+      "model": "openai/gpt-5.4-mini"
     },
     "multimodal-looker": {
-      "model": "opencode-go/minimax-m2.7"
+      "model": "openai/gpt-5.4-mini"
     },
     "prometheus": {
       "model": "github-copilot/claude-opus-4.6"
@@ -32,7 +32,7 @@
       "model": "github-copilot/claude-sonnet-4.6"
     },
     "sisyphus-junior": {
-      "model": "opencode-go/minimax-m2.7"
+      "model": "openai/gpt-5.4-mini"
     },
     "hephaestus": {
       "model": "github-copilot/gpt-5.4"
