@@ -11,7 +11,7 @@
       "model": "opencode-go/minimax-m2.7"
     },
     "oracle": {
-      "model": "github-copilot/gpt-5.4"
+      "model": "openai/gpt-5.4"
     },
     "artistry": {
       "model": "opencode-go/kimi-k2.5"
@@ -35,13 +35,13 @@
       "model": "opencode-go/minimax-m2.7"
     },
     "hephaestus": {
-      "model": "github-copilot/gpt-5.4"
+      "model": "openai/gpt-5.4"
     },
     "momus": {
       "model": "github-copilot/claude-opus-4.6"
     },
     "metis": {
-      "model": "github-copilot/gpt-5.4"
+      "model": "openai/gpt-5.4"
     }
   }
 }
