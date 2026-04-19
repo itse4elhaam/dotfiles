@@ -1,0 +1,21 @@
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.0",
+  "base_commit_sha": "d4bb777f0f4c640fa749d86ae066548ff0aeef92",
+  "prompts": {
+    "e0e96fff19ce0f8a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_25ad93c72ffeSOwO7UhBsbg8Hy-d0a86e06-7e02-4133-8a0c-aae52d675ee8",
+        "model": "unknown"
+      },
+      "human_author": "Elhaam Basheer Chaudhry",
+      "messages": [],
+      "total_additions": 67,
+      "total_deletions": 0,
+      "accepted_lines": 67,
+      "overriden_lines": 0
+    }
+  }
+}
