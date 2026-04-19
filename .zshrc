@@ -731,3 +731,4 @@ wts() { wt switch "$@" 2>/dev/null || wt switch --create "$@"; }
 
 # worktrunk: tmux layout setup (wt-setup is source of truth)
 alias setup="$HOME/dotfiles/scripts/wt-setup"
+export PATH="$HOME/workspace/coding/robotics-pg/bin:$PATH"
