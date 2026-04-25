@@ -1,0 +1,78 @@
+.config/opencode/oh-my-openagent.json
+  086d9f0c9dea3a3a 8,14,38,44,47,53,56,59,65
+  cca3e2063c34fb1b 16-35
+.config/opencode/agent/ui-oracle.md
+  0d24e1c3c6f185ef 1-151
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "2f9cd4dce936137b8cc8ac4bc377a72176f1c3c0",
+  "prompts": {
+    "086d9f0c9dea3a3a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_23a15a73effeGEGAsQLas4DLXb-c9a842d3-12a3-4321-8446-f6ae8f2bb59f",
+        "model": "unknown"
+      },
+      "human_author": "Elhaam Basheer Chaudhry",
+      "messages": [],
+      "total_additions": 10,
+      "total_deletions": 687,
+      "accepted_lines": 9,
+      "overriden_lines": 1
+    },
+    "08d1c4196b3c04fc": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_23b7f88a1ffepMELoSI0TSlNmH-47d1dc19-1619-4b75-8c7c-b0607da786a4",
+        "model": "unknown"
+      },
+      "human_author": "Elhaam Basheer Chaudhry",
+      "messages": [],
+      "total_additions": 3275,
+      "total_deletions": 0,
+      "accepted_lines": 0,
+      "overriden_lines": 0
+    },
+    "0d24e1c3c6f185ef": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_23a15a73effeGEGAsQLas4DLXb-d0b74571-4252-4ab7-ba68-eeda85f2abd2",
+        "model": "unknown"
+      },
+      "human_author": "Elhaam Basheer Chaudhry",
+      "messages": [],
+      "total_additions": 153,
+      "total_deletions": 0,
+      "accepted_lines": 151,
+      "overriden_lines": 0
+    },
+    "9a3e0967a9b6fd8c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_23a15a73effeGEGAsQLas4DLXb-fa129e96-74ea-484b-bf39-7d0eabd941f6",
+        "model": "unknown"
+      },
+      "human_author": "Elhaam Basheer Chaudhry",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 2,
+      "accepted_lines": 0,
+      "overriden_lines": 0
+    },
+    "cca3e2063c34fb1b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_23a15a73effeGEGAsQLas4DLXb-397a4a82-7bc7-4887-b369-aa840e98baac",
+        "model": "unknown"
+      },
+      "human_author": "Elhaam Basheer Chaudhry",
+      "messages": [],
+      "total_additions": 21,
+      "total_deletions": 0,
+      "accepted_lines": 21,
+      "overriden_lines": 0
+    }
+  }
+}
