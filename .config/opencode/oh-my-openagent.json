@@ -2,7 +2,7 @@
   "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/master/assets/oh-my-opencode.schema.json",
   "agents": {
     "sisyphus": {
-      "model": "github-copilot/claude-opus-4.6"
+      "model": "opencode-go/kimi-k2.6"
     },
     "librarian": {
       "model": "opencode-go/kimi-k2.6"
@@ -14,7 +14,7 @@
       "model": "openai/gpt-5.5"
     },
     "ui-oracle": {
-      "model": "github-copilot/claude-opus-4.7",
+      "model": "opencode-go/kimi-k2.6",
       "mode": "subagent",
       "temperature": 0.4,
       "permission": {
@@ -38,7 +38,7 @@
       "model": "opencode-go/kimi-k2.6"
     },
     "frontend-ui-ux-engineer": {
-      "model": "github-copilot/claude-opus-4.6"
+      "model": "opencode-go/kimi-k2.6"
     },
     "document-writer": {
       "model": "opencode-go/kimi-k2.6"
@@ -59,7 +59,7 @@
       "model": "openai/gpt-5.5"
     },
     "momus": {
-      "model": "github-copilot/claude-opus-4.6"
+      "model": "opencode-go/glm-5.1"
     },
     "metis": {
       "model": "openai/gpt-5.5"
