@@ -126,5 +126,20 @@
   ],
   "instructions": [
     "{env:HOME}/dotfiles/docs/ai-guide.md"
-  ]
+  ],
+  "provider": {
+    "opencode-go": {
+      "models": {
+        "deepseek-v4-flash": {
+          "variants": {
+            "fast": {
+              "thinking": {
+                "type": "disabled"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
 }
