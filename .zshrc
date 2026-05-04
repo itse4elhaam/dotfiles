@@ -107,6 +107,8 @@ alias vi=vim
 alias vim=nvim
 alias tai=tmuxai
 alias oc="opencode --continue"
+alias awake="caffeinate sleep infinity"
+
 ai() {
   sudo apt install "$1" -y
 }
