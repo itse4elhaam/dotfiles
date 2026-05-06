@@ -53,7 +53,7 @@
       "model": "opencode-go/kimi-k2.6"
     },
     "sisyphus-junior": {
-      "model": "opencode-go/kimi-k2.6"
+      "model": "opencode-go/deepseek-v4-flash"
     },
     "hephaestus": {
       "model": "openai/gpt-5.5"
