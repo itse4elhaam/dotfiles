@@ -9,13 +9,13 @@
 [credential]
 	helper = store
 [alias]
-	cm = !git commit -m
+	cm = !git commit -m -n
 	ca = !git commit --amend
   atpc = "!git add -A && git commit --amend"
   atpp = "!git add -A && git commit --amend && git push --force-with-lease origin $(git symbolic-ref --short HEAD)"
-	ac = !git add -A && git commit -m
-	cmp = "!f() { git commit -m \"$1\" && git push origin $(git symbolic-ref --short HEAD); }; f"	
-	acp = "!f() { git add -A && git commit -m \"$1\" && git push origin $(git symbolic-ref --short HEAD); }; f"	
+	ac = !git add -A && git commit -m -n
+	cmp = "!f() { git commit -m \"$1\" -n && git push origin $(git symbolic-ref --short HEAD); }; f"	
+	acp = "!f() { git add -A && git commit -m \"$1\" -n && git push origin $(git symbolic-ref --short HEAD); }; f"	
 	cp = "!f() { git commit -m \"$1\" && git push origin $(git symbolic-ref --short HEAD); }; f"	
   acpd = "!f() { git add . && git commit -m \"$1 $(date '+%Y-%m-%d %H:%M:%S')\" && git push origin $(git symbolic-ref --short HEAD); }; f"
 	pom = push origin master
@@ -52,7 +52,7 @@
   cod = "!git checkout $(for b in dev develop development stg staging ; do git branch --list $b; done | head -n 1 | xargs)"
   col = "!git checkout -"
   sync = "!git pull origin $(git symbolic-ref --short HEAD) && git push origin $(git symbolic-ref --short HEAD)"
-  wip = !git add -A && git commit -m "WIP"
+  wip = !git add -A && git commit -m "WIP" -n
   undo = reset --soft HEAD~1
   diffc = "!f() { git diff \"$1\"..\"$(git symbolic-ref --short HEAD)\"; }; f"
   br-parent = !git show-branch | grep "*" | grep -v "$(git rev-parse --abbrev-ref HEAD)" | head -n1 | sed "s/.*\\[\\(.*\\)\\].*/\\1/" | cut -d" " -f1
