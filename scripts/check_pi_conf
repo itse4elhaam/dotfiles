@@ -1,0 +1,232 @@
+#!/usr/bin/env bash
+# check_pi_conf — Validate pi config changes don't break anything
+# Run from anywhere. Exits 0 if all checks pass, 1 otherwise.
+
+set -euo pipefail
+
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m'
+
+PASS=0
+FAIL=0
+
+check() {
+    local desc="$1"
+    shift
+    if "$@" &>/dev/null; then
+        echo -e "  ${GREEN}✓${NC} $desc"
+        PASS=$((PASS + 1))
+    else
+        echo -e "  ${RED}✗${NC} $desc"
+        FAIL=$((FAIL + 1))
+    fi
+}
+
+DOTFILES="${DOTFILES:-$HOME/dotfiles}"
+PI_AGENT="$HOME/.pi/agent"
+PI_DOTFILES="$DOTFILES/.pi/agent"
+
+echo "━━━ check_pi_conf — Pi Configuration Validator ━━━"
+echo ""
+
+# ─────────────────────────────────────────────
+# 1. Symlink Integrity
+# ─────────────────────────────────────────────
+echo "📎 Symlink Integrity"
+
+check "settings.json is symlinked" \
+    [ -L "$PI_AGENT/settings.json" ]
+
+check "settings.json resolves to dotfiles" \
+    [ "$(readlink -f "$PI_AGENT/settings.json")" = "$PI_DOTFILES/settings.json" ]
+
+check "keybindings.json is symlinked" \
+    [ -L "$PI_AGENT/keybindings.json" ]
+
+check "keybindings.json resolves to dotfiles" \
+    [ "$(readlink -f "$PI_AGENT/keybindings.json")" = "$PI_DOTFILES/keybindings.json" ]
+
+check "themes dir is symlinked" \
+    [ -L "$PI_AGENT/themes" ]
+
+check "themes dir resolves to dotfiles" \
+    [ "$(readlink -f "$PI_AGENT/themes")" = "$PI_DOTFILES/themes" ]
+
+echo ""
+
+# ─────────────────────────────────────────────
+# 2. JSON Validity
+# ─────────────────────────────────────────────
+echo "📄 JSON Validity"
+
+check "settings.json is valid JSON" \
+    python3 -c "import json; json.load(open('$PI_DOTFILES/settings.json'))"
+
+check "keybindings.json is valid JSON" \
+    python3 -c "import json; json.load(open('$PI_DOTFILES/keybindings.json'))"
+
+check "tokyo-night.json is valid JSON" \
+    python3 -c "import json; json.load(open('$PI_DOTFILES/themes/tokyo-night.json'))"
+
+echo ""
+
+# ─────────────────────────────────────────────
+# 3. Theme Completeness (51 required tokens)
+# ─────────────────────────────────────────────
+echo "🎨 Theme — Tokyo Night"
+
+# Tokens that may be "" (empty = terminal default, valid per pi docs)
+ALLOW_EMPTY_TOKENS=" text userMessageText customMessageText toolOutput mdCodeBlock "
+
+REQUIRED_TOKENS=(
+    accent border borderAccent borderMuted success error warning muted dim text
+    thinkingText selectedBg userMessageBg userMessageText customMessageBg
+    customMessageText customMessageLabel toolPendingBg toolSuccessBg toolErrorBg
+    toolTitle toolOutput
+    mdHeading mdLink mdLinkUrl mdCode mdCodeBlock mdCodeBlockBorder mdQuote
+    mdQuoteBorder mdHr mdListBullet
+    toolDiffAdded toolDiffRemoved toolDiffContext
+    syntaxComment syntaxKeyword syntaxFunction syntaxVariable syntaxString
+    syntaxNumber syntaxType syntaxOperator syntaxPunctuation
+    thinkingOff thinkingMinimal thinkingLow thinkingMedium thinkingHigh thinkingXhigh
+    bashMode
+)
+
+check "tokyo-night has name = tokyo-night" \
+    python3 -c "
+import json
+d = json.load(open('$PI_DOTFILES/themes/tokyo-night.json'))
+assert d.get('name') == 'tokyo-night'
+"
+
+for token in "${REQUIRED_TOKENS[@]}"; do
+    check "tokyo-night has color token: $token" \
+        python3 -c "
+import json
+d = json.load(open('$PI_DOTFILES/themes/tokyo-night.json'))
+colors = d.get('colors', {})
+assert '$token' in colors, f'Missing: $token'
+v = colors['$token']
+# Empty string = terminal default, valid for specific tokens per pi docs
+if '$token' in '$ALLOW_EMPTY_TOKENS':
+    assert isinstance(v, str), f'Wrong type for $token: {type(v).__name__}'
+else:
+    assert isinstance(v, str) and v != '', f'Token $token is empty but not in allowlist'
+"
+done
+
+echo ""
+
+# ─────────────────────────────────────────────
+# 4. Settings Sanity
+# ─────────────────────────────────────────────
+echo "⚙️  Settings Sanity"
+
+check "theme is set to tokyo-night" \
+    python3 -c "
+import json
+d = json.load(open('$PI_DOTFILES/settings.json'))
+assert d.get('theme') == 'tokyo-night', f'theme={d.get(\"theme\")}'
+"
+
+check "defaultProvider is set" \
+    python3 -c "
+import json
+d = json.load(open('$PI_DOTFILES/settings.json'))
+assert d.get('defaultProvider'), 'missing defaultProvider'
+"
+
+check "defaultModel is set" \
+    python3 -c "
+import json
+d = json.load(open('$PI_DOTFILES/settings.json'))
+assert d.get('defaultModel'), 'missing defaultModel'
+"
+
+echo ""
+
+# ─────────────────────────────────────────────
+# 5. Keybinding Format — validate against pi's known actions
+# ─────────────────────────────────────────────
+echo "⌨️  Keybinding Format"
+
+check "keybindings use valid pi action IDs and key format" \
+    python3 -c "
+import json, re
+d = json.load(open('$PI_DOTFILES/keybindings.json'))
+# All valid pi actions from TUI_KEYBINDINGS + KEYBINDINGS
+valid_actions = [
+    'tui.editor.cursorUp', 'tui.editor.cursorDown',
+    'tui.editor.cursorLeft', 'tui.editor.cursorRight',
+    'tui.editor.cursorWordLeft', 'tui.editor.cursorWordRight',
+    'tui.editor.cursorLineStart', 'tui.editor.cursorLineEnd',
+    'tui.editor.jumpForward', 'tui.editor.jumpBackward',
+    'tui.editor.pageUp', 'tui.editor.pageDown',
+    'tui.editor.deleteCharBackward', 'tui.editor.deleteCharForward',
+    'tui.editor.deleteWordBackward', 'tui.editor.deleteWordForward',
+    'tui.editor.deleteToLineStart', 'tui.editor.deleteToLineEnd',
+    'tui.editor.yank', 'tui.editor.yankPop', 'tui.editor.undo',
+    'tui.input.newLine', 'tui.input.submit', 'tui.input.tab', 'tui.input.copy',
+    'tui.select.up', 'tui.select.down', 'tui.select.pageUp', 'tui.select.pageDown',
+    'tui.select.confirm', 'tui.select.cancel',
+    'app.interrupt', 'app.clear', 'app.exit', 'app.suspend',
+    'app.thinking.cycle', 'app.model.cycleForward', 'app.model.cycleBackward',
+    'app.model.select', 'app.tools.expand', 'app.thinking.toggle',
+    'app.session.toggleNamedFilter', 'app.editor.external',
+    'app.message.followUp', 'app.message.dequeue',
+    'app.clipboard.pasteImage',
+    'app.session.new', 'app.session.tree', 'app.session.fork', 'app.session.resume',
+    'app.tree.foldOrUp', 'app.tree.unfoldOrDown',
+    'app.tree.editLabel', 'app.tree.toggleLabelTimestamp',
+    'app.session.togglePath', 'app.session.toggleSort',
+    'app.session.rename', 'app.session.delete', 'app.session.deleteNoninvasive',
+    'app.models.save', 'app.models.enableAll', 'app.models.clearAll',
+    'app.models.toggleProvider', 'app.models.reorderUp', 'app.models.reorderDown',
+    'app.tree.filter.default', 'app.tree.filter.noTools',
+    'app.tree.filter.userOnly', 'app.tree.filter.labeledOnly',
+    'app.tree.filter.all', 'app.tree.filter.cycleForward',
+    'app.tree.filter.cycleBackward',
+]
+
+valid_modifiers = ('ctrl', 'shift', 'alt')
+# Key format: optional modifier(s) + keyname (e.g., 'ctrl+p', 'alt+right', 'pageDown')
+key_re = re.compile(r'^([a-z]+\+)*[a-zA-Z0-9]+$')
+
+for action, keys in d.items():
+    assert action in valid_actions, f'Unknown action: {action}'
+    keys_list = keys if isinstance(keys, list) else [keys]
+    for k in keys_list:
+        assert isinstance(k, str), f'Key must be string, got {type(k).__name__}'
+        assert key_re.match(k), f'Bad key format: {k}'
+        parts = k.split('+')
+        for m in parts[:-1]:
+            assert m in valid_modifiers, f'Invalid modifier \"{m}\" in \"{k}\"'
+"
+
+echo ""
+
+# ─────────────────────────────────────────────
+# 6. Pi Runtime Check (quick smoke test)
+# ─────────────────────────────────────────────
+echo "🚀 Pi Runtime Smoke Test"
+
+if SMOKE_OUT=$(pi --print "echo ok" 2>&1); then
+    check "pi starts without crash" \
+        sh -c "echo '$SMOKE_OUT' | grep -q ok"
+else
+    check "pi starts without crash" false
+fi
+
+echo ""
+
+# ─────────────────────────────────────────────
+# Summary
+# ─────────────────────────────────────────────
+TOTAL=$((PASS + FAIL))
+echo "━━━ Results: $PASS/$TOTAL passed ━━━"
+
+if [ "$FAIL" -gt 0 ]; then
+    exit 1
+fi
