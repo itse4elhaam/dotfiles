@@ -5,3 +5,17 @@ oauth_creds*
 .qwen/todos
 
 lighthouse-reports
+
+# node_modules everywhere
+node_modules/
+
+# pi-crew audit artifacts
+.crew/
+
+# test files
+pi-readability-test.md
+
+# lockfiles in skill directories (keep root lockfile)
+.pi/agent/skills/**/package-lock.json
+.pi/agent/skills/**/bun.lock
+.pi/agent/skills/**/yarn.lock

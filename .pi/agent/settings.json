@@ -1,7 +1,13 @@
 {
-  "lastChangelogVersion": "0.74.0",
+  "lastChangelogVersion": "0.75.5",
   "theme": "tokyo-night",
   "defaultProvider": "opencode-go",
   "defaultModel": "deepseek-v4-flash",
-  "defaultThinkingLevel": "high"
+  "defaultThinkingLevel": "xhigh",
+  "packages": [
+    "npm:pi-crew"
+  ],
+  "hideThinkingBlock": true,
+  "quietStartup": true,
+  "collapseChangelog": true
 }
