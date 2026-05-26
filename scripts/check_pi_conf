@@ -208,7 +208,36 @@ for action, keys in d.items():
 echo ""
 
 # ─────────────────────────────────────────────
-# 6. Pi Runtime Check (quick smoke test)
+# 6. Extension Integrity
+# ─────────────────────────────────────────────
+echo "🧩 Extension Integrity"
+
+check "readability-enhancer.ts exists in dotfiles" \
+    [ -f "$PI_DOTFILES/extensions/readability-enhancer.ts" ]
+
+check "readability-enhancer.ts is symlinked" \
+    [ -L "$PI_AGENT/extensions/readability-enhancer.ts" ]
+
+check "readability-enhancer.ts resolves to dotfiles" \
+    [ "$(readlink -f "$PI_AGENT/extensions/readability-enhancer.ts")" = "$PI_DOTFILES/extensions/readability-enhancer.ts" ]
+
+echo ""
+
+# ─────────────────────────────────────────────
+# 7. Tmux Config Check
+# ─────────────────────────────────────────────
+echo "🪟 Tmux Config (via dotfiles)"
+
+check "extended-keys is on" \
+    grep -q "set -g extended-keys on" "$DOTFILES/.tmux.conf"
+
+check "extended-keys-format is csi-u" \
+    grep -q "set -g extended-keys-format csi-u" "$DOTFILES/.tmux.conf"
+
+echo ""
+
+# ─────────────────────────────────────────────
+# 8. Pi Runtime Check (quick smoke test)
 # ─────────────────────────────────────────────
 echo "🚀 Pi Runtime Smoke Test"
 
