@@ -1,244 +1,233 @@
 #!/bin/bash
-# Suspend Battery Drain Diagnostics for HP EliteBook 840 G10
-# Usage: sudo ./suspend-diagnostics.sh          # Pre-suspend diagnostics
-#        sudo ./suspend-diagnostics.sh --post   # Post-suspend extraction
+# Suspend Battery Drain Diagnostics — HP EliteBook 840 G10
+# Usage: sudo ./suspend-diagnostics.sh         # One-shot: pre → suspend → post
+#        sudo ./suspend-diagnostics.sh --deep   # Test deep sleep (S3)
 set -euo pipefail
 
-TIMESTAMP=$(date "+%Y%m%d_%H%M%S")
-PRESUSPEND_LOG="/tmp/suspend-diagnostics-presuspend-${TIMESTAMP}.log"
-POSTSUSPEND_LOG="/tmp/suspend-diagnostics-postsuspend-${TIMESTAMP}.log"
+LOGPATH="/tmp/suspend-diagnostics-$(date "+%Y%m%d_%H%M%S").log"
+exec > >(tee "$LOGPATH") 2>&1
 
-pre_suspend() {
-    exec > >(tee "$PRESUSPEND_LOG") 2>&1
-    echo "============================================"
-    echo " PRE-SUSPEND DIAGNOSTICS — $(date)"
-    echo "============================================"
+echo "============================================"
+echo " SUSPEND DIAGNOSTICS — $(date)"
+echo " Source: $(basename "$0")"
+echo "============================================"
 
-    # 1. Enable PM debug messages
-    echo 1 | tee /sys/power/pm_debug_messages
-    echo "[OK] pm_debug_messages=1"
+# ---------- PRE-SUSPEND ----------
+echo ""
+echo "╔══════════════════════════════════════════╗"
+echo "║  PRE-SUSPEND DIAGNOSTICS                 ║"
+echo "╚══════════════════════════════════════════╝"
 
-    # 2. Dump sleep states
-    echo ""
-    echo "--- Sleep States ---"
-    cat /sys/power/mem_sleep
+echo 1 | tee /sys/power/pm_debug_messages >/dev/null
+echo "[OK] pm_debug_messages=1"
 
-    # 3. ACPI wake devices
-    echo ""
-    echo "--- ACPI Wake Devices (/proc/acpi/wakeup) ---"
-    cat /proc/acpi/wakeup
+# ec_no_wakeup intentionally disabled — causes HP EliteBook G10 to abort s2idle entry
 
-    # 4. Last wakeup IRQ
-    echo ""
-    echo "--- PM Wakeup IRQ ---"
-    cat /sys/power/pm_wakeup_irq
+echo ""
+echo "--- Sleep States ---"
+cat /sys/power/mem_sleep
 
-    # 5. Wakeup counters on all devices
-    echo ""
-    echo "--- Wakeup Counters (non-zero) ---"
-    for f in /sys/bus/*/devices/*/power/wakeup_count; do
-        c=$(cat "$f" 2>/dev/null) || continue
-        [ "$c" -gt 0 ] 2>/dev/null && echo "  $f: $c"
-    done
+echo ""
+echo "--- ACPI Wake Devices ---"
+cat /proc/acpi/wakeup
 
-    # 6. USB device wakeup state
-    echo ""
-    echo "--- USB Device Wakeup State ---"
-    for f in /sys/bus/usb/devices/*/power/wakeup; do
-        state=$(cat "$f" 2>/dev/null) || continue
-        name=$(cat "${f%/power/wakeup}/product" 2>/dev/null || echo "unknown")
-        echo "  ${f}: ${state} (${name})"
-    done
+echo ""
+echo "--- PM Wakeup IRQ (last wake source) ---"
+cat /sys/power/pm_wakeup_irq
 
-    # 7. Interrupts for key lines
-    echo ""
-    echo "--- Key Interrupt Counts ---"
-    grep -E "ACPI|i8042|rtc0" /proc/interrupts
+echo ""
+echo "--- EC No Wakeup ---"
+cat /sys/module/acpi/parameters/ec_no_wakeup
 
-    # 8. EC no_wakeup state
-    echo ""
-    echo "--- EC No Wakeup (0=disabled, 1=enabled) ---"
-    cat /sys/module/acpi/parameters/ec_no_wakeup
+echo ""
+echo "--- Wakeup Counters (non-zero) ---"
+found=0
+for f in /sys/bus/*/devices/*/power/wakeup_count; do
+    c=$(cat "$f" 2>/dev/null) || continue
+    [ "$c" -gt 0 ] 2>/dev/null && echo "  $f: $c" && found=1
+done
+[ "$found" -eq 0 ] && echo "  (none)"
 
-    # 9. Storage of this boot's suspend events so far
-    echo ""
-    echo "--- Current Boot Suspend Events So Far ---"
-    journalctl -b 0 -p info --no-pager 2>/dev/null | grep -E "PM:|suspend|wake|GPE|ec_no_wake|wakeup" | tail -60 || echo "  (none yet)"
+echo ""
+echo "--- USB Device Wakeup State ---"
+for f in /sys/bus/usb/devices/[0-9]-[0-9]*/power/wakeup; do
+    state=$(cat "$f" 2>/dev/null) || continue
+    name=$(cat "${f%/power/wakeup}/product" 2>/dev/null || echo "unknown")
+    echo "  ${f}: ${state} (${name})"
+done
 
-    # 10. Previous boot for comparison
-    echo ""
-    echo "--- Previous Boot Suspend Events ---"
-    journalctl -b -1 -p info --no-pager 2>/dev/null | grep -E "PM:|suspend|wake|GPE" | tail -60 || echo "  (no previous boot logs)"
+echo ""
+echo "--- Key Interrupt Counts ---"
+grep -E "ACPI|i8042|rtc0" /proc/interrupts || echo "  (not found in /proc/interrupts)"
 
-    # 11. Total wakeup events from /sys/power
-    echo ""
-    echo "--- Wakeup Events Summary ---"
-    for f in /sys/power/wakeup_* 2>/dev/null; do
-        echo "  $(basename $f): $(cat $f 2>/dev/null)"
-    done
+echo ""
+echo "--- Wakeup Events Total ---"
+cat /sys/power/wakeup_count 2>/dev/null || echo "  unavailable"
 
-    # 12. s2idle/residency counters if available
-    echo ""
-    echo "--- S0ix Residency (intel_pmc_core) ---"
-    if [ -d /sys/kernel/debug/pmc_core ] 2>/dev/null; then
-        cat /sys/kernel/debug/pmc_core/slp_s0_residency_usec 2>/dev/null || echo "  slp_s0_residency_usec: unavailable"
-    else
-        echo "  debugfs not available (kernel lockdown)"
-    fi
-    # Try via PM QoS
-    cat /sys/power/pm_debug_messages 2>/dev/null
+echo ""
+echo "--- S0ix Residency ---"
+if [ -f /sys/kernel/debug/pmc_core/slp_s0_residency_usec ]; then
+    val=$(cat /sys/kernel/debug/pmc_core/slp_s0_residency_usec 2>/dev/null)
+    echo "  slp_s0_residency_usec: $val"
+else
+    echo "  debugfs not available (kernel lockdown)"
+fi
 
-    echo ""
-    echo "============================================"
-    echo " PRE-SUSPEND DIAGNOSTICS COMPLETE"
-    echo "============================================"
-    echo ""
-    echo "Log saved to: $PRESUSPEND_LOG"
-    echo ""
-    echo "NEXT STEPS:"
-    echo "  1. Unplug external USB devices (mouse/keyboard) to isolate variables"
-    echo "  2. Close the lid and let it suspend"
-    echo "  3. Wait 5-10 minutes (or until it wakes)"
-    echo "  4. Open lid and run: sudo $0 --post"
-    echo ""
-}
+echo ""
+echo "--- Current Boot Suspend Events ---"
+journalctl -b 0 -p info --no-pager 2>/dev/null \
+    | grep -E "(PM:|suspend|wake|GPE)" \
+    | grep -v "hibernation.*Registered nosave" \
+    | grep -v "PM:.*genpd" \
+    | grep -v "PM:.*Magic number" \
+    | grep -v "PM:.*RTC time" \
+    | grep -v "ACPI:.*PM: Registering" \
+    | grep -v "ACPI: PM:" \
+    | tail -40
 
-post_suspend() {
-    exec > >(tee "$POSTSUSPEND_LOG") 2>&1
-    echo "============================================"
-    echo " POST-SUSPEND DIAGNOSTICS — $(date)"
-    echo "============================================"
+echo ""
+echo "--- Previous Boot Suspend Events ---"
+journalctl -b -1 -p info --no-pager 2>/dev/null \
+    | grep -E "(PM:|suspend|wake|GPE)" \
+    | grep -v "hibernation.*Registered nosave" \
+    | grep -v "PM:.*genpd" \
+    | grep -v "PM:.*Magic number" \
+    | grep -v "PM:.*RTC time" \
+    | grep -v "ACPI:.*PM: Registering" \
+    | grep -v "ACPI: PM:" \
+    | tail -40
 
-    # 1. Check pm_debug_messages is still set
-    echo "--- pm_debug_messages ---"
-    cat /sys/power/pm_debug_messages
+SUSPEND_START=$(date +%s)
 
-    # 2. Wakeup IRQ
-    echo ""
-    echo "--- PM Wakeup IRQ (last wake source) ---"
-    cat /sys/power/pm_wakeup_irq
+# ---------- SUSPEND ----------
+echo ""
+echo "╔══════════════════════════════════════════╗"
+echo "║  SUSPENDING...                           ║"
+echo "║                                          ║"
+echo "║  Close the lid now, or press power btn   ║"
+echo "║  System will enter s2idle.               ║"
+echo "║  When you open the lid, diagnostics      ║"
+echo "║  will continue automatically.            ║"
+echo "╚══════════════════════════════════════════╝"
+echo ""
 
-    # 3. Extract THIS boot's full suspend/resume log
-    echo ""
-    echo "--- Full Suspend/Resume Journal (current boot) ---"
-    journalctl -b 0 -p info --no-pager 2>/dev/null \
-        | grep -E "PM:|suspend|wake|GPE|ec_no_wake|wakeup|IRQ|i8042|ACPI" \
-        | tail -100
+systemctl suspend
 
-    # 4. Wakeup counters now
-    echo ""
-    echo "--- Wakeup Counters After Suspend ---"
-    for f in /sys/bus/*/devices/*/power/wakeup_count; do
-        c=$(cat "$f" 2>/dev/null) || continue
-        [ "$c" -gt 0 ] 2>/dev/null && echo "  $f: $c"
-    done
+# ---------- POST-SUSPEND (continues after resume) ----------
+SUSPEND_END=$(date +%s)
+echo ""
+echo "╔══════════════════════════════════════════╗"
+echo "║  POST-SUSPEND DIAGNOSTICS                ║"
+echo "╚══════════════════════════════════════════╝"
+echo "[OK] Resume detected. Suspend duration: $((SUSPEND_END - SUSPEND_START))s"
 
-    # 5. ACPI wake devices after
-    echo ""
-    echo "--- ACPI Wake Devices Now ---"
-    cat /proc/acpi/wakeup
+echo ""
+echo "--- PM Wakeup IRQ (last wake source) ---"
+cat /sys/power/pm_wakeup_irq
 
-    # 6. Interrupt deltas
-    echo ""
-    echo "--- Key Interrupt Counts (compare with pre-suspend) ---"
-    grep -E "ACPI|i8042|rtc0" /proc/interrupts
+echo ""
+echo "--- Wakeup Counters (non-zero after resume) ---"
+found=0
+for f in /sys/bus/*/devices/*/power/wakeup_count; do
+    c=$(cat "$f" 2>/dev/null) || continue
+    [ "$c" -gt 0 ] 2>/dev/null && echo "  $f: $c" && found=1
+done
+[ "$found" -eq 0 ] && echo "  (none)"
 
-    # 7. Check systemd sleep state
-    echo ""
-    echo "--- systemd sleep status ---"
-    systemctl is-system-running 2>/dev/null || echo "  unknown"
+echo ""
+echo "--- ACPI Wake Devices ---"
+cat /proc/acpi/wakeup
 
-    # 8. Network reconnection events (indirect wake marker)
-    echo ""
-    echo "--- Network Reconnection Events ---"
-    journalctl -b 0 --no-pager 2>/dev/null \
-        | grep -E "NetworkManager.*(wake|sleep|reconnect|link)" \
-        | tail -20
+echo ""
+echo "--- Key Interrupt Counts ---"
+grep -E "ACPI|i8042|rtc0" /proc/interrupts || echo "  (not found)"
 
-    echo ""
-    echo "============================================"
-    echo " POST-SUSPEND DIAGNOSTICS COMPLETE"
-    echo "============================================"
-    echo "Log saved to: $POSTSUSPEND_LOG"
-    echo ""
-    echo "Share the contents of these files for analysis:"
-    echo "  $PRESUSPEND_LOG"
-    echo "  $POSTSUSPEND_LOG"
-}
+echo ""
+echo "--- Wakeup Events Total ---"
+cat /sys/power/wakeup_count 2>/dev/null || echo "  unavailable"
 
+echo ""
+echo "--- Suspend/Resume Journal (this cycle) ---"
+journalctl -b 0 --since "@${SUSPEND_START}" -p info --no-pager 2>/dev/null \
+    | grep -E "(PM:|suspend|wake|GPE|wakeup|printk: Suspending)" \
+    | tail -40
+
+echo ""
+echo "--- Network Manager Sleep/Wake Events ---"
+journalctl -b 0 --since "@${SUSPEND_START}" --no-pager 2>/dev/null \
+    | grep -i "NetworkManager.*\(sleep\|wake\|reconnect\)" \
+    | tail -20
+
+echo ""
+echo "--- systemd Sleep Transactions (this boot) ---"
+journalctl -b 0 --no-pager 2>/dev/null \
+    | grep -E "systemd-sleep|systemd.*(suspend|resume)" \
+    | tail -20
+
+echo ""
+echo "============================================"
+echo " DIAGNOSTICS COMPLETE"
+echo "============================================"
+echo "Full log: $LOGPATH"
+echo ""
+
+
+# ---------- DEEP SLEEP TEST ----------
 deep_sleep_test() {
-    echo "============================================"
-    echo " DEEP SLEEP (S3) TEST"
-    echo "============================================"
     echo ""
-    echo "What will happen:"
-    echo "  1. Saves all work (you should save first)"
-    echo "  2. Forces ONE sleep cycle into deep/S3"
-    echo "  3. System will power off more aggressively"
-    echo "  4. Resume takes ~3-5 seconds (vs ~1s for s2idle)"
-    echo ""
-    echo "Risks:"
-    echo "  - Known issue: HP EliteBook S3 resume may panic"
-    echo "  - If so: long-press power 10s, reboot"
-    echo "  - Deep only affects this cycle (reboot resets)"
-    echo ""
-    echo "Ready? Sleeping in 5 seconds..."
+    echo "╔══════════════════════════════════════════╗"
+    echo "║  DEEP SLEEP (S3) TEST                    ║"
+    echo "╚══════════════════════════════════════════╝"
+    echo "Save all work first. Power button ready."
+    echo "Entering deep sleep in 5s..."
     sleep 5
 
-    echo ""
-    echo "[$(date)] Setting deep sleep..."
-    echo deep | tee /sys/power/mem_sleep
+    DEEP_START=$(date +%s)
+    echo deep | tee /sys/power/mem_sleep >/dev/null
     echo "[OK] mem_sleep=$(cat /sys/power/mem_sleep)"
-
-    echo ""
-    echo "[$(date)] Entering S3 deep sleep now..."
+    echo "[$(date)] Entering S3..."
     systemctl suspend
 
-    # If we get here, resume succeeded
+    DEEP_END=$(date +%s)
+    echo "[OK] Resume! Duration: $((DEEP_END - DEEP_START))s"
     echo ""
-    echo "[OK] Resume successful!"
-    echo ""
-
-    # Check if deep actually took effect
     echo "--- PM Wakeup IRQ (post-deep) ---"
     cat /sys/power/pm_wakeup_irq
 
     echo ""
     echo "--- Wakeup Counters ---"
+    found=0
     for f in /sys/bus/*/devices/*/power/wakeup_count; do
         c=$(cat "$f" 2>/dev/null) || continue
-        [ "$c" -gt 0 ] 2>/dev/null && echo "  $f: $c"
+        [ "$c" -gt 0 ] 2>/dev/null && echo "  $f: $c" && found=1
     done
+    [ "$found" -eq 0 ] && echo "  (none)"
 
     echo ""
-    echo "--- Journalctl Suspend Events (post-deep) ---"
-    journalctl -b 0 -p info --no-pager 2>/dev/null \
-        | grep -E "PM:|suspend|wake|GPE" | tail -20
+    echo "--- Journal (post-deep) ---"
+    journalctl -b 0 --since "@${DEEP_START}" --no-pager 2>/dev/null \
+        | grep -E "(PM:|suspend|wake|GPE)" | tail -20
+
+    echo ""
+    echo "--- Network Events (post-deep) ---"
+    journalctl -b 0 --since "@${DEEP_START}" --no-pager 2>/dev/null \
+        | grep -i "NetworkManager.*\(sleep\|wake\|reconnect\)" | tail -10
 
     echo ""
     echo "============================================"
     echo " DEEP SLEEP TEST COMPLETE"
     echo "============================================"
-    echo "If this worked: deep sleep is safe on your system."
-    echo "Next step: sudo kernelstub -a \"mem_sleep_default=deep\""
+    echo "If resume worked: deep sleep is safe."
+    echo "To make permanent: sudo kernelstub -a \"mem_sleep_default=deep\""
+    echo "Full log: $LOGPATH"
 }
 
 case "${1:-}" in
-    --post|-p)
-        post_suspend
-        ;;
-    --deep|-d)
-        deep_sleep_test
-        ;;
+    --deep|-d) deep_sleep_test ;;
     --help|-h)
-        echo "Usage: sudo $0 [--post | --deep | --help]"
-        echo ""
-        echo "  (no args)     Run pre-suspend diagnostics + enable pm_debug_messages"
-        echo "  --post, -p    Run post-suspend diagnostics after waking"
-        echo "  --deep, -d    Run deep sleep (S3) test (save work first!)"
-        echo "  --help, -h    Show this help"
+        echo "Usage: sudo $0 [--deep | --help]"
+        echo "  (no args)  One-shot: pre-diagnostics → suspend → post-diagnostics"
+        echo "  --deep     Test deep sleep (S3) — save work first"
         ;;
-    *)
-        pre_suspend
-        ;;
+    *) ;;  # default runs main flow above
 esac
