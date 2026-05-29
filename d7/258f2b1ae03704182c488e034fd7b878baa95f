@@ -1,0 +1,19 @@
+elitebook-suspend-drain-investigation.md
+  s_57fa3705425954::t_99e5de8af95112 130,132-211,213-214
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "d7258f2b1ae03704182c488e034fd7b878baa95f",
+  "prompts": {},
+  "sessions": {
+    "s_57fa3705425954": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_18ccc217fffee9d3z8ZoFpTrx5",
+        "model": "unknown"
+      },
+      "human_author": "Elhaam Basheer Chaudhry <e4elhaam@gmail.com>"
+    }
+  }
+}
