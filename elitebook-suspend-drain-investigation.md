@@ -189,17 +189,17 @@ The difference likely correlates with **external USB devices plugged in** (mouse
 - **EC GPE** is the most likely cause (HP known issue — Bug 218939). EC sends events through ACPI (IRQ 9), not through a dedicated device. This aligns with: ACPI IRQ having 219,072 interrupts.
 - **29-second resume→re-suspend interval** = systemd/gnome idle detection + sleep timer. Not a bug — it's the system deciding "user isn't back, let's go back to sleep."
 
-### Next Diagnostic Step: Enable PM Debug Messages
+### Diagnostic Script (scripts/suspend-diagnostics.sh)
 
-To capture the **actual wake source** during the next suspend cycle, we can enable verbose logging:
+A bundled script has been created to run all diagnostics in one shot:
 
 ```bash
-echo 1 | sudo tee /sys/power/pm_debug_messages
-sudo systemctl suspend
-# After resume: journalctl -b -1 | grep -E "wake|PM:"
+sudo ./scripts/suspend-diagnostics.sh          # Pre-suspend diagnostics + enable pm_debug_messages
+sudo ./scripts/suspend-diagnostics.sh --post   # After wake: extract logs and analyze
+sudo ./scripts/suspend-diagnostics.sh --deep   # Test deep sleep (S3) — save work first
 ```
 
-This is **zero-risk** — it only adds log messages. The setting resets on reboot. **No system behavior changes.**
+**Workflow**: Run pre-suspend → close lid 5-10 min → open lid → run --post → share both output logs.
 
 ## 7. Recommended Path
 
@@ -207,10 +207,8 @@ This is **zero-risk** — it only adds log messages. The setting resets on reboo
 |------|--------|------|--------|
 | **1** | ~~Update kernel (Fix A)~~ **SKIP — no s2idle fixes, known BTF bug** | — | ✅ Researched |
 | **2** | Identify wake devices (Fix D) — read-only, done | 5 min | ✅ Complete |
-| **2b** | **PM debug messages** — capture actual wake source | 2 min | ⏳ Needs approval |
-| **3** | Safe deep sleep test (Fix B) — save work, power button ready | 5 min | ⏳ Pending |
-| **4** | If deep works → permanent deep (Fix F) |
+| **2b** | **Run diagnostic script** — capture actual wake source | 2 min | 📜 Script ready in `scripts/suspend-diagnostics.sh` |
+| **3** | Run deep sleep test with `--deep` flag | 5 min | 📜 Ready to run |
+| **4** | If deep works → permanent deep (Fix F) | | ⏳ Pending deep test |
 | | If deep panics → ec_no_wakeup runtime (Fix C) | 5 min | ⏳ Pending |
-| **5** | Configure suspend-then-hibernate (Fix E) as backup for long unattended periods | 10 min | ⏳ Pending |
-
-**Want me to execute any of these?** I'll pause before each system change and explain exactly what's happening.
+| **5** | Configure suspend-then-hibernate (Fix E) as backup | 10 min | ⏳ Pending |
