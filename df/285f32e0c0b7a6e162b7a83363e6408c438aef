@@ -1,0 +1,20 @@
+.config/opencode/opencode.json
+  s_bb08a51ac88199::t_a7a0a4f9a36c5f 55
+  s_bb08a51ac88199::t_95fe30a236077c 60,63,65
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "df285f32e0c0b7a6e162b7a83363e6408c438aef",
+  "prompts": {},
+  "sessions": {
+    "s_bb08a51ac88199": {
+      "agent_id": {
+        "tool": "pi",
+        "id": "019e66c0-7858-7ae4-9f19-075987241795",
+        "model": "deepseek-v4-flash"
+      },
+      "human_author": "Elhaam Basheer Chaudhry <e4elhaam@gmail.com>"
+    }
+  }
+}
