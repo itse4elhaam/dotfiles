@@ -3,7 +3,7 @@
   "theme": "tokyo-night",
   "defaultProvider": "opencode-go",
   "defaultModel": "deepseek-v4-flash",
-  "defaultThinkingLevel": "xhigh",
+  "defaultThinkingLevel": "high",
   "packages": [
     "npm:pi-crew"
   ],

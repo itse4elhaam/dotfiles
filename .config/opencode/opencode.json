@@ -52,76 +52,24 @@
       ],
       "enabled": true
     },
-    "memory": {
-      "type": "local",
-      "command": [
-        "npx",
-        "-y",
-        "@modelcontextprotocol/server-memory"
-      ],
-      "environment": {
-        "MEMORY_BANK_ROOT": "/home/elhaam/.memory/memory.jsonl"
-      },
-      "enabled": true
-    },
-    "octocode": {
-      "type": "local",
-      "command": [
-        "npx",
-        "-y",
-        "octocode-mcp@latest"
-      ],
-      "enabled": false
-    },
-    "Better Auth": {
-      "type": "remote",
-      "url": "https://mcp.chonkie.ai/better-auth/better-auth-builder/mcp",
-      "enabled": false
-    },
-    "playwright": {
-      "type": "local",
-      "command": [
-        "npx",
-        "-y",
-        "@playwright/mcp@latest"
-      ],
-      "enabled": false
-    },
     "linear": {
       "type": "local",
       "command": [
         "npx",
         "-y",
-        "mcp-remote",
-        "https://mcp.linear.app/mcp"
+        "linear-mcp-server"
       ],
+      "environment": {
+        "LINEAR_API_KEY": "{env:LINEAR_API_KEY}"
+      },
+      "timeout": 30000,
       "enabled": true
-    },
-    "next-devtools": {
-      "type": "local",
-      "command": [
-        "npx",
-        "-y",
-        "next-devtools-mcp@latest"
-      ],
-      "enabled": false
-    },
-    "aid": {
-      "type": "local",
-      "command": [
-        "npx",
-        "-y",
-        "@janreges/ai-distiller-mcp"
-      ],
-      "enabled": false
     }
   },
   "plugin": [
     "oh-my-openagent",
     "@tarquinen/opencode-dcp@3.1.9",
     "opencode-supermemory@latest",
-    "opencode-anthropic-auth@0.0.8",
-    "@nick-vi/opencode-type-inject",
     "opencode-pty"
   ],
   "instructions": [

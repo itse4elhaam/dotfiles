@@ -1,0 +1,12 @@
+{
+  "servers": {
+    "typescript": {
+      "disabled": true
+    },
+
+    "tsgo": {
+      "command": ["npx", "tsgo", "--lsp", "--stdio"],
+      "extensions": [".ts", ".tsx"]
+    }
+  }
+}

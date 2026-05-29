@@ -74,6 +74,7 @@ alias ex='explorer.exe .'
 alias notepad='notepad.exe'
 alias clip='xcopy'
 alias edge='msedge.exe'
+alias z="zathura"
 # for cd:
 alias ..='cd ..'
 alias .2='cd ../..'
