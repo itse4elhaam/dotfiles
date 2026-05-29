@@ -127,15 +127,90 @@ sudo kernelstub -a "mem_sleep_default=deep"
 ```
 **Confidence**: 70% (contingent on Fix B) | **Rollback**: `sudo kernelstub -d "mem_sleep_default=deep"`
 
-## 6. Recommended Path
+## 6. Investigation Results (Fix D — May 29)
 
-| Step | Action | Time |
-|------|--------|------|
-| **1** | ~~Update kernel (Fix A)~~ **SKIP — no s2idle fixes, known BTF bug** | — |
-| **2** | Identify wake devices (Fix D — read-only) | 5 min |
-| **3** | Safe deep sleep test (Fix B) — save work, power button ready | 5 min |
+### ACPI Wake Sources — `/proc/acpi/wakeup`
+
+| Device | S-state | Status | What it is |
+|--------|---------|--------|-----------|
+| **XHCI** | S3 | enabled | USB 3.0 controller (xHCI) |
+| TXHC | S4 | enabled | USB 4.0 / Type-C controller |
+| TDM0/1 | S4 | enabled | USB Type-C DisplayPort mux |
+| TRP0/2 | S4 | enabled | Thunderbolt PCIe root ports |
+| **PEG0/2** | S4 | enabled | PCIe graphics (dGPU slot — unused on this model) |
+| **AWAC** | S4 | enabled | RTC alarm |
+| serio0 | — | enabled | **i8042 keyboard controller** |
+| INTC1078:00 | — | enabled | **Intel HID events** (Modern Standby hotkeys/panel) |
+
+### Critical Finding: `pm_wakeup_irq = 1`
+
+```
+$ cat /sys/power/pm_wakeup_irq
+1
+```
+
+**IRQ 1 = i8042 (PS/2 keyboard controller)** — This is the **last** device that woke the system. However:
+
+- **i8042 has only 26 total interrupts** since boot (3+ hours uptime). That's extremely low.
+- The wakeup may be from a normal keyboard press to wake the laptop (not spurious).
+- The kernel **does not log** the s2idle wakeup source on this kernel version. `pm_wakeup_irq` is the only indicator, and it's ambiguous.
+
+### USB Device Analysis
+
+| USB Port | Device | Wakeup Enabled | Wakeup Count |
+|----------|--------|---------------|-------------|
+| 3-3 | SONiX external USB keyboard | enabled | 0 (never woken) |
+| 3-6 | YICHIP 2.4G wireless mouse receiver | enabled | 0 (never woken) |
+| 3-7, 3-10 | Unknown (no product description) | disabled | — |
+
+USB wakeup counts are all 0 — **no USB device has triggered a wake event**.
+
+### Interrupt Analysis
+
+| Interrupt | Count (since boot) | Notes |
+|-----------|-------------------|-------|
+| i8042 (IRQ 1) | 26 | Negligible |
+| rtc0 (IRQ 8) | 0 | RTC not firing |
+| ACPI (IRQ 9) | 219,072 | Very active — this is normal for Pop!_OS |
+| INTC1055:00 (IRQ 14) | 1 | Intel HID events |
+
+### Sleep Behavior Comparison
+
+- **Boot -3** (May 24-26): **Rapid cycling confirmed**. Pattern: suspend (2-3 min → collapsing to 5s) → resume → ~29s active → re-suspend. 40 events.
+- **Boot -1** (May 27-29): **Much better**. Most suspends lasted hours (1-17h). Only ~10 events total.
+- **Boot 0** (May 29): No suspend events yet. Good behavior.
+
+The difference likely correlates with **external USB devices plugged in** (mouse/keyboard) or a **different lid-open/lid-closed pattern** during those boots.
+
+### Preliminary Conclusions
+
+- **USB wake is not the primary cause** (wakeup counts = 0, USB hubs have wake disabled)
+- **i8042 (keyboard controller)** is a candidate — but low interrupt count suggests it's not spurious firing
+- **EC GPE** is the most likely cause (HP known issue — Bug 218939). EC sends events through ACPI (IRQ 9), not through a dedicated device. This aligns with: ACPI IRQ having 219,072 interrupts.
+- **29-second resume→re-suspend interval** = systemd/gnome idle detection + sleep timer. Not a bug — it's the system deciding "user isn't back, let's go back to sleep."
+
+### Next Diagnostic Step: Enable PM Debug Messages
+
+To capture the **actual wake source** during the next suspend cycle, we can enable verbose logging:
+
+```bash
+echo 1 | sudo tee /sys/power/pm_debug_messages
+sudo systemctl suspend
+# After resume: journalctl -b -1 | grep -E "wake|PM:"
+```
+
+This is **zero-risk** — it only adds log messages. The setting resets on reboot. **No system behavior changes.**
+
+## 7. Recommended Path
+
+| Step | Action | Time | Status |
+|------|--------|------|--------|
+| **1** | ~~Update kernel (Fix A)~~ **SKIP — no s2idle fixes, known BTF bug** | — | ✅ Researched |
+| **2** | Identify wake devices (Fix D) — read-only, done | 5 min | ✅ Complete |
+| **2b** | **PM debug messages** — capture actual wake source | 2 min | ⏳ Needs approval |
+| **3** | Safe deep sleep test (Fix B) — save work, power button ready | 5 min | ⏳ Pending |
 | **4** | If deep works → permanent deep (Fix F) |
-| | If deep panics → ec_no_wakeup runtime (Fix C) | 5 min |
-| **5** | Configure suspend-then-hibernate (Fix E) as backup for long unattended periods | 10 min |
+| | If deep panics → ec_no_wakeup runtime (Fix C) | 5 min | ⏳ Pending |
+| **5** | Configure suspend-then-hibernate (Fix E) as backup for long unattended periods | 10 min | ⏳ Pending |
 
 **Want me to execute any of these?** I'll pause before each system change and explain exactly what's happening.
