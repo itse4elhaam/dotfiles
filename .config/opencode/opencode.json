@@ -3,11 +3,13 @@
   "permission": {
     "bash": {
       "tmux kill-server": "deny",
-      "git push --force": "deny",
-      "git push -f": "deny",
+      "git push --force": "ask",
+      "git push -f": "ask",
       "rm -rf /": "deny",
       "rm -rf /home/elhaam/dotfiles": "deny",
-      "git reset --hard": "deny"
+      "git reset --hard": "deny",
+      "*build": "ask",
+      "*validate-quick": "ask"
     }
   },
   "autoupdate": false,
