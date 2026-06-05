@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=Startup Workspaces
+Comment=Open Ghostty, Edge, and Upwork Tracker on login
+Exec=/home/elhaam/dotfiles/scripts/startup-setup.sh
+Terminal=false
+X-GNOME-Autostart-enabled=true
