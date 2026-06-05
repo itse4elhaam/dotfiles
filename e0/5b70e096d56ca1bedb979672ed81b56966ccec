@@ -1,0 +1,19 @@
+.config/opencode/plugins/git-ai.ts
+  s_2140c75b3b962f::t_fcf513449f2892 21-23,27-28,146-177,180-185,187,189-211,213-265,268-272,277-337,339-343,345-347,349,355-362,364-367,370-371,375,381-395,399-402,404-407,409-413,415-419,422,424-452,456-490,493,497-499,503-506,509-511,514-515
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.3",
+  "base_commit_sha": "e05b70e096d56ca1bedb979672ed81b56966ccec",
+  "prompts": {},
+  "sessions": {
+    "s_2140c75b3b962f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_16b94ba6fffeHtNsqCkU5qi11I",
+        "model": "unknown"
+      },
+      "human_author": "Elhaam Basheer Chaudhry <e4elhaam@gmail.com>"
+    }
+  }
+}
