@@ -1,0 +1,23 @@
+.agents/skills/conflict-rebase-resolution/SKILL.md
+  s_57b2181f610a29::t_aaa41258a39044 1-186
+.agents/skills/conflict-rebase-resolution/REFERENCE.md
+  s_57b2181f610a29::t_225f86092953d2 1-132
+.agents/skills/conflict-rebase-resolution/scripts/verify-bak-diff.sh
+  s_57b2181f610a29::t_d3d813a9fa0976 1-113
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.1",
+  "base_commit_sha": "77dcf13eedd372daf98d8466288a40b960be8c03",
+  "prompts": {},
+  "sessions": {
+    "s_57b2181f610a29": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_0fc85aaf5ffewdsYDtxcJo7DdN",
+        "model": "unknown"
+      },
+      "human_author": "Elhaam Basheer Chaudhry <e4elhaam@gmail.com>"
+    }
+  }
+}
