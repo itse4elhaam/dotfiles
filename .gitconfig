@@ -32,6 +32,7 @@
 	fa = fetch --all
 	rh = reset --hard
 	rho = "!git reset --hard origin/$(git symbolic-ref --short HEAD)"
+	lrho = "!git fetch --all && git reset --hard origin/$(git symbolic-ref --short HEAD)"
   rha = "!git add. && reset --soft"
 	rs = reset --soft
 	plc = "!git pull origin $(git symbolic-ref --short HEAD)"

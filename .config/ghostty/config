@@ -1,5 +1,5 @@
 theme                          = tokyonight_night
-background-opacity             = 0.99
+background-opacity             = 1
 
 title                         = CodeCrypt
 window-title-font-family      = CodeCrypt
