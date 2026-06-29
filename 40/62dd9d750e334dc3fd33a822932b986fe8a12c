@@ -1,0 +1,19 @@
+.config/opencode/oh-my-openagent.json
+  s_22e7161ec8b55c::t_7330c959235719 13-16,19
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.3",
+  "base_commit_sha": "4062dd9d750e334dc3fd33a822932b986fe8a12c",
+  "prompts": {},
+  "sessions": {
+    "s_22e7161ec8b55c": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_0ed16dfc3ffeJLrk9TLNT62jkX",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Elhaam Basheer Chaudhry <e4elhaam@gmail.com>"
+    }
+  }
+}
