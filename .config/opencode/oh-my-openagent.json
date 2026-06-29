@@ -10,11 +10,13 @@
     "explore": {
       "model": "opencode-go/deepseek-v4-flash"
     },
-    "oracle": {
-      "model": "openai/gpt-5.5"
+    "oracle": { "model": "openai/gpt-5.5", "variant": "xhigh" ,
+      "fallback_models": [
+        "opencode-go/glm-5.1"
+      ]
     },
     "ui-oracle": {
-      "model": "opencode-go/kimi-k2.6",
+      "model": "opencode-go/kimi-k2.7-code",
       "mode": "subagent",
       "temperature": 0.4,
       "permission": {
