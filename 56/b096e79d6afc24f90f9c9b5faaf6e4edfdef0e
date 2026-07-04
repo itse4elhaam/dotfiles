@@ -1,0 +1,23 @@
+.agents/skills/local-change-review/SKILL.md
+  s_57b2181f610a29::t_eb44814993f28c 9,11,13,15,17,31,39,41,43
+  s_57b2181f610a29::t_afefc78ae188d4 3,25,28,34-35
+.agents/skills/conflict-rebase-resolution/SKILL.md
+  s_57b2181f610a29::t_9d3ec046da4c98 22-39
+  s_57b2181f610a29::t_d69b2f0152031b 9,11,13,15,17,19,42,44,46,48,50
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "56b096e79d6afc24f90f9c9b5faaf6e4edfdef0e",
+  "prompts": {},
+  "sessions": {
+    "s_57b2181f610a29": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_0fc85aaf5ffewdsYDtxcJo7DdN",
+        "model": "unknown"
+      },
+      "human_author": "Elhaam Basheer Chaudhry <e4elhaam@gmail.com>"
+    }
+  }
+}
