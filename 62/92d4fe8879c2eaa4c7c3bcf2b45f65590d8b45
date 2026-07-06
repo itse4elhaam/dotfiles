@@ -1,0 +1,30 @@
+.agents/skills/elhaam-review/SKILL.md
+  s_05aebfab7e68c8::t_084937081b13b6 15,76-77,79,81
+  s_c105cc1e0ec1c5::t_e0849cba778718 3,14,30,50-52,57,69
+  s_c105cc1e0ec1c5::t_3aa41ade4e771d 8,12-13,21,23,25-26,34-35,44,53,59-61,68,70-71,75,89,94,97-98
+  s_c105cc1e0ec1c5::t_3dfd2ae2d57ef7 1-2,4-7,9-11,16-20,22,24,27-29,31-33,36-43,45-49,54-56,58,62-67,72-74,78,80,82-88,90-93,95-96
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "6292d4fe8879c2eaa4c7c3bcf2b45f65590d8b45",
+  "prompts": {},
+  "sessions": {
+    "s_05aebfab7e68c8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_0c941b07bffecbBDHx2cj23Bjm",
+        "model": "unknown"
+      },
+      "human_author": "Elhaam Basheer Chaudhry <e4elhaam@gmail.com>"
+    },
+    "s_c105cc1e0ec1c5": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_0c97c4d27ffeTudHMxXbxrx2Pl",
+        "model": "unknown"
+      },
+      "human_author": "Elhaam Basheer Chaudhry <e4elhaam@gmail.com>"
+    }
+  }
+}
