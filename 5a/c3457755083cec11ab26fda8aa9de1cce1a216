@@ -1,0 +1,28 @@
+.agents/skills/github-graphql-first/SKILL.md
+  s_dcda15c4dc7000::t_b99f68343fe007 43
+  s_2b7878d8aa8b85::t_70aa3cbaab43dc 1-42,44-70
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "5ac3457755083cec11ab26fda8aa9de1cce1a216",
+  "prompts": {},
+  "sessions": {
+    "s_2b7878d8aa8b85": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_0c96970f6ffe8CUP6NNAavEXK9",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Elhaam Basheer Chaudhry <e4elhaam@gmail.com>"
+    },
+    "s_dcda15c4dc7000": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_0c96970f6ffe8CUP6NNAavEXK9",
+        "model": "unknown"
+      },
+      "human_author": "Elhaam Basheer Chaudhry <e4elhaam@gmail.com>"
+    }
+  }
+}
