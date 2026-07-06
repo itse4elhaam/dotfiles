@@ -69,13 +69,9 @@
   },
   "plugin": [
     "oh-my-openagent",
-    "@tarquinen/opencode-dcp@3.1.9",
     "opencode-supermemory@latest",
     "opencode-pty",
     "@koriit/opencode-tmux-window-status"
-  ],
-  "instructions": [
-    "{env:HOME}/dotfiles/docs/ai-guide.md"
   ],
   "provider": {
     "opencode-go": {
