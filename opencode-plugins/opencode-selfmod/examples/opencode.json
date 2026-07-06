@@ -1,0 +1,14 @@
+{
+  "plugin": [
+    [
+      "opencode-selfmod",
+      {
+        "model": "opencode-go/deepseek-v4-flash",
+        "riskThreshold": "moderate",
+        "validationCommands": ["bun run typecheck", "bun run build"],
+        "maxContextChars": 24000,
+        "maxFileChars": 4000
+      }
+    ]
+  ]
+}
