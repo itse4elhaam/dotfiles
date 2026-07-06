@@ -12,7 +12,7 @@
     },
     "oracle": { "model": "openai/gpt-5.5", "variant": "xhigh" ,
       "fallback_models": [
-        "opencode-go/glm-5.1"
+        "opencode-go/glm-5.2"
       ]
     },
     "ui-oracle": {
@@ -57,7 +57,8 @@
       "disable": true
     },
     "sisyphus-junior": {
-      "model": "opencode-go/minimax-m3"
+      "model": "opencode-go/deepseek-v4-flash",
+      "variant": "high"
     },
     "hephaestus": {
       "model": "openai/gpt-5.5"
