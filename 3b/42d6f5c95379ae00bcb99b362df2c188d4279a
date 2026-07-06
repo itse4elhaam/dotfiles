@@ -1,0 +1,19 @@
+.agents/skills/local-change-review/SKILL.md
+  s_d38d56383962cf::t_376bb74edd8528 3,9,11,13,15,17-164
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "3b42d6f5c95379ae00bcb99b362df2c188d4279a",
+  "prompts": {},
+  "sessions": {
+    "s_d38d56383962cf": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_0c9685b57ffed8DfziFVZ85zmq",
+        "model": "unknown"
+      },
+      "human_author": "Elhaam Basheer Chaudhry <e4elhaam@gmail.com>"
+    }
+  }
+}
