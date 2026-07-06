@@ -1,0 +1,111 @@
+opencode-plugins/opencode-selfmod/.gitignore
+  s_0b86ec6a09bde4::t_bf8b5efe8ec7e0 1-3
+opencode-plugins/opencode-selfmod/LICENSE
+  s_0b86ec6a09bde4::t_aecea8e809eb43 1-21
+opencode-plugins/opencode-selfmod/README.md
+  s_0b86ec6a09bde4::t_3c56b5c78ea416 1-200
+opencode-plugins/opencode-selfmod/agent/self-modifier.md
+  s_0b86ec6a09bde4::t_0ef98e3d725403 1-92
+opencode-plugins/opencode-selfmod/dist/config.d.ts
+  s_0b86ec6a09bde4::t_7c6fa11cb2a4e8 1-43
+opencode-plugins/opencode-selfmod/dist/config.d.ts.map
+  s_0b86ec6a09bde4::t_8e7d1f81bb3da8 1
+opencode-plugins/opencode-selfmod/dist/config.js
+  s_0b86ec6a09bde4::t_0e70667c319b51 1-105
+opencode-plugins/opencode-selfmod/dist/config.js.map
+  s_0b86ec6a09bde4::t_901ae44538ae69 1
+opencode-plugins/opencode-selfmod/dist/context-pack.d.ts
+  s_0b86ec6a09bde4::t_578d588094e326 1-45
+opencode-plugins/opencode-selfmod/dist/context-pack.d.ts.map
+  s_0b86ec6a09bde4::t_ba846a23bc8e97 1
+opencode-plugins/opencode-selfmod/dist/context-pack.js
+  s_0b86ec6a09bde4::t_2ebb1744bc8121 1-205
+opencode-plugins/opencode-selfmod/dist/context-pack.js.map
+  s_0b86ec6a09bde4::t_c1c906787e6b25 1
+opencode-plugins/opencode-selfmod/dist/index.d.ts
+  s_0b86ec6a09bde4::t_bebf7e23e02873 1-4
+opencode-plugins/opencode-selfmod/dist/index.d.ts.map
+  s_0b86ec6a09bde4::t_04bdb7df511d1c 1
+opencode-plugins/opencode-selfmod/dist/index.js
+  s_0b86ec6a09bde4::t_8303e4fb968861 1-316
+opencode-plugins/opencode-selfmod/dist/index.js.map
+  s_0b86ec6a09bde4::t_04e11f1221676a 1
+opencode-plugins/opencode-selfmod/dist/policy.d.ts
+  s_0b86ec6a09bde4::t_28bd7ea3d162ca 1-47
+opencode-plugins/opencode-selfmod/dist/policy.d.ts.map
+  s_0b86ec6a09bde4::t_7ad3db071c3efe 1
+opencode-plugins/opencode-selfmod/dist/policy.js
+  s_0b86ec6a09bde4::t_ca000b14f6920e 1-190
+opencode-plugins/opencode-selfmod/dist/policy.js.map
+  s_0b86ec6a09bde4::t_308d4f48310c8d 1
+opencode-plugins/opencode-selfmod/dist/proposals.d.ts
+  s_0b86ec6a09bde4::t_d0b95b19d9dd8c 1-27
+opencode-plugins/opencode-selfmod/dist/proposals.d.ts.map
+  s_0b86ec6a09bde4::t_838b25466d9fde 1
+opencode-plugins/opencode-selfmod/dist/proposals.js
+  s_0b86ec6a09bde4::t_8c6cdca930d734 1-35
+opencode-plugins/opencode-selfmod/dist/proposals.js.map
+  s_0b86ec6a09bde4::t_a9fa318fc30c02 1
+opencode-plugins/opencode-selfmod/dist/reporting.d.ts
+  s_0b86ec6a09bde4::t_5ead9d7a286850 1-27
+opencode-plugins/opencode-selfmod/dist/reporting.d.ts.map
+  s_0b86ec6a09bde4::t_a09fc72c221d2f 1
+opencode-plugins/opencode-selfmod/dist/reporting.js
+  s_0b86ec6a09bde4::t_18e122c3f69665 1-59
+opencode-plugins/opencode-selfmod/dist/reporting.js.map
+  s_0b86ec6a09bde4::t_270e379b490515 1
+opencode-plugins/opencode-selfmod/dist/validation.d.ts
+  s_0b86ec6a09bde4::t_b0dd12dc66c6b5 1-21
+opencode-plugins/opencode-selfmod/dist/validation.d.ts.map
+  s_0b86ec6a09bde4::t_7f27cc11ed6b0c 1
+opencode-plugins/opencode-selfmod/dist/validation.js
+  s_0b86ec6a09bde4::t_1e0bd208a08460 1-40
+opencode-plugins/opencode-selfmod/dist/validation.js.map
+  s_0b86ec6a09bde4::t_8af51476cd6aae 1
+opencode-plugins/opencode-selfmod/dist/worktree.d.ts
+  s_0b86ec6a09bde4::t_d34463fdd43b08 1-51
+opencode-plugins/opencode-selfmod/dist/worktree.d.ts.map
+  s_0b86ec6a09bde4::t_393d171b8584f2 1
+opencode-plugins/opencode-selfmod/dist/worktree.js
+  s_0b86ec6a09bde4::t_f01ce3373bb4b7 1-105
+opencode-plugins/opencode-selfmod/dist/worktree.js.map
+  s_0b86ec6a09bde4::t_193dc53fbef187 1
+opencode-plugins/opencode-selfmod/examples/opencode.json
+  s_0b86ec6a09bde4::t_2fb516a7be691f 1-14
+opencode-plugins/opencode-selfmod/package.json
+  s_0b86ec6a09bde4::t_e7769d10e4b110 1-54
+opencode-plugins/opencode-selfmod/src/config.ts
+  s_0b86ec6a09bde4::t_749def63b5ac46 1-123
+opencode-plugins/opencode-selfmod/src/context-pack.ts
+  s_0b86ec6a09bde4::t_43a088de34f3e8 1-298
+opencode-plugins/opencode-selfmod/src/index.ts
+  s_0b86ec6a09bde4::t_76525ac43a880f 1-370
+opencode-plugins/opencode-selfmod/src/policy.ts
+  s_0b86ec6a09bde4::t_4dce6ade3b313d 1-274
+opencode-plugins/opencode-selfmod/src/proposals.ts
+  s_0b86ec6a09bde4::t_21f11bb7c46087 1-70
+opencode-plugins/opencode-selfmod/src/reporting.ts
+  s_0b86ec6a09bde4::t_04da673a913411 1-101
+opencode-plugins/opencode-selfmod/src/validation.ts
+  s_0b86ec6a09bde4::t_d3a68b02ad1ff7 1-68
+opencode-plugins/opencode-selfmod/src/worktree.ts
+  s_0b86ec6a09bde4::t_d9644177e244ab 1-176
+opencode-plugins/opencode-selfmod/tsconfig.json
+  s_0b86ec6a09bde4::t_60b6b651982e9e 1-19
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "84985baa6d39187dfc35f8cbe6f1b23af151c4c2",
+  "prompts": {},
+  "sessions": {
+    "s_0b86ec6a09bde4": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_0c941b07bffecbBDHx2cj23Bjm",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Elhaam Basheer Chaudhry <e4elhaam@gmail.com>"
+    }
+  }
+}
