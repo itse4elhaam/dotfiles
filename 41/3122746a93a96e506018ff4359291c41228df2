@@ -1,0 +1,39 @@
+.agents/skills/pr-review-dossier/SKILL.md
+  s_05aebfab7e68c8::t_ac625c07caced5 3
+  s_05aebfab7e68c8::t_f9f6ef30c0d3ed 8
+  s_2b7878d8aa8b85::t_70aa3cbaab43dc 1-2,4-7,9-10,15-70,73-78
+  s_dcda15c4dc7000::t_b99f68343fe007 11-14
+  s_05aebfab7e68c8::t_f2407aab0f6980 71-72
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "413122746a93a96e506018ff4359291c41228df2",
+  "prompts": {},
+  "sessions": {
+    "s_05aebfab7e68c8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_0c941b07bffecbBDHx2cj23Bjm",
+        "model": "unknown"
+      },
+      "human_author": "Elhaam Basheer Chaudhry <e4elhaam@gmail.com>"
+    },
+    "s_2b7878d8aa8b85": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_0c96970f6ffe8CUP6NNAavEXK9",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Elhaam Basheer Chaudhry <e4elhaam@gmail.com>"
+    },
+    "s_dcda15c4dc7000": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_0c96970f6ffe8CUP6NNAavEXK9",
+        "model": "unknown"
+      },
+      "human_author": "Elhaam Basheer Chaudhry <e4elhaam@gmail.com>"
+    }
+  }
+}
