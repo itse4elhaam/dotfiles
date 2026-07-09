@@ -1,0 +1,21 @@
+.config/opencode/opencode.json
+  s_b2f1f0ec296cfa::t_a51260e03ec4fc 74
+.zshrc
+  s_b2f1f0ec296cfa::t_96d0053d72fa45 736-741
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "1354c18fb1450918eb9efebeff510f8933f83037",
+  "prompts": {},
+  "sessions": {
+    "s_b2f1f0ec296cfa": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_0b926cceaffePKjRjRpVOz75To",
+        "model": "unknown"
+      },
+      "human_author": "Elhaam Basheer Chaudhry <e4elhaam@gmail.com>"
+    }
+  }
+}
