@@ -36,6 +36,10 @@ Create a self-contained HTML document optimized for humans reading dense context
 4. **Verify readability.** Check line length, heading order, contrast, zoom/reflow, and print behavior.
    Completion: the document remains readable on a laptop, large monitor, and browser zoom.
 
+5. **Open in browser (default).** Detect which browser is open (Chrome, Firefox, Brave, Edge, etc.), collect the absolute path of the HTML document, and open it as a new tab in that browser. Skip this step only if the user explicitly asks not to open it.
+   Completion: the dossier is open in the user's browser for immediate reading.
+   See [REFERENCES.md](REFERENCES.md) for the exact detection and opening process per browser.
+
 ## Minimal scaffold
 
 ```html
