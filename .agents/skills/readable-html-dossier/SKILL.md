@@ -15,6 +15,7 @@ Create a self-contained HTML document optimized for humans reading dense context
 - **Standalone:** inline CSS; no build step. Only use CDN scripts when diagrams genuinely need Mermaid.
 - **Semantic:** `main`, `section`, `article`, headings in order, tables only for tabular data.
 - **Context-rich:** include background, evidence, uncertainty, and domain links when those help a human make a decision.
+- **Typography:** body text in Source Sans 3 (18px/1.7), headings in Inter (weight 650, -0.02em letter-spacing), code in JetBrains Mono (14px/1.6). Prose column capped at 760px. See [REFERENCES.md](REFERENCES.md#typography) for the full spec.
 
 ## Workflow
 
@@ -50,16 +51,18 @@ Create a self-contained HTML document optimized for humans reading dense context
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Dossier</title>
   <style>
-    :root{color-scheme:dark light;--bg:#121212;--panel:#1b1b1b;--text:#e6e1d9;--muted:#aaa39a;--accent:#8ab4ff;--border:#333}
+    @import url('https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700&family=Inter:wght@400;650&family=JetBrains+Mono:wght@400;500&display=swap');
+    :root{color-scheme:dark light;--bg:#121212;--panel:#1b1b1b;--text:#e6e1d9;--muted:#aaa39a;--accent:#8ab4ff;--border:#333;--font-body:"Source Sans 3",system-ui,sans-serif;--font-heading:"Inter","Source Sans 3",system-ui,sans-serif;--font-code:"JetBrains Mono","SFMono-Regular",Consolas,monospace}
     [data-theme="light"]{--bg:#fafafa;--panel:#fff;--text:#1f1f1f;--muted:#5f5f5f;--accent:#0057b3;--border:#ddd}
-    body{margin:0;background:var(--bg);color:var(--text);font:clamp(1rem,.94rem+.21vw,1.125rem)/1.7 system-ui,-apple-system,Segoe UI,sans-serif}
-    main{max-width:min(72rem,100% - 2rem);margin:auto;padding:clamp(1.5rem,4vw,4rem) 0}
-    .prose{max-width:65ch}.card{background:var(--panel);border:1px solid var(--border);border-radius:16px;padding:1.25rem;margin:1rem 0}
-    h1,h2,h3{line-height:1.2} a{color:var(--accent)} code,pre{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+    body{margin:0;background:var(--bg);color:var(--text);font:400 1.125rem/1.7 var(--font-body)}
+    main{max-width:min(760px,100% - 2rem);margin:auto;padding:clamp(1.5rem,4vw,4rem) 0}
+    .card{background:var(--panel);border:1px solid var(--border);border-radius:16px;padding:1.25rem;margin:1rem 0}
+    h1,h2,h3{font-family:var(--font-heading);font-weight:650;line-height:1.2;letter-spacing:-0.02em}
+    a{color:var(--accent)} code{font-family:var(--font-code);font-size:.9em} pre{font-family:var(--font-code);font-size:.875rem;line-height:1.6;overflow-x:auto}
     @media print{body{background:#fff!important;color:#000!important;font-size:11pt}.card{break-inside:avoid}a[href^="http"]::after{content:" (" attr(href) ")";font-size:.85em}}
   </style>
 </head>
-<body><main><article class="prose"><h1>Dossier title</h1></article></main></body>
+<body><main><article><h1>Dossier title</h1></article></main></body>
 </html>
 ```
 
