@@ -733,3 +733,9 @@ wts() { wt switch "$@" 2>/dev/null || wt switch --create "$@"; }
 # worktrunk: tmux layout setup (wt-setup is source of truth)
 alias setup="$HOME/dotfiles/scripts/wt-setup"
 export PATH="$HOME/workspace/coding/robotics-pg/bin:$PATH"
+
+# >>> grok installer >>>
+export PATH="$HOME/.grok/bin:$PATH"
+fpath=(~/.grok/completions/zsh $fpath)
+autoload -Uz compinit && compinit -C
+# <<< grok installer <<<

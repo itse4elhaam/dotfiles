@@ -71,7 +71,7 @@
     "oh-my-openagent",
     "opencode-supermemory@latest",
     "opencode-pty",
-    "@koriit/opencode-tmux-window-status"
+    "@koriit/opencode-tmux-window-status",
   ],
   "provider": {
     "opencode-go": {
