@@ -1,0 +1,21 @@
+.agents/skills/conflict-rebase-resolution/SKILL.md
+  s_3be51b25aeb097::t_453e0094a972c3 17
+.agents/skills/pr-review-dossier/SKILL.md
+  s_3be51b25aeb097::t_10221275767289 42
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.12",
+  "base_commit_sha": "05fbcb46b4262f6ef6c1ad68bebbde5447b8b978",
+  "prompts": {},
+  "sessions": {
+    "s_3be51b25aeb097": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_0b15841daffetbRM962737ncec",
+        "model": "unknown"
+      },
+      "human_author": "Elhaam Basheer Chaudhry <e4elhaam@gmail.com>"
+    }
+  }
+}
