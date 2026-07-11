@@ -1,0 +1,23 @@
+.agents/skills/readable-html-dossier/REFERENCES.md
+  s_3be51b25aeb097::t_7fa022f2241bc5 30
+  s_3be51b25aeb097::t_3f112635f47665 75-77
+  s_3be51b25aeb097::t_4f5f64872a88b2 11,14-15
+.agents/skills/readable-html-dossier/SKILL.md
+  s_3be51b25aeb097::t_d76a1faa3ca293 40
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.12",
+  "base_commit_sha": "49394919f08ef37f7dc422aa874df341cad9bbfd",
+  "prompts": {},
+  "sessions": {
+    "s_3be51b25aeb097": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_0b15841daffetbRM962737ncec",
+        "model": "unknown"
+      },
+      "human_author": "Elhaam Basheer Chaudhry <e4elhaam@gmail.com>"
+    }
+  }
+}
