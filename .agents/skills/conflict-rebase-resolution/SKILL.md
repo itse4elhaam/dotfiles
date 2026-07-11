@@ -14,7 +14,7 @@ These steps must be followed in order.
 
 1. Fetch the latest copy of the branch to merge
 2. Pull/Merge the branch into the current branch with rebase false, this gives you and the user a holistic view of the conflicts (if any)
-3. Analyze the conflicts and for each of them, use subagents to gather relevant context, then report the resolution strategy to the user with confidence level and the reasoning behind your decision and why the conflict existed in the first place. The purpose of this step is to align with the user completely on the strategy.
+3. Analyze the conflicts and for each of them, use subagents (explore, librarian) to gather relevant context. **Crucially, treat subagent findings as a starting point, not the final truth.** Always verify subagent output against the actual code — re-read the files, check surrounding context, and confirm the findings. Subagents may miss nuances, misunderstand the conflict, or return incomplete information. After verification, report the resolution strategy to the user with confidence level and the reasoning behind your decision and why the conflict existed in the first place. The purpose of this step is to align with the user completely on the strategy.
 4. After locking in the strategy, ABORT the current merge.
 5. Create a backup branch from the current branch, use this convention: bak/<current-branch>/<timestamp>
 6. Start a rebase against the target branch and resolve the conflicts one by one, if you encounter something that's new and unresolved before, report it to the user and align before proceeding. Once everything is resolved complete the rebase
