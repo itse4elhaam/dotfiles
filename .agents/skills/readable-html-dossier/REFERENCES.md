@@ -8,13 +8,14 @@ After creating the HTML dossier, open it in the user's browser by: (1) detecting
 
 ### 1. Detect which browser is running
 
-Check for running browser processes using `pgrep`. Order by likelihood:
+Check for running browser processes using `pgrep`. Order by likelihood (Edge preferred for this user):
 
 ```bash
+pgrep -x msedge >/dev/null 2>&1 && echo "edge"     # Edge: primary browser
+pgrep -x google-chrome >/dev/null 2>&1 && echo "chrome"
 pgrep -x chrome >/dev/null 2>&1 && echo "chrome"
 pgrep -x firefox >/dev/null 2>&1 && echo "firefox"
 pgrep -x brave >/dev/null 2>&1 && echo "brave"
-pgrep -x msedge >/dev/null 2>&1 && echo "edge"
 ```
 
 Common process names per browser:
@@ -26,7 +27,7 @@ Common process names per browser:
 | Brave   | `brave` | `brave-browser` |
 | Edge    | `msedge`, `microsoft-edge` | `microsoft-edge`, `msedge` |
 
-> **Multiple browsers open?** Prefer Chrome, then Brave, then Edge, then Firefox (most-to-least likely for this user). Or use the one specified by the user if they mentioned one.
+> **Multiple browsers open?** Prefer Edge, then Chrome, then Brave, then Firefox (most-to-least likely for this user). Or use the one specified by the user if they mentioned one.
 
 > **No browser open?** Fall back to `xdg-open` (Linux) or `open` (macOS). These use the OS default browser.
 
@@ -71,12 +72,12 @@ open "$file_url"        # macOS
 html_path="/path/to/dossier.html"
 file_url="file://$(realpath "$html_path")"
 
-if pgrep -x google-chrome >/dev/null 2>&1 || pgrep -x chrome >/dev/null 2>&1; then
+if pgrep -x msedge >/dev/null 2>&1 || pgrep -x microsoft-edge >/dev/null 2>&1; then
+  microsoft-edge --new-tab "$file_url"
+elif pgrep -x google-chrome >/dev/null 2>&1 || pgrep -x chrome >/dev/null 2>&1; then
   google-chrome --new-tab "$file_url"
 elif pgrep -x brave >/dev/null 2>&1; then
   brave-browser --new-tab "$file_url"
-elif pgrep -x msedge >/dev/null 2>&1 || pgrep -x microsoft-edge >/dev/null 2>&1; then
-  microsoft-edge --new-tab "$file_url"
 elif pgrep -x firefox >/dev/null 2>&1 || pgrep -x firefox-esr >/dev/null 2>&1; then
   firefox --new-tab "$file_url"
 else
