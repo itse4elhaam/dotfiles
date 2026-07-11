@@ -1,0 +1,29 @@
+.agents/skills/linear-issue-recon/SKILL.md
+  s_6501422988ad39::t_dadfa0acb6917b 1-105
+.agents/skills/README.md
+  s_4d003e4759a7fa::t_68b217faa92688 17
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.12",
+  "base_commit_sha": "d0740ea54dba7ac77e924eabb0372c6bd46f0250",
+  "prompts": {},
+  "sessions": {
+    "s_4d003e4759a7fa": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_0b05d23b6ffeMLcejDNA102vbm",
+        "model": "deepseek-v4-flash"
+      },
+      "human_author": "Elhaam Basheer Chaudhry <e4elhaam@gmail.com>"
+    },
+    "s_6501422988ad39": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_0b05d23b6ffeMLcejDNA102vbm",
+        "model": "unknown"
+      },
+      "human_author": "Elhaam Basheer Chaudhry <e4elhaam@gmail.com>"
+    }
+  }
+}
