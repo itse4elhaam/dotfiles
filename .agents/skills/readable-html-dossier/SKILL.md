@@ -29,7 +29,10 @@ Create a self-contained HTML document optimized for humans reading dense context
    - Recommended actions
    - Open questions / stale items
    - Source links and domain documents
+   - External resources — docs, articles, videos, or any reference that deepens understanding of the topic
    Completion: every major section has a clear reader purpose.
+
+   > **External resources:** Agents should load relevant search skills (e.g. from `~/.agents/skills` — `research`, `librarian`, `websearch`) to find and curate external references. These can be official docs, blog posts, tutorials, YouTube videos, or any material that helps a human build a richer mental model of the dossier's subject. Place them in a dedicated section near the end of the report.
 
 3. **Write the HTML.** Save where the caller asks; use `/tmp` only for explicitly one-off reports and always report the path.
    Completion: the file opens directly in a browser without a server.
