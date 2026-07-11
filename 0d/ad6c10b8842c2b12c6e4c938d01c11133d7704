@@ -1,0 +1,20 @@
+.agents/skills/readable-html-dossier/SKILL.md
+  s_4d003e4759a7fa::t_585d6f83b6d285 43,47-57
+  s_4d003e4759a7fa::t_ebf4925b59840d 58
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.12",
+  "base_commit_sha": "0dad6c10b8842c2b12c6e4c938d01c11133d7704",
+  "prompts": {},
+  "sessions": {
+    "s_4d003e4759a7fa": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_0b05d23b6ffeMLcejDNA102vbm",
+        "model": "deepseek-v4-flash"
+      },
+      "human_author": "Elhaam Basheer Chaudhry <e4elhaam@gmail.com>"
+    }
+  }
+}
