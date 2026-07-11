@@ -1,6 +1,6 @@
 ---
 name: local-change-review
-description: Review uncommitted local changes by grouping related hunks into small, intentional commits. Use when the user asks to review local changes, clean up a working tree, split changes into commits, stage changes safely, or prepare local work for commit.
+description: Group uncommitted local changes into small, intentional commits.
 allowed-tools: Read, Bash, Grep, Glob, Edit
 ---
 
@@ -11,6 +11,8 @@ Review the user's local working tree and turn it into small, intentional, user-a
 This skill is for uncommitted local changes only. Do not use it for reviewing a PR, remote branch, or already-pushed commit series unless the user explicitly asks for that.
 
 ## Process
+
+Read and execute one step at a time. Complete the current step fully before reading the next one.
 
 ### 1. Inspect repository state
 

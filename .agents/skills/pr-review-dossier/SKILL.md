@@ -1,6 +1,6 @@
 ---
 name: pr-review-dossier
-description: Use when a user asks for a read-only, evidence-backed HTML dossier of existing GitHub PR review feedback for the current branch, especially to decide the way ahead or approve changes based on reviewer concerns, validity, and stale items.
+description: Build an evidence-backed HTML dossier of existing GitHub PR review feedback — investigate reviewer concerns, decide the way ahead.
 ---
 
 # PR Review Dossier

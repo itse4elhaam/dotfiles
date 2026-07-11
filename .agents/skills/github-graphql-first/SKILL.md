@@ -1,6 +1,6 @@
 ---
 name: github-graphql-first
-description: Use when fetching structured GitHub data with gh, especially pull requests, reviews, review threads, comments, project items, timelines, or nested repository data.
+description: Use when fetching structured GitHub data with gh — especially PR review threads, nested repository data, or any data that forms a graph.
 ---
 
 # GitHub GraphQL First
@@ -9,7 +9,7 @@ Use `gh api graphql` as the default for structured GitHub data. Use REST endpoin
 
 ## Core rule
 
-If you are about to run `gh api repos/...`, `gh pr view --json`, or multiple REST calls to reconstruct relationships, stop and ask: **is this naturally a graph?** If yes, use GraphQL.
+If you are about to run `gh api repos/...`, `gh pr view --json`, or multiple REST calls to reconstruct relationships, stop and ask: **is this task-shaped data — naturally a graph?** If yes, use GraphQL.
 
 Good GraphQL fits:
 - PR review threads with comments and resolution state

@@ -1,6 +1,6 @@
 ---
 name: readable-html-dossier
-description: Use when creating a standalone HTML report, dossier, investigation brief, review findings document, or human-readable context page from agent research.
+description: Create a standalone, reading-first HTML report for research, reviews, investigations, or any dense context.
 ---
 
 # Readable HTML Dossier
@@ -37,8 +37,14 @@ Create a self-contained HTML document optimized for humans reading dense context
 3. **Write the HTML.** Save where the caller asks; use `/tmp` only for explicitly one-off reports and always report the path.
    Completion: the file opens directly in a browser without a server.
 
-4. **Verify readability.** Check line length, heading order, contrast, zoom/reflow, and print behavior.
-   Completion: the document remains readable on a laptop, large monitor, and browser zoom.
+4. **Verify readability (static only).** Audit the HTML/CSS source directly — never by rendering in a browser. Check:
+   - Line length: body text column stays near 45–75 characters.
+   - Heading order: no jumps (e.g. `h1` → `h3`) or gaps.
+   - Contrast: meets WCAG AA (`color` + `background-color` on same elements).
+   - Print stylesheet: forces light background and exposes URLs via `::after`.
+   - Empty sections: removed.
+   - Zoom/reflow: no horizontal scrolling at 200% zoom or laptop widths (check `max-width`, `overflow`, and `min-width` values in CSS).
+   Completion: every quality check passed against the source code — no browser was launched.
 
 5. **Open in browser (default).** Detect which browser is open (Edge, Chrome, Brave, Firefox, etc.), collect the **absolute path** of the HTML file, convert it to a `file://` URL, and open it as a new tab in that browser. Skip this step only if the user explicitly asks not to open it.
    Completion: the dossier is open in the user's browser for immediate reading.
@@ -52,9 +58,11 @@ Create a self-contained HTML document optimized for humans reading dense context
 
    **Forbidden approaches (MUST NOT use):**
    - ❌ Do NOT start a dev server or HTTP server (`npx serve`, `python -m http.server`, `npx http-server`, or any other static file server).
-   - ❌ Do NOT use Playwright MCP, browser automation, or any scriptable browser to open the file. The dossier is for human reading, not automated inspection.
-   - ❌ Do NOT use `file://` paths with Playwright or any headless browser.
+   - ❌ Do NOT use Playwright MCP or Playwright scripts for **any** purpose — not for opening, not for verification, not for screenshots, not for checking rendered output. Playwright always launches Chrome in headed mode on this system.
+   - ❌ Do NOT use any scriptable browser automation — Puppeteer, Selenium, or similar — for any purpose in this skill.
    - ❌ Do NOT paste the path into an open browser via automation.
+
+   **If headless rendering verification is genuinely needed** (rare — static source checks cover almost everything): use `agent-browser` from `/home/elhaam/.agents/skills/agent-browser` instead. It runs Chrome/Chromium headlessly via CDP and does not open a visible window.
 
 ## Minimal scaffold
 
