@@ -10,7 +10,7 @@
     "explore": {
       "model": "opencode-go/deepseek-v4-flash"
     },
-    "oracle": { "model": "openai/gpt-5.5", "variant": "xhigh" ,
+    "oracle": { "model": "openai/gpt-5.6-sol", "variant": "xhigh" ,
       "fallback_models": [
         "opencode-go/glm-5.2"
       ]
@@ -61,13 +61,13 @@
       "variant": "high"
     },
     "hephaestus": {
-      "model": "openai/gpt-5.5"
+      "model": "openai/gpt-5.6-sol"
     },
     "momus": {
       "model": "opencode-go/deepseek-v4-pro"
     },
     "metis": {
-      "model": "openai/gpt-5.5"
+      "model": "openai/gpt-5.6-sol"
     }
   },
   "disabled_hooks": ["todo-continuation-enforcer"]
