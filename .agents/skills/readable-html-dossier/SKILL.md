@@ -40,9 +40,21 @@ Create a self-contained HTML document optimized for humans reading dense context
 4. **Verify readability.** Check line length, heading order, contrast, zoom/reflow, and print behavior.
    Completion: the document remains readable on a laptop, large monitor, and browser zoom.
 
-5. **Open in browser (default).** Detect which browser is open (Edge, Chrome, Brave, Firefox, etc.), collect the absolute path of the HTML document, and open it as a new tab in that browser. Skip this step only if the user explicitly asks not to open it.
+5. **Open in browser (default).** Detect which browser is open (Edge, Chrome, Brave, Firefox, etc.), collect the **absolute path** of the HTML file, convert it to a `file://` URL, and open it as a new tab in that browser. Skip this step only if the user explicitly asks not to open it.
    Completion: the dossier is open in the user's browser for immediate reading.
    See [REFERENCES.md](REFERENCES.md) for the exact detection and opening process per browser.
+
+   **Correct method (MUST use this):**
+   - Detect the running browser via `pgrep` (order: Edge → Chrome → Brave → Firefox).
+   - Convert the absolute path to a `file://` URL: `file://$(realpath "$html_path")`.
+   - Open with `--new-tab` flag: e.g. `microsoft-edge --new-tab "file:///path/to/dossier.html"`.
+   - Fall back to `xdg-open` (Linux) or `open` (macOS) when no browser is detected.
+
+   **Forbidden approaches (MUST NOT use):**
+   - ❌ Do NOT start a dev server or HTTP server (`npx serve`, `python -m http.server`, `npx http-server`, or any other static file server).
+   - ❌ Do NOT use Playwright MCP, browser automation, or any scriptable browser to open the file. The dossier is for human reading, not automated inspection.
+   - ❌ Do NOT use `file://` paths with Playwright or any headless browser.
+   - ❌ Do NOT paste the path into an open browser via automation.
 
 ## Minimal scaffold
 
