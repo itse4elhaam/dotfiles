@@ -1,0 +1,34 @@
+.agents/skills/local-change-review/SKILL.md
+  s_6501422988ad39::t_f48e15c7585af8 3,15
+  s_6501422988ad39::t_be3c544b39a1b1 16
+.agents/skills/readable-html-dossier/SKILL.md
+  s_6501422988ad39::t_db0e8e0001d232 40-47
+  s_6501422988ad39::t_1c2720558d2171 61-62,65
+  s_6501422988ad39::t_4039aaa44fb52e 3
+  s_6501422988ad39::t_0b814d5e2d3187 66
+.agents/skills/elhaam-review/SKILL.md
+  s_6501422988ad39::t_2a62b657336ee4 3
+  s_6501422988ad39::t_471e05c012ccce 13,15,17,19,95,97-102
+.agents/skills/conflict-rebase-resolution/SKILL.md
+  s_6501422988ad39::t_052bac2ccde054 9,11,13,15-51
+.agents/skills/pr-review-dossier/SKILL.md
+  s_6501422988ad39::t_92569d5315ef12 3
+.agents/skills/github-graphql-first/SKILL.md
+  s_6501422988ad39::t_cb8f984d151fcb 3,12
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.12",
+  "base_commit_sha": "f7fb11fe0d6a7ca3c3a66e6f806c5f3be74261a3",
+  "prompts": {},
+  "sessions": {
+    "s_6501422988ad39": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_0b05d23b6ffeMLcejDNA102vbm",
+        "model": "unknown"
+      },
+      "human_author": "Elhaam Basheer Chaudhry <e4elhaam@gmail.com>"
+    }
+  }
+}
