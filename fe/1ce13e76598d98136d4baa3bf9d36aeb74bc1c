@@ -1,0 +1,46 @@
+.agents/skills/readable-html-dossier/REFERENCES.md
+  s_20bacb74f9047a::t_c9ebc995a3af5d 68,72,81-90,94-103
+  s_5eac92196540d2::t_1e486fb0ed4a02 7-37,63,65-67,69,73-80,92,104-138,140,142,144,148,151,172-173,179
+  s_20bacb74f9047a::t_fd0e4d87f9075b 50,52-58,61,64,146,149-150,153-154,157,159,161-165,167-171
+  s_5eac92196540d2::t_6a6e779bea6cd2 4-6
+  s_5eac92196540d2::t_78761329be1f9c 38-40
+.agents/skills/readable-html-dossier/SKILL.md
+  s_20bacb74f9047a::t_c9ebc995a3af5d 26-27
+  s_18c93dd5a42f92::t_7aec8a86633739 41
+  s_5eac92196540d2::t_495877d1b89e74 3,38-40
+  s_20bacb74f9047a::t_fd0e4d87f9075b 42-45
+  s_20bacb74f9047a::t_9743154d2a635a 23-25
+  s_20bacb74f9047a::t_1d5536a8471f7a 46-48
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.13",
+  "base_commit_sha": "fe1ce13e76598d98136d4baa3bf9d36aeb74bc1c",
+  "prompts": {},
+  "sessions": {
+    "s_18c93dd5a42f92": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_0ab416966ffeAlB9fFL8HeBO9I",
+        "model": "unknown"
+      },
+      "human_author": "Elhaam Basheer Chaudhry <e4elhaam@gmail.com>"
+    },
+    "s_20bacb74f9047a": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_0ab7590bfffeF3P2wGkFpY4Z7h",
+        "model": "deepseek-v4-flash"
+      },
+      "human_author": "Elhaam Basheer Chaudhry <e4elhaam@gmail.com>"
+    },
+    "s_5eac92196540d2": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_0ab6b6d2effeyabty6P5g0AJNs",
+        "model": "unknown"
+      },
+      "human_author": "Elhaam Basheer Chaudhry <e4elhaam@gmail.com>"
+    }
+  }
+}
