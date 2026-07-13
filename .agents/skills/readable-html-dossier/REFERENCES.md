@@ -1,181 +1,179 @@
-# Browser detection & tab opening
+# Readable HTML dossier reference
 
-## Overview
+Load the section named by `SKILL.md` only when that step is active.
 
-After creating the HTML dossier, open it in the user's browser by: (1) detecting which browser is running, (2) converting the file path to a `file://` URL, (3) opening it as a new tab.
+## Visual contract
 
-## Step by step
+Use this normative presentation contract:
 
-### 1. Detect which browser is running
+- Display scale: `--display-scale: 150%` on screen, applied through the root font size so typography, spacing, and controls scale together while responsive layout remains active. Reset to `100%` for print.
+- Body: system sans-serif stack, `1.125rem/1.7`, prose width `min(65ch, 100% - 2rem)`.
+- Headings: system sans-serif stack, weight `650`, line height `1.2`, letter spacing `-.02em`.
+- Code: system monospace stack, `.875rem/1.6`, with horizontal overflow contained by the code block.
+- Theme: softened dark colors by default; define light mode through CSS variables and `data-theme="light"`.
+- Layout: semantic landmarks and ordered headings; tables only for tabular data; no page-level horizontal overflow at narrow widths or 200% zoom.
+- Links: visibly underlined and distinguishable without color alone.
+- Print: force a light palette and expose external URLs.
+- Dependencies: inline required CSS and JavaScript. Use a CDN only when a diagram genuinely requires Mermaid; the report remains readable when that resource is unavailable.
 
-Check for running browser processes using `pgrep`. Order by likelihood (Edge preferred for this user):
+Minimal scaffold:
 
-```bash
-pgrep -x msedge >/dev/null 2>&1 && echo "edge"     # Edge: primary browser
-pgrep -x google-chrome >/dev/null 2>&1 && echo "chrome"
-pgrep -x chrome >/dev/null 2>&1 && echo "chrome"
-pgrep -x firefox >/dev/null 2>&1 && echo "firefox"
-pgrep -x brave >/dev/null 2>&1 && echo "brave"
+```html
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Dossier</title>
+  <style>
+    :root{color-scheme:dark light;--display-scale:150%;--bg:#121212;--panel:#1b1b1b;--text:#e6e1d9;--muted:#aaa39a;--accent:#8ab4ff;--border:#333;--font-body:system-ui,-apple-system,"Segoe UI",sans-serif;--font-code:ui-monospace,"SFMono-Regular",Consolas,monospace}
+    [data-theme="light"]{--bg:#fafafa;--panel:#fff;--text:#1f1f1f;--muted:#5f5f5f;--accent:#0057b3;--border:#ddd}
+    html{font-size:var(--display-scale)} *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--text);font:400 1.125rem/1.7 var(--font-body)}
+    main{max-width:min(65ch,100% - 2rem);margin:auto;padding:clamp(1.5rem,4vw,4rem) 0}
+    .card{background:var(--panel);border:1px solid var(--border);border-radius:1rem;padding:1.25rem;margin:1rem 0}
+    h1,h2,h3{font-weight:650;line-height:1.2;letter-spacing:-.02em} a{color:var(--accent);text-decoration:underline}
+    code{font-family:var(--font-code);font-size:.9em} pre{font:400 .875rem/1.6 var(--font-code);overflow-x:auto;max-width:100%}
+    button,input,select,textarea,progress{font:inherit;max-width:100%} button,input,select,textarea{padding:.5em .75em} input,select,textarea{width:min(100%,30rem)} progress,input[type="range"]{width:min(100%,24rem);min-height:1em}
+    :focus-visible{outline:3px solid var(--accent);outline-offset:3px}
+    @media (prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;transition:none!important;animation:none!important}}
+    @media print{:root{--display-scale:100%}body{background:#fff!important;color:#000!important;font-size:11pt}.card{break-inside:avoid}a[href^="http"]::after{content:" (" attr(href) ")";font-size:.85em}}
+  </style>
+</head>
+<body><main><article><h1>Dossier title</h1></article></main></body>
+</html>
 ```
 
-Common process names per browser:
+## Reading progress tracker
 
-| Browser | Process name(s) | Command |
-|---------|----------------|---------|
-| Chrome  | `chrome`, `google-chrome`, `chromium`, `chromium-browser` | `google-chrome`, `google-chrome-stable`, `chromium` |
-| Firefox | `firefox`, `firefox-esr` | `firefox` |
-| Brave   | `brave` | `brave-browser` |
-| Edge    | `msedge`, `microsoft-edge` | `microsoft-edge`, `msedge` |
+Automatic tracking works when the reader opens a compatible dossier from `DOC_MAP.html`. The map retains the child-window reference; the dossier reports percentage milestones to that opener. A direct-open dossier has no trusted map opener and uses manual fallback progress in the map.
 
-> **Multiple browsers open?** Prefer Edge, then Chrome, then Brave, then Firefox (most-to-least likely for this user). Or use the one specified by the user if they mentioned one.
+Serialize the complete metadata object, then replace HTML-sensitive characters before inserting that complete result as the metadata block's text:
 
-> **No browser open?** Fall back to `xdg-open` (Linux) or `open` (macOS). These use the OS default browser.
-
-### 2. Convert path to file:// URL
-
-```bash
-# Absolute path from the write step, e.g. /tmp/dossier.html
-# Convert to file:// URL
-file_url="file://$(realpath "$html_path")"
+```javascript
+const serializedMetadata = JSON.stringify({ documentId })
+  .replace(/</g, "\\u003c")
+  .replace(/>/g, "\\u003e")
+  .replace(/&/g, "\\u0026")
+  .replace(/\u2028/g, "\\u2028")
+  .replace(/\u2029/g, "\\u2029");
 ```
 
-`realpath` resolves symlinks and normalises the path. The `file://` prefix lets browsers open local files.
+This is data serialization, not HTML escaping. Do not wrap `serializedMetadata` in additional quotes.
 
-### 3. Open as new tab
+```html
+<script id="doc-map-metadata" type="application/json">SERIALIZED_METADATA_OBJECT</script>
+<script>
+(() => {
+  const metadata = document.getElementById("doc-map-metadata");
+  const headings = [...document.querySelectorAll("main h2[id], main h3[id]")];
+  let documentId;
+  let shortDocumentTimer;
+  let greatestReported = -1;
+  let lastReportedHeadingId = null;
 
-For each browser, use the `--new-tab` flag with the file URL:
+  try {
+    ({ documentId } = JSON.parse(metadata.textContent));
+  } catch (error) {
+    console.warn("Read tracking metadata is invalid", error);
+    return;
+  }
 
-```bash
-# Chrome / Chromium
-google-chrome --new-tab "$file_url"
-google-chrome-stable --new-tab "$file_url"
+  const currentHeadingId = () => {
+    const readingLine = Math.min(window.innerHeight * 0.35, 240);
+    let current = null;
+    for (const heading of headings) {
+      if (heading.getBoundingClientRect().top > readingLine) break;
+      current = heading.id;
+    }
+    return current;
+  };
 
-# Firefox
-firefox --new-tab "$file_url"
+  const reportProgress = (progress) => {
+    if (!window.opener || window.opener.closed) return;
+    const milestone = progress === 100 ? 100 : Math.floor(progress / 5) * 5;
+    const lastHeadingId = currentHeadingId();
+    if (milestone <= greatestReported && lastHeadingId === lastReportedHeadingId) return;
+    greatestReported = Math.max(greatestReported, milestone);
+    lastReportedHeadingId = lastHeadingId;
+    window.opener.postMessage({
+      type: "doc-map:progress",
+      documentId,
+      progress: greatestReported,
+      lastHeadingId
+    }, "*");
+  };
 
-# Brave
-brave-browser --new-tab "$file_url"
+  const measureProgress = () => {
+    const root = document.documentElement;
+    const maximum = root.scrollHeight - root.clientHeight;
+    if (maximum <= 1) return null;
+    const atEnd = Math.abs(maximum - root.scrollTop) <= 1;
+    return atEnd ? 100 : Math.min(99, Math.floor((root.scrollTop / maximum) * 100));
+  };
 
-# Edge
-microsoft-edge --new-tab "$file_url"
-# or
-msedge --new-tab "$file_url"
+  const updateProgress = () => {
+    const progress = measureProgress();
+    if (progress !== null) reportProgress(progress);
+  };
 
-# Fallback (OS default browser)
-xdg-open "$file_url"   # Linux
-open "$file_url"        # macOS
+  const scheduleShortDocument = () => {
+    window.clearTimeout(shortDocumentTimer);
+    if (measureProgress() !== null || document.visibilityState !== "visible") return;
+    shortDocumentTimer = window.setTimeout(() => reportProgress(100), 3000);
+  };
+
+  window.addEventListener("scroll", updateProgress, { passive: true });
+  window.addEventListener("resize", () => {
+    updateProgress();
+    scheduleShortDocument();
+  });
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") scheduleShortDocument();
+    else window.clearTimeout(shortDocumentTimer);
+  });
+  updateProgress();
+  scheduleShortDocument();
+})();
+</script>
 ```
 
-### 4. Complete script pattern
+Local-file origins may be opaque, so this sender must use `"*"` as the target origin. The receiver, source/ID validation, storage, and `isRead` rules live in `/doc-map`'s registry contract. This sender emits milestone changes rather than every scroll event.
+
+## Browser opening
+
+Open local output directly; no server or browser automation is part of delivery.
+
+1. Resolve and serialize the file URI safely with an installed Python executable:
+
+   ```bash
+   python_cmd="$(command -v python3 || command -v python)"
+   file_url="$("$python_cmd" -c 'from pathlib import Path; import sys; print(Path(sys.argv[1]).resolve().as_uri())' "$html_path")"
+   ```
+
+2. Detect a running browser in this order: Edge, Chrome/Chromium, Brave, Firefox, and resolve its matching installed executable.
+3. Open a new tab with that executable; use `xdg-open "$file_url"` on Linux or `open "$file_url"` on macOS when no matching executable is available.
 
 ```bash
-html_path="/path/to/dossier.html"
-file_url="file://$(realpath "$html_path")"
-
+browser_cmd=""
 if pgrep -x msedge >/dev/null 2>&1 || pgrep -x microsoft-edge >/dev/null 2>&1; then
-  microsoft-edge --new-tab "$file_url"
+  browser_cmd="$(command -v microsoft-edge || command -v msedge || true)"
 elif pgrep -x google-chrome >/dev/null 2>&1 || pgrep -x chrome >/dev/null 2>&1; then
-  google-chrome --new-tab "$file_url"
-elif pgrep -x brave >/dev/null 2>&1; then
-  brave-browser --new-tab "$file_url"
+  browser_cmd="$(command -v google-chrome || command -v google-chrome-stable || true)"
+elif pgrep -x chromium >/dev/null 2>&1 || pgrep -x chromium-browser >/dev/null 2>&1; then
+  browser_cmd="$(command -v chromium || command -v chromium-browser || true)"
+elif pgrep -x brave >/dev/null 2>&1 || pgrep -x brave-browser >/dev/null 2>&1; then
+  browser_cmd="$(command -v brave-browser || command -v brave || true)"
 elif pgrep -x firefox >/dev/null 2>&1 || pgrep -x firefox-esr >/dev/null 2>&1; then
-  firefox --new-tab "$file_url"
+  browser_cmd="$(command -v firefox || command -v firefox-esr || true)"
+fi
+
+if [[ -n "$browser_cmd" ]]; then
+  "$browser_cmd" --new-tab "$file_url"
+elif [[ "$(uname -s)" == "Darwin" ]]; then
+  open "$file_url"
 else
   xdg-open "$file_url"
 fi
 ```
 
-## Notes
-
-- `--new-tab` may fail if no browser window is open; some browsers open a new window instead. That's acceptable.
-- `realpath` requires `coreutils`. On macOS, use `grealpath` from `brew install coreutils`, or construct the URL manually.
-- Prefer `pgrep` over `ps | grep` — it's cleaner and avoids false matches.
-
----
-
-# Typography
-
-## Font pairing
-
-| Use case | Font | Weight | CSS |
-|----------|------|-------:|-----|
-| Body text / prose | **Source Sans 3** | 400 | `1.125rem/1.7 "Source Sans 3", system-ui, sans-serif` |
-| Headings | **Inter** | 650 | `family: Inter; weight: 650; letter-spacing: -0.02em` |
-| Key concepts / labels | **Source Sans 3** | 600 | `weight: 600` in body font |
-| Code blocks | **JetBrains Mono** | 400 | `font: .875rem/1.6 "JetBrains Mono", monospace` |
-| Inline code / identifiers | **JetBrains Mono** | 400 | `font-size: 0.9em` of body |
-
-## Design rationale
-
-- **Source Sans 3** was designed for UI environments — open, calm letterforms that make long paragraphs feel airy rather than dense. It is the primary reading face.
-- **Inter** has a high x-height and geometric clarity suited for headings, callouts, navigation, and interface-like labels. Avoid using Inter for body paragraphs — it projects a "software UI" personality.
-- **JetBrains Mono** was designed specifically for developer readability: wide characters, obvious punctuation, deliberate letterforms that remain crisp at small sizes. Use exclusively for code, terminal output, filenames, paths, and identifiers.
-- The font switch itself is semantic punctuation: *this is explanation → now this is executable thought.*
-
-## Loading from Google Fonts
-
-Use a single `@import` in the `<style>` block:
-
-```css
-@import url('https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700&family=Inter:wght@400;650&family=JetBrains+Mono:wght@400;500&display=swap');
-```
-
-`@import` must appear before any other CSS rules in the `<style>` block.
-
-## Spacing
-
-- **Body text:** 18px (1.125rem), line-height 1.7
-- **Code blocks:** 14px (0.875rem), line-height 1.6, horizontal scroll instead of wrapping
-- **Inline code:** 0.9em of body size
-- **Main prose column:** 760px max-width (not 65ch — at 18px that would be ~1170px)
-- **Vertical spacing:** generous between conceptual sections; use margins on headings and cards
-
-## Config reference
-
-```css
-:root {
-  --font-body: "Source Sans 3", system-ui, sans-serif;
-  --font-heading: "Inter", "Source Sans 3", system-ui, sans-serif;
-  --font-code: "JetBrains Mono", "SFMono-Regular", Consolas, monospace;
-}
-
-body {
-  font-family: var(--font-body);
-  font-size: 18px;
-  line-height: 1.7;
-  font-weight: 400;
-}
-
-h1, h2, h3, h4 {
-  font-family: var(--font-heading);
-  font-weight: 650;
-  line-height: 1.2;
-  letter-spacing: -0.02em;
-}
-
-p, li {
-  line-height: 1.7;
-}
-
-code, pre {
-  font-family: var(--font-code);
-}
-
-pre {
-  font-size: 14px;
-  line-height: 1.6;
-  overflow-x: auto;
-}
-
-:not(pre) > code {
-  font-size: 0.9em;
-}
-```
-
-## Anti-patterns
-
-- ❌ Do not render explanatory prose in monospace.
-- ❌ Do not use decorative/display fonts.
-- ❌ Do not use thin font weights (< 400) for body text.
-- ❌ Do not make the prose column wider than 780px.
-- ❌ Do not wrap long code lines — use horizontal scrolling instead.
+Use source inspection for routine verification. When rendered behavior cannot be established statically, use headless `agent-browser` rather than Playwright, Puppeteer, Selenium, or a visible automated browser.

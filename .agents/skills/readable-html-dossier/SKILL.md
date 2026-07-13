@@ -1,109 +1,63 @@
 ---
 name: readable-html-dossier
-description: Create a standalone, reading-first HTML report for research, reviews, investigations, or any dense context.
+description: Reading-first HTML dossier. Use when dense research, review, or investigation evidence must become a standalone report, or when another skill needs the dossier visual contract.
 ---
 
 # Readable HTML Dossier
 
-Create a self-contained HTML document optimized for humans reading dense context. Default to dark theme; support light mode through CSS variables and add a visible toggle only when the report is meant for interactive theme switching.
+Create a self-contained HTML dossier that turns dense evidence into a clear reading journey. The dossier is the narrative; `DOC_MAP.html` is the registry that helps the reader find and track it.
 
-## Design contract
+## Steps
 
-- **Reading first:** body text targets `65ch`, line-height `1.6–1.75`, 16–18px equivalent via `rem`/`clamp()`.
-- **Responsive by default:** no horizontal scrolling at normal zoom, 200% zoom, or laptop widths.
-- **Dark default:** use softened dark colors, not pure black/white. Light mode must be available through CSS variables and `data-theme="light"`; visible toggles are optional unless interactivity is required.
-- **Standalone:** inline CSS; no build step. Only use CDN scripts when diagrams genuinely need Mermaid.
-- **Semantic:** `main`, `section`, `article`, headings in order, tables only for tabular data.
-- **Context-rich:** include background, evidence, uncertainty, and domain links when those help a human make a decision.
-- **Typography:** body text in Source Sans 3 (18px/1.7), headings in Inter (weight 650, -0.02em letter-spacing), code in JetBrains Mono (14px/1.6). Prose column capped at 760px. See [REFERENCES.md](REFERENCES.md#typography) for the full spec.
+1. **Name the reader job.** Choose one primary job: decide, review, onboard, debug, or audit. State the intended reader, the decision or understanding available after reading, and the dossier's freshness boundary.
+   Completion: the title and opening paragraph identify the reader, purpose, and outcome without requiring the rest of the report.
 
-## Workflow
+2. **Build the evidence spine.** Gather the background, findings, uncertainty, actions, source links, domain documents, and external resources needed for the reader job. Use relevant research skills when external material would deepen the reader's mental model.
+   Completion: every conclusion can be traced to evidence, every uncertainty is visible, and every recommended action has a reason.
 
-1. **Choose the reader job.** Decide whether the dossier is for decision, review, onboarding, debugging, or audit.
-   Completion: the title and first paragraph say what a human can decide after reading.
+3. **Shape the reading journey.** Prefer this order when the evidence supports it:
+   - executive summary;
+   - background and vocabulary;
+   - findings or evidence cards;
+   - recommended actions;
+   - open questions and stale items;
+   - source links, domain documents, and curated external resources.
 
-2. **Shape the document.** Use this default order:
-   - Executive summary
-   - Background context
-   - Findings or evidence cards
-   - Recommended actions
-   - Open questions / stale items
-   - Source links and domain documents
-   - External resources — docs, articles, videos, or any reference that deepens understanding of the topic
-   Completion: every major section has a clear reader purpose.
+   Remove sections that have no reader job. Introduce each term before later sections depend on it. Give every resumable heading a stable, unique ID derived from meaning rather than position.
+   Completion: each section advances the reader from orientation to evidence to action, with no empty or orphaned section, and every resumable heading has a stable ID.
 
-   > **External resources:** Agents should load relevant search skills (e.g. from `~/.agents/skills` — `research`, `librarian`, `websearch`) to find and curate external references. These can be official docs, blog posts, tutorials, YouTube videos, or any material that helps a human build a richer mental model of the dossier's subject. Place them in a dedicated section near the end of the report.
+4. **Write the standalone HTML.** Save where the caller asks, or in the invocation folder when no path is specified. Use semantic HTML, inline CSS, responsive reflow, dark-default theme variables, a print stylesheet, no build step, and the visual contract's default display scale. Add a visible theme toggle only when interactive switching serves the reader.
+   Completion: one HTML file opens directly through `file://`, presents all screen content at the required design scale, contains its required styling, and needs no local server.
 
-3. **Write the HTML.** Save where the caller asks; use `/tmp` only for explicitly one-off reports and always report the path.
-   Completion: the file opens directly in a browser without a server.
+   Read [REFERENCES.md](REFERENCES.md#visual-contract) before writing; it is the single source of truth for typography, layout, scaffold, and interaction details.
 
-4. **Verify readability (static only).** Audit the HTML/CSS source directly — never by rendering in a browser. Check:
-   - Line length: body text column stays near 45–75 characters.
-   - Heading order: no jumps (e.g. `h1` → `h3`) or gaps.
-   - Contrast: meets WCAG AA (`color` + `background-color` on same elements).
-   - Print stylesheet: forces light background and exposes URLs via `::after`.
-   - Empty sections: removed.
-   - Zoom/reflow: no horizontal scrolling at 200% zoom or laptop widths (check `max-width`, `overflow`, and `min-width` values in CSS).
-   Completion: every quality check passed against the source code — no browser was launched.
+5. **Install reading-progress tracking.** Obtain the dossier's document ID from `/doc-map`'s stable-identity contract. Add the percentage tracker defined in [REFERENCES.md](REFERENCES.md#reading-progress-tracker), using the opener bridge from `/doc-map`.
+   Completion: a dossier opened from `DOC_MAP.html` reports monotonic 0–100% progress and reaches 100% only at the document end; direct opening and unavailable browser APIs leave it fully readable with manual map fallback.
 
-5. **Open in browser (default).** Detect which browser is open (Edge, Chrome, Brave, Firefox, etc.), collect the **absolute path** of the HTML file, convert it to a `file://` URL, and open it as a new tab in that browser. Skip this step only if the user explicitly asks not to open it.
-   Completion: the dossier is open in the user's browser for immediate reading.
-   See [REFERENCES.md](REFERENCES.md) for the exact detection and opening process per browser.
+6. **Verify from source.** Check semantic heading order, 45–75 character prose measure, WCAG AA contrast, non-color-only links, keyboard focus, print URL exposure, empty sections, required default scaling, and reflow when the user applies up to 200% browser zoom. Use source inspection by default; use headless `agent-browser` only when rendered behavior genuinely cannot be established statically.
+   Completion: every fixable check passes; any remaining limitation is demonstrably outside the agent's control and is disclosed before delivery.
 
-   **Correct method (MUST use this):**
-   - Detect the running browser via `pgrep` (order: Edge → Chrome → Brave → Firefox).
-   - Convert the absolute path to a `file://` URL: `file://$(realpath "$html_path")`.
-   - Open with `--new-tab` flag: e.g. `microsoft-edge --new-tab "file:///path/to/dossier.html"`.
-   - Fall back to `xdg-open` (Linux) or `open` (macOS) when no browser is detected.
+7. **Automatically register the dossier.** On every normal invocation, invoke `/doc-map` at the invocation root immediately after writing the local dossier. Pass the dossier path and let `/doc-map` create or reconcile `DOC_MAP.html` across all branch-relevant documents. The sole exception is when this skill is rendering `DOC_MAP.html` for `/doc-map`; complete that map without invoking `/doc-map` again.
 
-   **Forbidden approaches (MUST NOT use):**
-   - ❌ Do NOT start a dev server or HTTP server (`npx serve`, `python -m http.server`, `npx http-server`, or any other static file server).
-   - ❌ Do NOT use Playwright MCP or Playwright scripts for **any** purpose — not for opening, not for verification, not for screenshots, not for checking rendered output. Playwright always launches Chrome in headed mode on this system.
-   - ❌ Do NOT use any scriptable browser automation — Puppeteer, Selenium, or similar — for any purpose in this skill.
-   - ❌ Do NOT paste the path into an open browser via automation.
+   Completion: the dossier has exactly one current entry satisfying `/doc-map`'s complete registry contract.
 
-   **If headless rendering verification is genuinely needed** (rare — static source checks cover almost everything): use `agent-browser` from `/home/elhaam/.agents/skills/agent-browser` instead. It runs Chrome/Chromium headlessly via CDP and does not open a visible window.
+8. **Open through the registry.** Open `DOC_MAP.html` as the browser entry point and direct the reader to its tracked dossier link. The map must create the dossier tab so it can validate the completion event; command-line opening of the dossier bypasses automatic tracking.
+   Completion: the map is open, its dossier link creates a tracked child tab, and the user receives absolute paths for both files.
 
-## Minimal scaffold
+   Read [REFERENCES.md](REFERENCES.md#browser-opening) for the exact direct-file browser procedure and its hard guardrails.
 
-```html
-<!doctype html>
-<html lang="en" data-theme="dark">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Dossier</title>
-  <style>
-    @import url('https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700&family=Inter:wght@400;650&family=JetBrains+Mono:wght@400;500&display=swap');
-    :root{color-scheme:dark light;--bg:#121212;--panel:#1b1b1b;--text:#e6e1d9;--muted:#aaa39a;--accent:#8ab4ff;--border:#333;--font-body:"Source Sans 3",system-ui,sans-serif;--font-heading:"Inter","Source Sans 3",system-ui,sans-serif;--font-code:"JetBrains Mono","SFMono-Regular",Consolas,monospace}
-    [data-theme="light"]{--bg:#fafafa;--panel:#fff;--text:#1f1f1f;--muted:#5f5f5f;--accent:#0057b3;--border:#ddd}
-    body{margin:0;background:var(--bg);color:var(--text);font:400 1.125rem/1.7 var(--font-body)}
-    main{max-width:min(760px,100% - 2rem);margin:auto;padding:clamp(1.5rem,4vw,4rem) 0}
-    .card{background:var(--panel);border:1px solid var(--border);border-radius:16px;padding:1.25rem;margin:1rem 0}
-    h1,h2,h3{font-family:var(--font-heading);font-weight:650;line-height:1.2;letter-spacing:-0.02em}
-    a{color:var(--accent)} code{font-family:var(--font-code);font-size:.9em} pre{font-family:var(--font-code);font-size:.875rem;line-height:1.6;overflow-x:auto}
-    @media print{body{background:#fff!important;color:#000!important;font-size:11pt}.card{break-inside:avoid}a[href^="http"]::after{content:" (" attr(href) ")";font-size:.85em}}
-  </style>
-</head>
-<body><main><article><h1>Dossier title</h1></article></main></body>
-</html>
-```
+## Evidence card
 
-## Evidence writing
+Each finding answers:
 
-Each finding should answer:
 - What happened?
 - Why does it matter?
 - What evidence supports it?
 - What should a human or agent do next?
-- What could make this stale?
+- What could make it stale?
 
-Use tables for comparisons, cards for findings, and callouts for uncertainty. Do not bury actions inside prose.
+Use tables for genuine comparisons, cards for findings, and callouts for uncertainty. Keep actions visible rather than burying them in prose.
 
-## Quality checks
+## Completion contract
 
-- Body text column stays near 45–75 characters.
-- Contrast meets WCAG AA; aim higher for long reading.
-- Links are underlined or otherwise not color-only.
-- Print stylesheet forces light background and exposes URLs.
-- Empty sections are removed.
+The run is complete only when the dossier is readable as a standalone file, passes the source audit, reports its path, and is registered in `DOC_MAP.html` unless it is itself the map.
