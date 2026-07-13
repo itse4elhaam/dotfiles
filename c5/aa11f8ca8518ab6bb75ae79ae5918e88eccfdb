@@ -1,0 +1,42 @@
+.agents/skills/doc-map/REFERENCE.md
+  s_20bacb74f9047a::t_9b3a5f11b4ab1a 185
+  s_5eac92196540d2::t_b972f08a95e203 18-22,73,170-171,174-183,201-207,212-222
+  s_20bacb74f9047a::t_0e0b5df0b6d7d2 172,184,186-200,209-210,235,280
+  s_20bacb74f9047a::t_550881640964c9 53-55,64,75-150,161,164,173,211,232-234,236-279
+  s_5eac92196540d2::t_1d48f4a4069f4e 15-17
+  s_20bacb74f9047a::t_abf217b70c5fe7 56-58,61-63
+  s_20bacb74f9047a::t_ac4e33dbf7e130 151-153,158-160
+  s_20bacb74f9047a::t_098a4b94b43729 162-163
+  s_20bacb74f9047a::t_d099548895a603 281-283
+.agents/skills/doc-map/SKILL.md
+  s_20bacb74f9047a::t_5bd40ca4cb482c 29-50
+  s_5eac92196540d2::t_b9a22b7b7c1fde 3-18,54
+  s_5eac92196540d2::t_0479eb91cb6f0b 1-2
+.agents/skills/doc-map/FIXTURES.md
+  s_20bacb74f9047a::t_0e0b5df0b6d7d2 35-36,39,54-55
+  s_20bacb74f9047a::t_691202f35bd8c3 1-34,37-38,40-53,56-69
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.13",
+  "base_commit_sha": "c5aa11f8ca8518ab6bb75ae79ae5918e88eccfdb",
+  "prompts": {},
+  "sessions": {
+    "s_20bacb74f9047a": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_0ab7590bfffeF3P2wGkFpY4Z7h",
+        "model": "deepseek-v4-flash"
+      },
+      "human_author": "Elhaam Basheer Chaudhry <e4elhaam@gmail.com>"
+    },
+    "s_5eac92196540d2": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_0ab6b6d2effeyabty6P5g0AJNs",
+        "model": "unknown"
+      },
+      "human_author": "Elhaam Basheer Chaudhry <e4elhaam@gmail.com>"
+    }
+  }
+}
