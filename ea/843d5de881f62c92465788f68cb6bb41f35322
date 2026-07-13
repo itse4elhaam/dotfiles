@@ -1,0 +1,28 @@
+.agents/skills/README.md
+  s_20bacb74f9047a::t_fd0e4d87f9075b 38
+  s_5eac92196540d2::t_f811f707680909 3
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.13",
+  "base_commit_sha": "ea843d5de881f62c92465788f68cb6bb41f35322",
+  "prompts": {},
+  "sessions": {
+    "s_20bacb74f9047a": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_0ab7590bfffeF3P2wGkFpY4Z7h",
+        "model": "deepseek-v4-flash"
+      },
+      "human_author": "Elhaam Basheer Chaudhry <e4elhaam@gmail.com>"
+    },
+    "s_5eac92196540d2": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_0ab6b6d2effeyabty6P5g0AJNs",
+        "model": "unknown"
+      },
+      "human_author": "Elhaam Basheer Chaudhry <e4elhaam@gmail.com>"
+    }
+  }
+}
