@@ -15,8 +15,10 @@ Review the interaction between each diff hunk and the surrounding system. Catch 
    Completion: existing patterns near each hunk are known before any opinion is formed.
 3. **For GitHub PR review data, use `/github-graphql-first` when available; otherwise query GraphQL `reviewThreads` directly.** Inline thread context matters; REST-flattened comments are not enough.
    Completion: all review threads are collected with their full inline context.
-4. **Default deliverable is an HTML findings file.** Unless the user explicitly asks for Markdown, create a standalone review dossier using `/readable-html-dossier` when available; otherwise write a concise self-contained HTML file with inline CSS. Include evidence, uncertainty, source links, and the output path.
-   Completion: the deliverable format is decided and communicated.
+4. **Always produce an HTML findings file** as the deliverable. If the user explicitly requests Markdown, produce Markdown in addition to HTML, not as a replacement. Create a standalone review dossier using `/readable-html-dossier` when available; otherwise write a concise self-contained HTML file with inline CSS. Include evidence, uncertainty, source links, and the output path.
+
+   Additionally, if the current user-request also contains an explicit mutation directive to publish inline PR review comments, delegate to `/posting-pr-review-comments` for publication. That skill owns publication, re-validates candidates against fresh PR state, and posts comments as a single batched review. Requests framed as `review PR`, `review this branch`, or preview/hypothetical wording remain read-only and do NOT trigger publication.
+   Completion: the deliverable is produced, and publication is invoked only when explicitly authorized.
 
 ## Review lenses
 
@@ -80,7 +82,7 @@ Every repeatable review finding should become future leverage: test coverage, li
 
 ## Output contract
 
-Default to a standalone HTML findings file for human review. Use Markdown only when the user explicitly requests Markdown. The file must be readable without conversation context and include: scope reviewed, evidence links, unresolved uncertainties, severity-tagged findings, and automation follow-ups.
+Default to a standalone HTML findings file for human review. If the user explicitly requests Markdown, produce Markdown in addition to HTML, not as a replacement. The file must be readable without conversation context and include: scope reviewed, evidence links, unresolved uncertainties, severity-tagged findings, and automation follow-ups.
 
 Use concise severity-tagged comments inside the dossier:
 
