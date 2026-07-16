@@ -2,7 +2,8 @@
   "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/master/assets/oh-my-opencode.schema.json",
   "agents": {
     "sisyphus": {
-      "model": "opencode-go/deepseek-v4-flash"
+      "model": "opencode-go/deepseek-v4-flash",
+      "prompt_append": "ALWAYS create/append todo-list based on the user-request. DONOT start work until you have a todo list. Post-compression, the first task to do is bring back the todo-list"
     },
     "librarian": {
       "model": "opencode-go/deepseek-v4-flash"
@@ -10,7 +11,7 @@
     "explore": {
       "model": "opencode-go/deepseek-v4-flash"
     },
-    "oracle": { "model": "openai/gpt-5.6-sol", "variant": "xhigh" ,
+    "oracle": { "model": "openai/gpt-5.6-sol", "variant": "high" ,
       "fallback_models": [
         "opencode-go/glm-5.2"
       ]
@@ -64,7 +65,7 @@
       "model": "openai/gpt-5.6-sol"
     },
     "momus": {
-      "model": "opencode-go/deepseek-v4-pro"
+      "model": "openai/gpt-5.6-sol"
     },
     "metis": {
       "model": "openai/gpt-5.6-sol"

@@ -9,6 +9,7 @@
       "rm -rf /home/elhaam/dotfiles": "deny",
       "git reset --hard": "deny",
       "*build": "ask",
+      "gh pr merge*": "ask",
     }
   },
   "autoupdate": false,
@@ -71,7 +72,7 @@
     "oh-my-openagent",
     "opencode-supermemory@latest",
     "opencode-pty",
-    "@koriit/opencode-tmux-window-status",
+    "@koriit/opencode-tmux-window-status"
   ],
   "provider": {
     "opencode-go": {
