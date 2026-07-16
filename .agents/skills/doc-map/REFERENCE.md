@@ -203,7 +203,7 @@ document.addEventListener("click", (event) => {
 window.addEventListener("message", (event) => {
   const expectedId = openedDocuments.get(event.source);
   const message = event.data;
-  if (!expectedId || message?.type !== "doc-map:progress") return;
+  if (!expectedId || message?.type !== "dossier:progress") return;
   if (message.documentId !== expectedId) return;
   if (!Number.isInteger(message.progress) || message.progress < 0 || message.progress > 100) return;
   const headingId = message.lastHeadingId ?? null;

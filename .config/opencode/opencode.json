@@ -9,7 +9,7 @@
       "rm -rf /home/elhaam/dotfiles": "deny",
       "git reset --hard": "deny",
       "*build": "ask",
-      "gh pr merge*": "ask",
+      "gh pr merge*": "ask"
     }
   },
   "autoupdate": false,

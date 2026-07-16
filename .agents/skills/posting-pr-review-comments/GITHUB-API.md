@@ -66,7 +66,7 @@ else
   POST_RC=$?
 fi
 
-if [ "$POST_RC" -eq 0 ]; then
+if [[ "$POST_RC" -eq 0 ]]; then
   # Success: parse required response fields.
   # Review ID must be a JSON number, integral, and >0 — string "123" fails.
   REVIEW_ID=$(jq -er 'if (.id | type) == "number" and .id == (.id | floor) and .id > 0 then .id else empty end' "$RESPONSE_FILE") || { echo "FATAL: response missing/invalid review id (must be positive integer)" >&2; exit 1; }

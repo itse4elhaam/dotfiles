@@ -65,7 +65,7 @@ Bind the user-supplied input to a single conceptual variable `$PR_TARGET` — ei
   if ! printf '%s' "$PR_TARGET" | grep -qx '[0-9]\{1,\}'; then
     echo "Invalid PR number: $PR_RAW" >&2; exit 1
   fi
-  if [ -z "${GH_REPO:-}" ]; then
+  if [[ -z "${GH_REPO:-}" ]]; then
     CURRENT_URL=$(gh repo view --json url --jq .url)
     read -r HOST REPO < <(
       python3 -c "
@@ -451,7 +451,7 @@ API_COMMENTS_JSON=$(printf '%s' "$SANITIZED_LEDGER_JSON" | jq '[.[] |
 ]')
 
 # Non-empty array check: zero candidates should not reach publication
-if [ "$(printf '%s' "$API_COMMENTS_JSON" | jq 'length')" -eq 0 ]; then
+if [[ "$(printf '%s' "$API_COMMENTS_JSON" | jq 'length')" -eq 0 ]]; then
   echo "FATAL: zero validated comments; silence branch should have stopped before publication" >&2
   exit 1
 fi
@@ -484,7 +484,7 @@ MANIFEST_HEAD_SHA=$(printf '%s' "$MANIFEST_JSON" | jq -r '.head_sha')
 MANIFEST_GH_REPO="$MANIFEST_HOST/$MANIFEST_REPO"
 
 # Validate non-empty and PR number digits
-if [ -z "$MANIFEST_HOST" ] || [ -z "$MANIFEST_REPO" ] || [ -z "$MANIFEST_PR_NUMBER" ]; then
+if [[ -z "$MANIFEST_HOST" || -z "$MANIFEST_REPO" || -z "$MANIFEST_PR_NUMBER" ]]; then
   echo "FATAL: Manifest-derived variables empty" >&2; exit 1
 fi
 if ! printf '%s' "$MANIFEST_PR_NUMBER" | grep -qx '[0-9]\{1,\}'; then
@@ -599,13 +599,13 @@ MANIFEST_PROJECTION=$(printf '%s' "$MANIFEST_JSON" | jq '{
   target_comment_count: (.validated_comments | length),
   target_comments: .validated_comments
 }')
-if [ "$PROJECTION_CHECK" != "$MANIFEST_PROJECTION" ]; then
+if [[ "$PROJECTION_CHECK" != "$MANIFEST_PROJECTION" ]]; then
   echo "FATAL: Payload projection does not match frozen manifest. Stopping." >&2
   exit 1
 fi
 
 # Also verify the command target equals frozen manifest target
-if [ "$MANIFEST_HOST/$MANIFEST_REPO/$MANIFEST_PR_NUMBER" != "$(printf '%s' "$MANIFEST_JSON" | jq -r '.host + "/" + .repo + "/" + .pr_number')" ]; then
+if [[ "$MANIFEST_HOST/$MANIFEST_REPO/$MANIFEST_PR_NUMBER" != "$(printf '%s' "$MANIFEST_JSON" | jq -r '.host + "/" + .repo + "/" + .pr_number')" ]]; then
   echo "FATAL: Command target does not match frozen manifest. Stopping." >&2
   exit 1
 fi
@@ -637,7 +637,7 @@ This step classifies the POST outcome using `$POST_RC`, `$RESPONSE_FILE`, and `$
 **Exit code convention:** `exit 1` = terminal stop (do not retry). `exit 2` = restart from step 5 for fresh revalidation and one retry. On `exit 2`, discard the manifest, re-fetch the diff, re-validate anchors (step 5), rebuild manifest (step 9), repeat preflight (step 10), POST (step 11), and re-enter this error handler. If step 12 is reached again from the retry POST and the outcome is again 422, stop — a recurring 422 is not transient.
 
 ```bash
-if [ "$POST_RC" -eq 0 ]; then
+if [[ "$POST_RC" -eq 0 ]]; then
   # POST succeeded — already parsed in step 11, no error action needed.
   # Continue to step 13 verification.
   :
@@ -646,7 +646,7 @@ else
   # Extract HTTP status from gh stderr (e.g. "gh: 422 Unprocessable Entity (HTTP 422)")
   HTTP_STATUS=$(grep -oP '\(HTTP \K\d+' "$ERROR_FILE" 2>/dev/null || echo "")
   # Fallback: try response body status field (non-2xx gh responses may omit this)
-  if [ -z "$HTTP_STATUS" ]; then
+  if [[ -z "$HTTP_STATUS" ]]; then
     HTTP_STATUS=$(jq -r '.status // empty' "$RESPONSE_FILE" 2>/dev/null || echo "")
   fi
 
@@ -734,7 +734,7 @@ else
 
       CANDIDATE_COUNT=$(printf '%s' "$CANDIDATES" | jq 'length')
 
-      if [ "$CANDIDATE_COUNT" -eq 0 ]; then
+      if [[ "$CANDIDATE_COUNT" -eq 0 ]]; then
         echo "UNKNOWN OUTCOME: No matching review found among PR reviews. Review may or may not have been created." >&2
         echo "Absence is not proof. A new current-turn directive is required before any retry." >&2
         exit 1
@@ -745,7 +745,7 @@ else
       INVALID_ID_FOUND=$(printf '%s' "$CANDIDATES" | jq -r '
         [.[] | select((.id | type) != "number" or .id != (.id | floor) or .id <= 0)] | length
       ')
-      if [ "$INVALID_ID_FOUND" -gt 0 ]; then
+      if [[ "$INVALID_ID_FOUND" -gt 0 ]]; then
         echo "UNKNOWN OUTCOME: $INVALID_ID_FOUND candidate(s) with invalid IDs. Stopping." >&2
         exit 1
       fi
@@ -804,14 +804,14 @@ else
           exit 1
         }
 
-        if [ "$NORMALIZED_CANDIDATE" = "$NORMALIZED_MANIFEST" ]; then
+        if [[ "$NORMALIZED_CANDIDATE" = "$NORMALIZED_MANIFEST" ]]; then
           EXACT_MATCH_COUNT=$((EXACT_MATCH_COUNT + 1))
           EXACT_MATCH_ID="$CID"
         fi
       done
 
       # 8. Classify outcome based on exact match count
-      if [ "$EXACT_MATCH_COUNT" -eq 1 ]; then
+      if [[ "$EXACT_MATCH_COUNT" -eq 1 ]]; then
         # Confirmed-created: set review fields and replace RESPONSE_FILE
         REVIEW_ID="$EXACT_MATCH_ID"
         # Use --argjson for safe state lookup, never shell interpolation
@@ -829,7 +829,7 @@ else
             echo "UNKNOWN OUTCOME: Final review GET missing/invalid id (must be positive integer). Stopping." >&2
             exit 1
           }
-          if [ "$CONFIRMED_ID" != "$REVIEW_ID" ]; then
+          if [[ "$CONFIRMED_ID" != "$REVIEW_ID" ]]; then
             echo "UNKNOWN OUTCOME: Final review GET returned id=$CONFIRMED_ID, expected $REVIEW_ID. Stopping." >&2
             exit 1
           fi
@@ -839,7 +839,7 @@ else
         fi
         POST_RC=0
         echo "RECONCILED: Found exact matching review #$REVIEW_ID. Continuing to step 13 verification." >&2
-      elif [ "$EXACT_MATCH_COUNT" -eq 0 ]; then
+      elif [[ "$EXACT_MATCH_COUNT" -eq 0 ]]; then
         echo "UNKNOWN OUTCOME: No exact comment match among $CANDIDATE_COUNT candidate(s)." >&2
         echo "Absence is not proof. A new current-turn directive is required before any retry." >&2
         exit 1
@@ -888,7 +888,7 @@ RESPONSE_PR_URL=$(jq -er '.pull_request_url' "$RESPONSE_FILE") || { echo "FATAL:
 RESPONSE_ACTOR=$(jq -er '.user.login' "$RESPONSE_FILE") || { echo "FATAL: RESPONSE_FILE missing review author" >&2; exit 1; }
 
 # Validate REVIEW_ID numeric equality (both are strict positive integers at this point)
-if [ "$RESPONSE_REVIEW_ID" -ne "$REVIEW_ID" ] 2>/dev/null; then
+if [[ "$RESPONSE_REVIEW_ID" -ne "$REVIEW_ID" ]] 2>/dev/null; then
   echo "FATAL: RESPONSE_REVIEW_ID ($RESPONSE_REVIEW_ID) does not match REVIEW_ID ($REVIEW_ID)" >&2; exit 1
 fi
 ```
