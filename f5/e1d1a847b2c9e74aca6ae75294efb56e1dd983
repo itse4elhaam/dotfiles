@@ -1,0 +1,27 @@
+.agents/skills/posting-pr-review-comments/SKILL.md
+  s_519d75f696eca3::t_0a23db2ab7622f 68,454,602,608,640,649,737,748,807,814,832,842
+  s_519d75f696eca3::t_bb4d775a90a50e 487
+  s_519d75f696eca3::t_326ac461622435 891
+.config/opencode/opencode.json
+  s_519d75f696eca3::t_e4b514688a3ad6 12
+.agents/skills/doc-map/REFERENCE.md
+  s_519d75f696eca3::t_88ac700fe39d33 206
+.agents/skills/posting-pr-review-comments/GITHUB-API.md
+  s_519d75f696eca3::t_0a23db2ab7622f 69
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "f5e1d1a847b2c9e74aca6ae75294efb56e1dd983",
+  "prompts": {},
+  "sessions": {
+    "s_519d75f696eca3": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_09503ba52ffebksd9SQz2iVTOD",
+        "model": "unknown"
+      },
+      "human_author": "Elhaam Basheer Chaudhry <e4elhaam@gmail.com>"
+    }
+  }
+}
