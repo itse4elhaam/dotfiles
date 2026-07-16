@@ -51,7 +51,6 @@ The document ID is its normalized path relative to the invocation root, using `/
 doc-map:v2:<map-id>:document:<relative-path>
 doc-map:v2:<map-id>:ui
 doc-map:v2:<map-id>:queues
-doc-map:v2:<map-id>:annotations
 ```
 
 Changing the key prefix, map-ID algorithm, or path normalization requires an explicit migration because regeneration must preserve reader state.
@@ -134,6 +133,7 @@ The generated map must:
 5. preserve search, every filter, sort, grouping/view mode, theme, selected queue, and collapsed sections across reloads;
 6. provide “Reset view” to restore and persist defaults;
 7. respond to a same-key `storage` event when the browser supplies one, while treating same-tab state as authoritative because cross-file events are unreliable under `file://`.
+8. mirror active filters into repeated URL query parameters named `format`, `branchState`, `readState`, `contextRichness`, and `health`; validate URL values against supported options, let a non-empty valid URL filter set override stored filters on initial load, and update UI plus `localStorage` through the same state application path.
 
 Debounce text-query persistence, but update its results immediately. Regeneration must preserve the UI key. The default list sort is `lastModified` descending; user state may select suggested order, progress, title, reading time, context richness, format, or branch state.
 
@@ -163,14 +163,14 @@ function applyUiState(nextState, { persist = true } = {}) {
 applyUiState(uiState, { persist: false });
 ```
 
-Every control handler calls `applyUiState` with a new state object. A `storage` event for `uiStateKey` parses its `newValue` and calls the same function with `{ persist: false }`.
+Every control handler calls `applyUiState` with a new state object. A `storage` event for `uiStateKey` parses its `newValue` and calls the same function with `{ persist: false }`. Filter changes also call `history.replaceState` with the validated repeated query parameters so the current filtered view is copyable without adding a history entry. Search text and other personal UI preferences remain local-only.
 
 ### Automatic progress
 
 `DOC_MAP.html` cannot observe scrolling in a separate document, and separate `file://` pages cannot reliably share `localStorage`. Automatic tracking therefore uses an opener bridge:
 
-1. The map delegates clicks from every compatible document, resume, annotation, and bookmark link; validates its document/heading IDs; opens the encoded URL with `window.open`; and records the returned `Window` reference with the expected document ID.
-2. The dossier sends `{ type: "doc-map:progress", documentId, progress, lastHeadingId }` to `window.opener` with `postMessage`. Use `/readable-html-dossier`'s reading-progress tracker as the sender implementation.
+1. The map delegates clicks from every compatible document and resume link; validates its document/heading IDs; opens the encoded URL with `window.open`; and records the returned `Window` reference with the expected document ID.
+2. A compatible document sends `{ type: "dossier:progress", documentId, progress, lastHeadingId }` to `window.opener` with `postMessage`. The progress-tracker implementation is the sender's responsibility; this map implements only the receiving side.
 3. The map accepts the event only when `event.source` is a recorded child window and `documentId` exactly matches the ID paired with that window.
 4. The map validates an integer percentage, applies monotonic precedence, persists accepted progress in its own storage, and refreshes the row and aggregate immediately.
 
@@ -230,6 +230,19 @@ Build a separate active reading path; list sorting does not redefine it.
 
 The map presents “Continue reading” as the first unfinished document whose prerequisites are 100% complete. Readers can still open any document.
 
+### Editorial reading hierarchy
+
+Present the reading workspace in this normative order, not as a flat list or dashboard:
+
+1. **Continue Reading** — one prominent card showing the first incomplete document whose prerequisites are 100% complete. Display its title, about, estimated remaining time, and a prominent “Continue” link with resume heading when available.
+2. **In Progress** — documents at 1–99% progress, ordered by prerequisite chain then reading time. Each card shows a progress bar and the current or next unfinished section.
+3. **Up Next** — documents not yet started but reachable through the suggested reading path, ordered by path position.
+4. **Library** — all remaining active documents in a searchable, filterable card grid. Cards show summary content (title, about, progress, reading time) by default; deeper metadata (health, section index, relationships) is progressively disclosed through expand/collapse or a “Show more” toggle. The expanded state is a local UI preference, not persisted.
+5. **Queues** — accessible through contextual inline controls from each document row or card. Queue assignment and management use inline forms or panels rather than native dialogs.
+6. **Diagnostics and Settings** — view toggles, filter configuration, health summary, and regeneration info are placed behind a labeled drawer, collapsible panel, or secondary tab. They never appear in the main reading hierarchy.
+
+Implementation checklists, fixture tables, schema versions, and engineer-facing metadata must be excluded from the reader-visible layout. The skill’s own testing methodology checklists are internal; do not surface them in the generated map.
+
 ### Resume links
 
 When stored progress is between 1 and 99 and `lastHeadingId` remains in the section index, show “Resume at <section title>” as a delegated tracked link carrying `data-document-id`, `data-heading-id`, and `data-auto-track="true"`. If the heading disappeared after regeneration, clear only `lastHeadingId`, retain percentage, and fall back to the tracked document URL. At 0%, show “Start”; at 100%, show “Revisit.”
@@ -241,7 +254,7 @@ Health signals are diagnostics, not quality scores. Each signal records `type`, 
 | Signal | Evidence rule |
 |---|---|
 | `stale` | An explicit freshness/expiry boundary has passed, or time-sensitive claims conflict with newer discovered evidence. Age alone is insufficient. |
-| `review-due` | Last modified is at least 90 days old and the document contains time-sensitive claims or external dependencies. |
+| `review-due` | Last modified is at least 90 days old, the document contains time-sensitive claims or external dependencies, AND those claims or dependencies show evidence of potential change since the modification date. Age plus a hypothetical future change is insufficient; the evidence must point to a concrete change that has occurred or is in progress. |
 | `duplicate` | Another active document has the same reader job and answered questions with substantially overlapping evidence. Name similarity alone is insufficient. |
 | `orphaned` | No relationship points to or from the document, and its contents do not identify it as standalone/reference material. |
 | `superseded` | The document or another discovered source explicitly identifies its replacement. |
@@ -265,19 +278,7 @@ Persist queues under `doc-map:v2:<map-id>:queues`:
 
 Create those three queues only when no queue state exists. Queue IDs are stable slugs unique within the map; names are editable. Preserve array order, support add/remove/reorder, deduplicate document IDs within a queue, and retain missing IDs as visibly unresolved until the user removes them or the document returns. A document may belong to multiple queues. Queue selection is UI state; queue contents are domain state.
 
-### Annotations and bookmarks
-
-Persist annotations under `doc-map:v2:<map-id>:annotations`:
-
-```json
-{
-  "items":[
-    {"id":"uuid","documentId":"report.html","headingId":"findings","kind":"note","text":"Compare with Q2.","createdAt":"2026-07-13T00:00:00.000Z","updatedAt":"2026-07-13T00:00:00.000Z"}
-  ]
-}
-```
-
-`kind` is `note` or `bookmark`. Notes require non-blank text; bookmarks may use an empty string. `headingId` is null for document-level items and otherwise must appear in the section index. Support create, edit, delete, filter, and direct navigation through the same delegated tracked-link contract used by resume links. Insert user text with `textContent`, not HTML. Preserve annotations whose document or heading is missing, label them unresolved, and never silently discard personal data during regeneration.
+Queue create, rename, delete, and assignment controls use contextual non-modal forms or panels rendered in the page, never native `alert`, `prompt`, or `confirm` dialogs. Validation appears inline. The controls are keyboard operable: Escape or Cancel closes without side effects, opening moves focus to the first control, and closing returns focus to the trigger.
 
 ### Accessible interaction
 
@@ -286,6 +287,10 @@ Persist annotations under `doc-map:v2:<map-id>:annotations`:
 - Expose weighted overall completion with visible text and an ARIA progressbar.
 - Keep filtering and sorting keyboard operable.
 - Preserve visible focus and communicate progress with text, structure, and color together.
+- Every interactive control must carry explicit visible text or a non-empty `aria-label`. Icon-only controls are permitted only when the same action is available through a labeled control in the same view.
+- Body text must render at a minimum effective size of 18px; secondary and label text at 14px. When a control's text would fall below the minimum, enlarge the control rather than shrinking the text.
+- Cards and rows use progressive disclosure: summary content (title, about, progress, reading time) is always visible; deeper metadata (health, section index, relationships) is accessible through expand, hover, or a "Show more" toggle. The expanded state is a local UI preference, not persisted.
+- The mobile layout at or below 768px viewport width switches to a single-column stack: Continue Reading, In Progress, Up Next, Library. The Library exposes its search and filter controls at the top of the section, not in a separate sidebar. Cards stack vertically without two-column grid.
 
 ### Regeneration
 
