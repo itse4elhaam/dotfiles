@@ -1,0 +1,31 @@
+.agents/skills/elhaam-review/SKILL.md
+  s_e2a7aaa67fac55::t_1789db810daec9 20
+  s_e2a7aaa67fac55::t_c38cafbbbea0b9 21
+  s_64ccd0823e1b63::t_96c3bf6b589378 18
+  s_64ccd0823e1b63::t_0c20e30862f3d8 85
+  s_64ccd0823e1b63::t_59959b33b7c4d1 19
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "b497d10779dfe9779b325e1c807d482073d75af4",
+  "prompts": {},
+  "sessions": {
+    "s_64ccd0823e1b63": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_09ff1e339ffe1WZlGNB9YqyDza",
+        "model": "unknown"
+      },
+      "human_author": "Elhaam Basheer Chaudhry <e4elhaam@gmail.com>"
+    },
+    "s_e2a7aaa67fac55": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_0a00d35efffeNtf57WBh084Y5O",
+        "model": "unknown"
+      },
+      "human_author": "Elhaam Basheer Chaudhry <e4elhaam@gmail.com>"
+    }
+  }
+}
