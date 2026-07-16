@@ -6,7 +6,6 @@ Load the section named by `SKILL.md` only when that step is active.
 
 Use this normative presentation contract:
 
-- Display scale: `--display-scale: 150%` on screen, applied through the root font size so typography, spacing, and controls scale together while responsive layout remains active. Reset to `100%` for print.
 - Body: system sans-serif stack, `1.125rem/1.7`, prose width `min(65ch, 100% - 2rem)`.
 - Headings: system sans-serif stack, weight `650`, line height `1.2`, letter spacing `-.02em`.
 - Code: system monospace stack, `.875rem/1.6`, with horizontal overflow contained by the code block.
@@ -15,6 +14,8 @@ Use this normative presentation contract:
 - Links: visibly underlined and distinguishable without color alone.
 - Print: force a light palette and expose external URLs.
 - Dependencies: inline required CSS and JavaScript. Use a CDN only when a diagram genuinely requires Mermaid; the report remains readable when that resource is unavailable.
+- Text size floors: body text minimum effective rendered size 18px; secondary, label, and metadata text minimum 14px. When a control's text would fall below the minimum, enlarge the control rather than shrinking the text.
+- Responsive layout: above 768px viewport width use the full width with sidebar or columnar hierarchy as the dossier structure requires. At or below 768px, switch to single-column with no sidebar; search and filter controls appear inline at section tops.
 
 Minimal scaffold:
 
@@ -26,9 +27,9 @@ Minimal scaffold:
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Dossier</title>
   <style>
-    :root{color-scheme:dark light;--display-scale:150%;--bg:#121212;--panel:#1b1b1b;--text:#e6e1d9;--muted:#aaa39a;--accent:#8ab4ff;--border:#333;--font-body:system-ui,-apple-system,"Segoe UI",sans-serif;--font-code:ui-monospace,"SFMono-Regular",Consolas,monospace}
+    :root{color-scheme:dark light;--bg:#121212;--panel:#1b1b1b;--text:#e6e1d9;--muted:#aaa39a;--accent:#8ab4ff;--border:#333;--font-body:system-ui,-apple-system,"Segoe UI",sans-serif;--font-code:ui-monospace,"SFMono-Regular",Consolas,monospace}
     [data-theme="light"]{--bg:#fafafa;--panel:#fff;--text:#1f1f1f;--muted:#5f5f5f;--accent:#0057b3;--border:#ddd}
-    html{font-size:var(--display-scale)} *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--text);font:400 1.125rem/1.7 var(--font-body)}
+    *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--text);font:400 1.125rem/1.7 var(--font-body)}
     main{max-width:min(65ch,100% - 2rem);margin:auto;padding:clamp(1.5rem,4vw,4rem) 0}
     .card{background:var(--panel);border:1px solid var(--border);border-radius:1rem;padding:1.25rem;margin:1rem 0}
     h1,h2,h3{font-weight:650;line-height:1.2;letter-spacing:-.02em} a{color:var(--accent);text-decoration:underline}
@@ -36,7 +37,7 @@ Minimal scaffold:
     button,input,select,textarea,progress{font:inherit;max-width:100%} button,input,select,textarea{padding:.5em .75em} input,select,textarea{width:min(100%,30rem)} progress,input[type="range"]{width:min(100%,24rem);min-height:1em}
     :focus-visible{outline:3px solid var(--accent);outline-offset:3px}
     @media (prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;transition:none!important;animation:none!important}}
-    @media print{:root{--display-scale:100%}body{background:#fff!important;color:#000!important;font-size:11pt}.card{break-inside:avoid}a[href^="http"]::after{content:" (" attr(href) ")";font-size:.85em}}
+    @media print{body{background:#fff!important;color:#000!important;font-size:11pt}.card{break-inside:avoid}a[href^="http"]::after{content:" (" attr(href) ")";font-size:.85em}}
   </style>
 </head>
 <body><main><article><h1>Dossier title</h1></article></main></body>
@@ -45,7 +46,7 @@ Minimal scaffold:
 
 ## Reading progress tracker
 
-Automatic tracking works when the reader opens a compatible dossier from `DOC_MAP.html`. The map retains the child-window reference; the dossier reports percentage milestones to that opener. A direct-open dossier has no trusted map opener and uses manual fallback progress in the map.
+The dossier reports reading progress to its opener window via `postMessage` when one exists. A directly opened dossier without an opener uses manual fallback progress.
 
 Serialize the complete metadata object, then replace HTML-sensitive characters before inserting that complete result as the metadata block's text:
 
@@ -61,10 +62,10 @@ const serializedMetadata = JSON.stringify({ documentId })
 This is data serialization, not HTML escaping. Do not wrap `serializedMetadata` in additional quotes.
 
 ```html
-<script id="doc-map-metadata" type="application/json">SERIALIZED_METADATA_OBJECT</script>
+<script id="dossier-metadata" type="application/json">SERIALIZED_METADATA_OBJECT</script>
 <script>
 (() => {
-  const metadata = document.getElementById("doc-map-metadata");
+  const metadata = document.getElementById("dossier-metadata");
   const headings = [...document.querySelectorAll("main h2[id], main h3[id]")];
   let documentId;
   let shortDocumentTimer;
@@ -96,7 +97,7 @@ This is data serialization, not HTML escaping. Do not wrap `serializedMetadata` 
     greatestReported = Math.max(greatestReported, milestone);
     lastReportedHeadingId = lastHeadingId;
     window.opener.postMessage({
-      type: "doc-map:progress",
+      type: "dossier:progress",
       documentId,
       progress: greatestReported,
       lastHeadingId
@@ -137,7 +138,7 @@ This is data serialization, not HTML escaping. Do not wrap `serializedMetadata` 
 </script>
 ```
 
-Local-file origins may be opaque, so this sender must use `"*"` as the target origin. The receiver, source/ID validation, storage, and `isRead` rules live in `/doc-map`'s registry contract. This sender emits milestone changes rather than every scroll event.
+Local-file origins may be opaque, so this sender must use `"*"` as the target origin. This sender emits milestone changes rather than every scroll event.
 
 ## Browser opening
 
@@ -176,4 +177,4 @@ else
 fi
 ```
 
-Use source inspection for routine verification. When rendered behavior cannot be established statically, use headless `agent-browser` rather than Playwright, Puppeteer, Selenium, or a visible automated browser.
+Prefer source inspection for routine verification. When one rendered fact remains genuinely uncertain after a source audit, use a single `/agent-browser` session for a minimal smoke check of that fact only. Do not use Playwright, Puppeteer, Selenium, or any visible automated browser. Do not take screenshots or perform exhaustive interaction testing.

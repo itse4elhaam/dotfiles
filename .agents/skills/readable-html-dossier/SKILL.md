@@ -1,11 +1,11 @@
 ---
 name: readable-html-dossier
-description: Reading-first HTML dossier. Use when dense research, review, or investigation evidence must become a standalone report, or when another skill needs the dossier visual contract.
+description: Use when dense research, review, investigation, onboarding, or audit evidence must become a standalone HTML report, or when a document needs a reading-first visual contract.
 ---
 
 # Readable HTML Dossier
 
-Create a self-contained HTML dossier that turns dense evidence into a clear reading journey. The dossier is the narrative; `DOC_MAP.html` is the registry that helps the reader find and track it.
+Create a self-contained HTML dossier that turns dense evidence into a clear reading journey. The dossier is the narrative; a standalone HTML report that tells the full reading journey.
 
 ## Steps
 
@@ -26,23 +26,18 @@ Create a self-contained HTML dossier that turns dense evidence into a clear read
    Remove sections that have no reader job. Introduce each term before later sections depend on it. Give every resumable heading a stable, unique ID derived from meaning rather than position.
    Completion: each section advances the reader from orientation to evidence to action, with no empty or orphaned section, and every resumable heading has a stable ID.
 
-4. **Write the standalone HTML.** Save where the caller asks, or in the invocation folder when no path is specified. Use semantic HTML, inline CSS, responsive reflow, dark-default theme variables, a print stylesheet, no build step, and the visual contract's default display scale. Add a visible theme toggle only when interactive switching serves the reader.
-   Completion: one HTML file opens directly through `file://`, presents all screen content at the required design scale, contains its required styling, and needs no local server.
+4. **Write the standalone HTML.** Save where the caller asks, or in the invocation folder when no path is specified. Use semantic HTML, inline CSS, responsive reflow, dark-default theme variables, a print stylesheet, and no build step. Add a visible theme toggle only when interactive switching serves the reader.
+   Completion: one HTML file opens directly through `file://`, contains its required styling, and needs no local server.
 
    Read [REFERENCES.md](REFERENCES.md#visual-contract) before writing; it is the single source of truth for typography, layout, scaffold, and interaction details.
 
-5. **Install reading-progress tracking.** Obtain the dossier's document ID from `/doc-map`'s stable-identity contract. Add the percentage tracker defined in [REFERENCES.md](REFERENCES.md#reading-progress-tracker), using the opener bridge from `/doc-map`.
-   Completion: a dossier opened from `DOC_MAP.html` reports monotonic 0–100% progress and reaches 100% only at the document end; direct opening and unavailable browser APIs leave it fully readable with manual map fallback.
+5. **Install reading-progress tracking.** Add the percentage tracker defined in [REFERENCES.md](REFERENCES.md#reading-progress-tracker).
+   Completion: a dossier opened from a trusted opener reports monotonic 0–100% progress and reaches 100% only at the document end; direct opening and unavailable browser APIs leave it fully readable.
 
-6. **Verify from source.** Check semantic heading order, 45–75 character prose measure, WCAG AA contrast, non-color-only links, keyboard focus, print URL exposure, empty sections, required default scaling, and reflow when the user applies up to 200% browser zoom. Use source inspection by default; use headless `agent-browser` only when rendered behavior genuinely cannot be established statically.
+6. **Verify briefly from source.** Check as many of the following from static HTML/CSS analysis as possible: semantic heading order, prose measure, WCAG AA contrast (resolve variables and calculate), non-color-only links, keyboard focus for native controls, print URL exposure, empty sections, minimum text sizes, and 200% zoom reflow from layout properties. Do not launch browser automation for checks the source can settle. If exactly one rendered fact remains genuinely uncertain after source audit, invoke `/agent-browser` once for a minimal headless smoke check of that fact only. Do not use Playwright, take screenshots, run multiple browsers, or perform exhaustive interaction testing.
    Completion: every fixable check passes; any remaining limitation is demonstrably outside the agent's control and is disclosed before delivery.
 
-7. **Automatically register the dossier.** On every normal invocation, invoke `/doc-map` at the invocation root immediately after writing the local dossier. Pass the dossier path and let `/doc-map` create or reconcile `DOC_MAP.html` across all branch-relevant documents. The sole exception is when this skill is rendering `DOC_MAP.html` for `/doc-map`; complete that map without invoking `/doc-map` again.
-
-   Completion: the dossier has exactly one current entry satisfying `/doc-map`'s complete registry contract.
-
-8. **Open through the registry.** Open `DOC_MAP.html` as the browser entry point and direct the reader to its tracked dossier link. The map must create the dossier tab so it can validate the completion event; command-line opening of the dossier bypasses automatic tracking.
-   Completion: the map is open, its dossier link creates a tracked child tab, and the user receives absolute paths for both files.
+7. **Open the dossier.** Open the HTML file directly with the user's browser. Provide the absolute path.
 
    Read [REFERENCES.md](REFERENCES.md#browser-opening) for the exact direct-file browser procedure and its hard guardrails.
 
@@ -60,4 +55,4 @@ Use tables for genuine comparisons, cards for findings, and callouts for uncerta
 
 ## Completion contract
 
-The run is complete only when the dossier is readable as a standalone file, passes the source audit, reports its path, and is registered in `DOC_MAP.html` unless it is itself the map.
+The run is complete only when the dossier is readable as a standalone file, passes the source audit, and reports its path.
