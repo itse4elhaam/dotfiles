@@ -16,3 +16,15 @@
 
 - Include read issue/create pr in the opencode
 - include it the prompt that a person is working alongside the AI as well
+
+
+---
+
+New ones, post AI
+
+
+-  Way to fork the current session into another pane
+
+- Check all of the local changes and see which ones are worth keepign
+- Always make changes into worktrees
+- Look for tmux + opencode plugin please
