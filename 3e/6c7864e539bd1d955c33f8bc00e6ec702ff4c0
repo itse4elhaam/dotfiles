@@ -1,0 +1,66 @@
+.agents/skills/readable-html-dossier/SKILL.md
+  s_20bacb74f9047a::t_80963c3c411249 29-30
+  s_d3ebcec8c0fc31::t_a222b476c8be1f 34-35
+  s_d3ebcec8c0fc31::t_5f64a747ad403a 40
+  s_d3ebcec8c0fc31::t_e48cc1b5afbb97 8
+  s_d3ebcec8c0fc31::t_9fa747449e0274 58
+  s_230b0984630c73::t_4459b4424b576d 37
+  s_20bacb74f9047a::t_620fdd704c6fde 3
+.agents/skills/readable-html-dossier/REFERENCES.md
+  s_d3ebcec8c0fc31::t_24ba7b4355cf6b 100
+  s_d3ebcec8c0fc31::t_ebfa101149db43 141
+  s_d3ebcec8c0fc31::t_2de351a7e1abb1 68
+  s_d3ebcec8c0fc31::t_f2f2511f5e3f3b 65
+  s_20bacb74f9047a::t_db43cca8e520e0 17,30,32,40
+  s_d3ebcec8c0fc31::t_caabafeaaa9092 49
+  s_b270984f3843fc::t_84c3e4954651c6 180
+  s_0c6aecd85ed366::t_824fdc2dea4aa5 18
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "3e6c7864e539bd1d955c33f8bc00e6ec702ff4c0",
+  "prompts": {},
+  "sessions": {
+    "s_0c6aecd85ed366": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_0a2ad2cf1ffeqMqGWBx64qsWGZ",
+        "model": "unknown"
+      },
+      "human_author": "Elhaam Basheer Chaudhry <e4elhaam@gmail.com>"
+    },
+    "s_20bacb74f9047a": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_0ab7590bfffeF3P2wGkFpY4Z7h",
+        "model": "deepseek-v4-flash"
+      },
+      "human_author": "Elhaam Basheer Chaudhry <e4elhaam@gmail.com>"
+    },
+    "s_230b0984630c73": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_0961e27bfffemki0mOTvaDbhtk",
+        "model": "deepseek-v4-flash"
+      },
+      "human_author": "Elhaam Basheer Chaudhry <e4elhaam@gmail.com>"
+    },
+    "s_b270984f3843fc": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_0961e27bfffemki0mOTvaDbhtk",
+        "model": "unknown"
+      },
+      "human_author": "Elhaam Basheer Chaudhry <e4elhaam@gmail.com>"
+    },
+    "s_d3ebcec8c0fc31": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_09ba78b78ffe6S5MASu8vY4Wx4",
+        "model": "unknown"
+      },
+      "human_author": "Elhaam Basheer Chaudhry <e4elhaam@gmail.com>"
+    }
+  }
+}
