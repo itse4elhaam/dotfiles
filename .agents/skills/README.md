@@ -10,12 +10,14 @@ AI agent skills for code review, Git workflows, documentation, and structured da
 |---|---|
 | **elhaam-review** | Personal code review with seven lenses: codebase boundary, simplicity, test confidence, security/server boundaries, scalability, maintainability, and automation feedback. Defaults to an HTML findings report. |
 | **pr-review-dossier** | Read-only investigation of GitHub PR review feedback. Fetches review threads via GraphQL and produces an evidence-backed HTML dossier with a recommended decision or way ahead. |
+| **posting-pr-review-comments** | Publish inline review comments to a GitHub PR as a single batched review. Write-side counterpart to read-only review skills. OpenCode config provides defense-in-depth via `ask` gates on `gh api` and `gh pr` mutations — see [opencode.json](../../.config/opencode/opencode.json) `permission.bash`. The current-turn user directive is the primary authorization, not the permission prompt. |
 | **local-change-review** | Review uncommitted local changes by grouping related hunks into small, intentional commits. |
 | **conflict-rebase-resolution** | Merge or rebase by gathering a holistic view of conflicts, then resolving them safely. |
 | **readable-html-dossier** | Create standalone, reading-first HTML reports for research, reviews, and investigations. |
 | **doc-map** | Maintain a branch-aware DOC_MAP.html registry with document summaries, reading metadata, and persistent read status. |
 | **github-graphql-first** | Fetch structured GitHub data — PRs, reviews, review threads, comments, project items, timelines — using `gh api graphql`. |
 | **linear-issue-recon** | Pull full context from a Linear issue (description, comments, linked issues and PRs), explore the codebase, and produce an HTML dossier with a way-ahead recommendation. |
+| **subagent-retry** | Recover stuck or incomplete subagent work — extract output, assess completeness, then finish the remainder or fire a follow-up agent. User-invoked. |
 
 ## Installing from this repo
 
