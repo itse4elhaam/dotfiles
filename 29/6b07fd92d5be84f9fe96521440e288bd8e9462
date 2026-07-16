@@ -1,0 +1,39 @@
+.config/opencode/opencode.json
+  s_02aa9a8b1dd86e::t_5cf6b83c169d7b 75
+  s_02aa9a8b1dd86e::t_c137937864b64e 12
+.config/opencode/oh-my-openagent.json
+  s_3138d37d4b6935::t_ee6cbb1eeeadd7 68
+  s_1c22beb1670273::t_076b93f65784d7 5-6,14
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "296b07fd92d5be84f9fe96521440e288bd8e9462",
+  "prompts": {},
+  "sessions": {
+    "s_02aa9a8b1dd86e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_09d408d48ffewr5Fa25R57VitY",
+        "model": "unknown"
+      },
+      "human_author": "Elhaam Basheer Chaudhry <e4elhaam@gmail.com>"
+    },
+    "s_1c22beb1670273": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_09527ca2fffe24kJ0GUQKfhB7k",
+        "model": "unknown"
+      },
+      "human_author": "Elhaam Basheer Chaudhry <e4elhaam@gmail.com>"
+    },
+    "s_3138d37d4b6935": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_09ff9b1bcffeS4HV3VmRmU2xeo",
+        "model": "unknown"
+      },
+      "human_author": "Elhaam Basheer Chaudhry <e4elhaam@gmail.com>"
+    }
+  }
+}
