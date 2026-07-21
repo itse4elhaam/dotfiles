@@ -1,0 +1,19 @@
+docs/adr/001-remove-redundant-superpowers-skills.md
+  s_0b21f82433ff00::t_35a57919910687 1-43
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "1c6496667d968473e392494d21cd8f5e34b0ddd3",
+  "prompts": {},
+  "sessions": {
+    "s_0b21f82433ff00": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_07d0d959affemdfVM62aESSlQp",
+        "model": "unknown"
+      },
+      "human_author": "Elhaam Basheer Chaudhry <e4elhaam@gmail.com>"
+    }
+  }
+}
