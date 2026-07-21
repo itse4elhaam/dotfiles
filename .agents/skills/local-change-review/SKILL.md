@@ -2,6 +2,7 @@
 name: local-change-review
 description: Group uncommitted local changes into small, intentional commits.
 allowed-tools: Read, Bash, Grep, Glob, Edit
+disable-model-invocation: true
 ---
 
 # Local Change Review

@@ -2,6 +2,7 @@
 name: conflict-rebase-resolution
 description: Merge target branch by gathering a holistic view of the conflicts followed by a safe and user-aligned rebase.
 allowed-tools: Bash, Read, Grep, Glob, Edit
+disable-model-invocation: true
 ---
 
 # Conflict Rebase Resolution

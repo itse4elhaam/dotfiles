@@ -1,6 +1,7 @@
 ---
 name: posting-pr-review-comments
 description: Use when the current user-request contains an explicit mutation directive to publish inline PR review comments to a concrete GitHub PR target.
+disable-model-invocation: true
 ---
 
 # Posting PR Review Comments

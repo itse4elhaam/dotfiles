@@ -10,7 +10,13 @@
       "git reset --hard": "deny",
       "*build": "ask",
       "gh pr merge*": "ask"
-    }
+    },
+    "linear_*": "deny",
+    "linear_fetch": "allow",
+    "linear_get_*": "allow",
+    "linear_list_*": "allow",
+    "linear_search*": "allow",
+    "linear_extract_images": "allow"
   },
   "autoupdate": false,
   "lsp": {
@@ -65,7 +71,7 @@
         "LINEAR_API_KEY": "{env:LINEAR_API_KEY}"
       },
       "timeout": 30000,
-      "enabled": true
+      "enabled": true,
     }
   },
   "plugin": [
