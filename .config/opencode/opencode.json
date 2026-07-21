@@ -11,7 +11,7 @@
       "*build": "ask",
       "gh pr merge*": "ask"
     },
-    "linear_*": "deny",
+    "linear_*": "ask",
     "linear_fetch": "allow",
     "linear_get_*": "allow",
     "linear_list_*": "allow",
