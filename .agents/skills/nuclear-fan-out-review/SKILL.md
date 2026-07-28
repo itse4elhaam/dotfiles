@@ -1,6 +1,6 @@
 ---
-name: pr-review-dossier
-description: A fan-out review using the @oracle subagent along all frontiers supported by the workspace and the codebase
+name: nuclear-fan-out-review
+description: Fan-out review using parallel @oracle subagents across all codebase frontiers — codebase standards, existing review skills, and severity calibration
 ---
 
 If you are in an existing session with context about the codebase and current features, ignore the following advice otherwise, launch maximum @explore subagents and gain context.
