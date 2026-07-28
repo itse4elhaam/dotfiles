@@ -1,0 +1,19 @@
+.agents/skills/nuclear-fan-out-review/SKILL.md
+  s_f9a1fd03f9aabe::t_6a6b37732b37df 2-3
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "1e01be71254c55c45b853d49dcb2b999d2a55fdc",
+  "prompts": {},
+  "sessions": {
+    "s_f9a1fd03f9aabe": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_059005c2bffe6r3hZjLRRvoYyj",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Elhaam Basheer Chaudhry <e4elhaam@gmail.com>"
+    }
+  }
+}
