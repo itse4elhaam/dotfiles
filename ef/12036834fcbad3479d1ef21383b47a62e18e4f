@@ -1,0 +1,38 @@
+.agents/skills/readable-html-dossier/REFERENCES.md
+  s_e2a6315a362cf0::t_65c357be51fb2d 180
+.agents/skills/readable-html-dossier/SKILL.md
+  s_69194a28319a3f::t_bc48eb128beb97 58
+  s_13f595f7582ca9::t_91399e102869e4 37-38
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.18",
+  "base_commit_sha": "ef12036834fcbad3479d1ef21383b47a62e18e4f",
+  "prompts": {},
+  "sessions": {
+    "s_13f595f7582ca9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_058b11236ffe7bvAfVsaD6t0O5",
+        "model": "unknown"
+      },
+      "human_author": "Elhaam Basheer Chaudhry <e4elhaam@gmail.com>"
+    },
+    "s_69194a28319a3f": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_058b11236ffe7bvAfVsaD6t0O5",
+        "model": "deepseek-v4-flash"
+      },
+      "human_author": "Elhaam Basheer Chaudhry <e4elhaam@gmail.com>"
+    },
+    "s_e2a6315a362cf0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_05933fa8bffePp6V0bLhyTUIPM",
+        "model": "unknown"
+      },
+      "human_author": "Elhaam Basheer Chaudhry <e4elhaam@gmail.com>"
+    }
+  }
+}
