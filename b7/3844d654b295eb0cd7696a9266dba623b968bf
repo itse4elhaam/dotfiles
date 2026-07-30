@@ -1,0 +1,32 @@
+scripts/oc-fork
+  s_e907979eb2b506::t_f644ffa59bf8ff 98
+  s_e907979eb2b506::t_8f3b3a0a426a52 1-97,99-179,184-219
+  s_e907979eb2b506::t_e925a982c06ff7 180-183
+scripts/oc-fork.test.sh
+  s_e907979eb2b506::t_896d361db350d7 118-123
+  s_e907979eb2b506::t_6c2eaf0942bed1 1-117,124-175
+.tmux.conf
+  s_e907979eb2b506::t_60f0473d5ab1c4 37-40
+.config/opencode/plugins/session-expose.ts
+  s_e907979eb2b506::t_fbdfefb8d44dcb 32
+  s_e907979eb2b506::t_4859db0011668c 1,3,7-14,16-29,33-57
+  s_e907979eb2b506::t_caf100ca720e52 2,4-6,15,30-31
+.config/opencode/context/domain/dotfiles-architecture.md
+  s_e907979eb2b506::t_09a2f17993bc35 91-150
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.18",
+  "base_commit_sha": "b73844d654b295eb0cd7696a9266dba623b968bf",
+  "prompts": {},
+  "sessions": {
+    "s_e907979eb2b506": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_04d526769ffeCveE6QniDcvT0s",
+        "model": "unknown"
+      },
+      "human_author": "Elhaam Basheer Chaudhry <e4elhaam@gmail.com>"
+    }
+  }
+}
