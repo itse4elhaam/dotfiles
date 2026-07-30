@@ -1,5 +1,13 @@
 {
   "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/master/assets/oh-my-opencode.schema.json",
+  "browser_automation_engine": {
+    "provider": "agent-browser"
+  },
+  "disabled_skills": [
+    "playwright",
+    "playwright-cli",
+    "dev-browser"
+  ],
   "agents": {
     "sisyphus": {
       "model": "opencode-go/deepseek-v4-flash",

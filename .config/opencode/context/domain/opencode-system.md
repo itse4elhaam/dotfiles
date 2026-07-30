@@ -72,8 +72,10 @@ All DISABLED by default in `opencode.json`:
 - aid: Code analysis
 - augments: Framework examples
 
+**Browser Automation**:
+- agent-browser: All browser interactions (navigation, screenshots, scraping, E2E)
+
 **As Needed**:
-- playwright: UI testing
 - next-devtools: Next.js debugging
 - desktop-commander: File operations
 - mindpilot: Diagrams
