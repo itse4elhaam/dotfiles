@@ -1,6 +1,6 @@
 ---
 name: pr-review-dossier
-description: Use when a user asks for a read-only, evidence-backed HTML dossier of existing GitHub PR review feedback for the current branch, especially to decide the way ahead or approve changes based on reviewer concerns, validity, and stale items.
+description: Build an evidence-backed HTML dossier of existing GitHub PR review feedback — investigate reviewer concerns, decide the way ahead.
 ---
 
 # PR Review Dossier
@@ -39,7 +39,7 @@ Use `/check-pr` for PR readiness, failing checks, fixing/resolving comments, or 
    - **Needs human decision:** tradeoff/product ambiguity remains.
    Completion: every issue has evidence and a suggested fix or no-fix rationale.
 
-6. **Use parallel subagents when available.** Split investigation by reviewer account, file area, or bot/human category. Do not let subagents decide final truth without controller verification.
+6. **Use parallel subagents when available.** Split investigation by reviewer account, file area, or bot/human category. **Treat subagent results as a starting point, not a finished product.** Always verify their findings against the actual code — re-read files, check diffs, and confirm evidence before accepting a conclusion. Do not let subagents decide final truth without controller verification.
    Completion: findings are reconciled into one consistent inventory.
 
 7. **Write the HTML dossier.** Use `/readable-html-dossier`. Include:

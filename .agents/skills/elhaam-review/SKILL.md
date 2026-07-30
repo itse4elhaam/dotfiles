@@ -1,6 +1,6 @@
 ---
 name: elhaam-review
-description: Use when reviewing code, pull requests, local diffs, or agent-written changes for codebase fit, security boundaries, maintainability, test confidence, scalability, and review automation opportunities.
+description: Review code changes across seven lenses — codebase boundary, simplicity, test confidence, security, scalability, maintainability, and automation feedback.
 ---
 
 # Elhaam Review
@@ -10,9 +10,15 @@ Review the interaction between each diff hunk and the surrounding system. Catch 
 ## Required context gathering
 
 1. **Read the diff and changed files.** Identify feature intent, touched layers, and risky hunks.
+   Completion: every changed file has been read and categorized by risk.
 2. **Search before judging.** Find existing helpers, constants, types, server/data patterns, tests, and naming conventions near touched code.
+   Completion: existing patterns near each hunk are known before any opinion is formed.
 3. **For GitHub PR review data, use `/github-graphql-first` when available; otherwise query GraphQL `reviewThreads` directly.** Inline thread context matters; REST-flattened comments are not enough.
-4. **Default deliverable is an HTML findings file.** Unless the user explicitly asks for Markdown, create a standalone review dossier using `/readable-html-dossier` when available; otherwise write a concise self-contained HTML file with inline CSS. Include evidence, uncertainty, source links, and the output path.
+   Completion: all review threads are collected with their full inline context.
+4. **Always produce an HTML findings file** as the deliverable. If the user explicitly requests Markdown, produce Markdown in addition to HTML, not as a replacement. Create a standalone review dossier using `/readable-html-dossier` when available; otherwise write a concise self-contained HTML file with inline CSS. Include evidence, uncertainty, source links, and the output path.
+
+   Additionally, if the current user-request also contains an explicit mutation directive to publish inline PR review comments, delegate to `/posting-pr-review-comments` for publication. That skill owns publication, re-validates candidates against fresh PR state, and posts comments as a single batched review. Requests framed as `review PR`, `review this branch`, or preview/hypothetical wording remain read-only and do NOT trigger publication.
+   Completion: the deliverable is produced, and publication is invoked only when explicitly authorized.
 
 ## Review lenses
 
@@ -76,7 +82,7 @@ Every repeatable review finding should become future leverage: test coverage, li
 
 ## Output contract
 
-Default to a standalone HTML findings file for human review. Use Markdown only when the user explicitly requests Markdown. The file must be readable without conversation context and include: scope reviewed, evidence links, unresolved uncertainties, severity-tagged findings, and automation follow-ups.
+Default to a standalone HTML findings file for human review. If the user explicitly requests Markdown, produce Markdown in addition to HTML, not as a replacement. The file must be readable without conversation context and include: scope reviewed, evidence links, unresolved uncertainties, severity-tagged findings, and automation follow-ups.
 
 Use concise severity-tagged comments inside the dossier:
 
@@ -88,11 +94,11 @@ Use concise severity-tagged comments inside the dossier:
 
 Separate **Blockers** (security/correctness/data loss/missing confidence), **Should fix** (readability/duplication/constants/local pattern drift), and **Teach-back** (good patterns/automation opportunities/why it matters).
 
-## Common misses this skill must prevent
+## Review discipline
 
-- Calling a public `use server` export “just a helper”.
-- Reviewing only changed lines without searching existing patterns.
-- Accepting “manual happy path tested” for risky data/server/payment logic.
-- Suggesting simplification that silently removes behavior.
-- Flagging style without naming maintainability or extension risk.
-- Forgetting to turn repeated findings into tests, rules, helpers, or agent instructions.
+- **Classify every export by caller and effect.** A `use server` export that client code calls is an action with auth and ownership requirements, not a helper.
+- **Search existing patterns before judging each hunk.** Every diff sits inside established conventions — find them first.
+- **Require evidence proportional to risk.** Happy-path manual QA is insufficient for data/server/payment logic; demand multi-scenario tests.
+- **Name the behaviour, edge cases, and contracts before suggesting simplification.** Silent behaviour removal is not simplification.
+- **Pair every style flag with a maintainability or extension risk.** Style without consequence is noise.
+- **Convert every repeatable finding into leverage.** Each repeated issue should produce a test, lint rule, shared helper, or agent instruction.

@@ -1,6 +1,6 @@
 ---
 name: github-graphql-first
-description: Use when fetching structured GitHub data with gh, especially pull requests, reviews, review threads, comments, project items, timelines, or nested repository data.
+description: Use when fetching structured GitHub data with gh — especially PR review threads, nested repository data, or any data that forms a graph.
 ---
 
 # GitHub GraphQL First
@@ -9,7 +9,7 @@ Use `gh api graphql` as the default for structured GitHub data. Use REST endpoin
 
 ## Core rule
 
-If you are about to run `gh api repos/...`, `gh pr view --json`, or multiple REST calls to reconstruct relationships, stop and ask: **is this naturally a graph?** If yes, use GraphQL.
+If you are about to run `gh api repos/...`, `gh pr view --json`, or multiple REST calls to reconstruct relationships, stop and ask: **is this task-shaped data — naturally a graph?** If yes, use GraphQL.
 
 Good GraphQL fits:
 - PR review threads with comments and resolution state
@@ -24,19 +24,33 @@ Acceptable non-GraphQL fits:
 
 When you fall back, state the reason in the final notes.
 
+## Host qualification
+
+Every `gh api graphql` call must include `--hostname "$HOST"`. The host value is either:
+
+- **Provided by a calling skill** (e.g. `posting-pr-review-comments` passes its resolved `$HOST` and `$GH_REPO`). Use those variables directly.
+- **Derived from the current repo** when called standalone (no caller-provided host):
+  ```bash
+  REPO_URL=$(gh repo view --json url --jq .url)
+  HOST=$(python3 -c "import urllib.parse,sys; print(urllib.parse.urlparse(sys.argv[1]).hostname)" "$REPO_URL")
+  ```
+  Derive `$REPO` from `$HOST` and caller-provided target, or from `gh repo view` in standalone mode.
+
+When a caller provides host and repo variables, always prefer them over local derivation. Append `--hostname "$HOST"` to every `gh api graphql` invocation.
+
 ## Workflow
 
 1. **Discover the shape.** Research the current GitHub GraphQL docs or introspect the schema before assuming fields exist.
    ```bash
-   gh api graphql -f query='query { __type(name: "PullRequest") { fields { name } } }'
+   gh api graphql -f query='query { __type(name: "PullRequest") { fields { name } } }' --hostname "$HOST"
    ```
    Completion: you know the type, field names, and pagination boundaries you need.
 
-2. **Use variables, not string interpolation.** Pass strings with `-f`; pass ints/bools/null with `-F`.
+2. **Use variables, not string interpolation.** Pass strings with `-f`; pass ints/bools/null with `-F`. Owner/repo variables must come from the canonical target when provided by a caller.
    ```bash
-   gh api graphql \
-     -f owner="$OWNER" -f repo="$REPO" -F pr="$PR" \
-     -f query='query($owner: String!, $repo: String!, $pr: Int!) { ... }'
+   gh api graphql -f owner="$OWNER" -f repo="$REPO" -F pr="$PR" \
+     -f query='query($owner: String!, $repo: String!, $pr: Int!) { ... }' \
+     --hostname "$HOST"
    ```
    Completion: shell values are not embedded inside the GraphQL text.
 

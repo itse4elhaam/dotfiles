@@ -9,7 +9,14 @@
       "rm -rf /home/elhaam/dotfiles": "deny",
       "git reset --hard": "deny",
       "*build": "ask",
-    }
+      "gh pr merge*": "ask"
+    },
+    "linear_*": "ask",
+    "linear_fetch": "allow",
+    "linear_get_*": "allow",
+    "linear_list_*": "allow",
+    "linear_search*": "allow",
+    "linear_extract_images": "allow"
   },
   "autoupdate": false,
   "lsp": {
@@ -64,14 +71,14 @@
         "LINEAR_API_KEY": "{env:LINEAR_API_KEY}"
       },
       "timeout": 30000,
-      "enabled": true
+      "enabled": true,
     }
   },
   "plugin": [
     "oh-my-openagent",
     "opencode-supermemory@latest",
     "opencode-pty",
-    "@koriit/opencode-tmux-window-status",
+    "@koriit/opencode-tmux-window-status"
   ],
   "provider": {
     "opencode-go": {
