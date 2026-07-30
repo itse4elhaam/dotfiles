@@ -177,4 +177,4 @@ else
 fi
 ```
 
-Prefer source inspection for routine verification. When one rendered fact remains genuinely uncertain after a source audit, use a single `/agent-browser` session for a minimal smoke check of that fact only. Do not use Playwright, Puppeteer, Selenium, or any visible automated browser. Do not take screenshots or perform exhaustive interaction testing.
+Do not use Playwright, Puppeteer, Selenium, or any visible automated browser. Do not take screenshots or perform exhaustive interaction testing. The single verification pass in Step 6 is the only check needed.

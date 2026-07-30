@@ -34,8 +34,8 @@ Create a self-contained HTML dossier that turns dense evidence into a clear read
 5. **Install reading-progress tracking.** Add the percentage tracker defined in [REFERENCES.md](REFERENCES.md#reading-progress-tracker).
    Completion: a dossier opened from a trusted opener reports monotonic 0–100% progress and reaches 100% only at the document end; direct opening and unavailable browser APIs leave it fully readable.
 
-6. **Verify briefly from source.** Check as many of the following from static HTML/CSS analysis as possible: semantic heading order, prose measure, WCAG AA contrast (resolve variables and calculate), non-color-only links, keyboard focus for native controls, print URL exposure, empty sections, minimum text sizes, and 200% zoom reflow from layout properties. Do not launch browser automation for checks the source can settle. If exactly one rendered fact remains genuinely uncertain after source audit, invoke `/agent-browser` once for a minimal headless smoke check of that fact only. Do not use Playwright, take screenshots, run multiple browsers, or perform exhaustive interaction testing.
-   Completion: every fixable check passes; any remaining limitation is demonstrably outside the agent's control and is disclosed before delivery.
+6. **Verify once from source.** Run a single pass checking only: (1) the HTML opens as `file://` without manifest errors, (2) no empty sections remain, (3) prose width respects `min(65ch, 100% - 2rem)`. That is the entire check. Do not do type checks, linting, or any codebase-level validation — this is an HTML report, not application code. Do not launch browser automation, Playwright, screenshots, or browser tests of any kind. Do not re-read or re-verify after this single pass.
+   Completion: the three checks pass; the dossier file exists and is ready for delivery.
 
 7. **Open the dossier.** Open the HTML file directly with the user's browser. Provide the absolute path.
 
@@ -55,4 +55,4 @@ Use tables for genuine comparisons, cards for findings, and callouts for uncerta
 
 ## Completion contract
 
-The run is complete only when the dossier is readable as a standalone file, passes the source audit, and reports its path.
+The run is complete only when the dossier is readable as a standalone file and reports its path.
