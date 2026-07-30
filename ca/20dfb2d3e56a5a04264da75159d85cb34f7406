@@ -1,0 +1,454 @@
+dev-setup/runs/skills.sh
+  s_84eef4fda69eb3::t_93b0d8dc70d698 14-23
+.agents/skills/pr-review-dossier/SKILL.md
+  s_3be51b25aeb097::t_10221275767289 42
+  s_6501422988ad39::t_92569d5315ef12 3
+.agents/skills/readable-html-dossier/REFERENCES.md
+  s_3be51b25aeb097::t_3f112635f47665 159,161
+  s_20bacb74f9047a::t_c9ebc995a3af5d 69,73,82-91,95-99,101-104
+  s_5eac92196540d2::t_1e486fb0ed4a02 7-8,9-16,19-29,31,33-38,64,66-67,70,74-81,93,105-139,143,145,149,152,173-174
+  s_20bacb74f9047a::t_fd0e4d87f9075b 51,53-59,62,147,150-151,154-155,158,160,162-166,168-172
+  s_5eac92196540d2::t_6a6e779bea6cd2 4-6
+  s_5eac92196540d2::t_78761329be1f9c 39,41
+  s_d3ebcec8c0fc31::t_24ba7b4355cf6b 100
+  s_d3ebcec8c0fc31::t_ebfa101149db43 141
+  s_d3ebcec8c0fc31::t_2de351a7e1abb1 68
+  s_d3ebcec8c0fc31::t_f2f2511f5e3f3b 65
+  s_20bacb74f9047a::t_db43cca8e520e0 17,30,32,40
+  s_d3ebcec8c0fc31::t_caabafeaaa9092 49
+  s_0c6aecd85ed366::t_824fdc2dea4aa5 18
+  s_e2a6315a362cf0::t_65c357be51fb2d 180
+  s_32eab4903756e3::t_6fdacd087d66e6 1-3,42-44,47,63,71-72,92,94
+.agents/skills/linear-issue-recon/SKILL.md
+  s_6501422988ad39::t_dadfa0acb6917b 1-105
+.agents/skills/README.md
+  s_4d003e4759a7fa::t_68b217faa92688 19
+  s_20bacb74f9047a::t_fd0e4d87f9075b 40
+  s_5eac92196540d2::t_f811f707680909 3
+  s_7fd91ef0134f1f::t_03d489e5634380 13
+  s_1c22beb1670273::t_9dfd3e7bc3bf0e 20
+  s_32eab4903756e3::t_6fdacd087d66e6 17
+.agents/skills/local-change-review/SKILL.md
+  s_6501422988ad39::t_f48e15c7585af8 3,16
+  s_6501422988ad39::t_be3c544b39a1b1 17
+  s_7ab0c09a3463b2::t_133fe41713762e 5
+.agents/skills/elhaam-review/SKILL.md
+  s_6501422988ad39::t_2a62b657336ee4 3
+  s_6501422988ad39::t_471e05c012ccce 13,15,17,97,99-104
+  s_e2a7aaa67fac55::t_1789db810daec9 20
+  s_e2a7aaa67fac55::t_c38cafbbbea0b9 21
+  s_64ccd0823e1b63::t_96c3bf6b589378 18
+  s_64ccd0823e1b63::t_0c20e30862f3d8 85
+  s_64ccd0823e1b63::t_59959b33b7c4d1 19
+.agents/skills/conflict-rebase-resolution/SKILL.md
+  s_6501422988ad39::t_052bac2ccde054 10,12,14,16-52
+  s_7ab0c09a3463b2::t_3ffb79df771151 5
+.agents/skills/github-graphql-first/SKILL.md
+  s_6501422988ad39::t_cb8f984d151fcb 3,12
+  s_3900f6a427cc36::t_f39376b14916b4 27-40,45
+  s_3900f6a427cc36::t_7870707f8dacb7 49,51-53
+.agents/skills/doc-map/REFERENCE.md
+  s_20bacb74f9047a::t_9b3a5f11b4ab1a 185
+  s_5eac92196540d2::t_b972f08a95e203 18-22,72,170-171,174-183,201-205,207,212-222
+  s_20bacb74f9047a::t_0e0b5df0b6d7d2 184,186-200,209-210,248
+  s_20bacb74f9047a::t_550881640964c9 53,54,63,74-135,137-150,161,164,211,232,246-247,249-256,258-280
+  s_5eac92196540d2::t_1d48f4a4069f4e 15-17
+  s_20bacb74f9047a::t_abf217b70c5fe7 55-57,60-62
+  s_20bacb74f9047a::t_ac4e33dbf7e130 151-153,158-160
+  s_20bacb74f9047a::t_098a4b94b43729 162-163
+  s_20bacb74f9047a::t_d099548895a603 282-284
+  s_20bacb74f9047a::t_c7b6b2814ea24c 172,241,281
+  s_20bacb74f9047a::t_a3b71473369094 136,166
+  s_b270984f3843fc::t_4541f721ff5674 173
+  s_20bacb74f9047a::t_74f62b17ee25aa 291
+  s_0c6aecd85ed366::t_1bf7a5f4c9a62e 233-240,242-245
+  s_0c6aecd85ed366::t_435e816eb68543 290,292-293
+  s_0c6aecd85ed366::t_2ffa8d4778bc34 257
+  s_519d75f696eca3::t_88ac700fe39d33 206
+  s_32eab4903756e3::t_6fdacd087d66e6 1-14,23-52,58-59,64-71,73,154-157,165,167-169,208,223-231,285-289,294-297
+.agents/skills/doc-map/SKILL.md
+  s_20bacb74f9047a::t_5bd40ca4cb482c 30-41,55-57,59-60,62
+  s_5eac92196540d2::t_b9a22b7b7c1fde 5-10,12-19,66
+  s_5eac92196540d2::t_0479eb91cb6f0b 1-2
+  s_0c6aecd85ed366::t_e74831c0cd80ff 43-46,48-50,52
+  s_20bacb74f9047a::t_9c0f1fed5f5fa8 51
+  s_20bacb74f9047a::t_393c9b40d11a48 47,53
+  s_0c6aecd85ed366::t_e596242ed82219 42
+  s_20bacb74f9047a::t_0a5ed867ea261d 54
+  s_b270984f3843fc::t_a9c57839d8282f 3-4,11,58,61
+  s_32eab4903756e3::t_6fdacd087d66e6 20-29,63-65
+.agents/skills/doc-map/FIXTURES.md
+  s_20bacb74f9047a::t_0e0b5df0b6d7d2 35-36,39
+  s_20bacb74f9047a::t_691202f35bd8c3 1-34,37-38,40-42,44-47,50-53,54-58,59,61-62,77-79
+  s_0c6aecd85ed366::t_6414513d5f75ac 63-68,70-71,73,75
+  s_20bacb74f9047a::t_a3b71473369094 48
+  s_20bacb74f9047a::t_f361c15b63b92e 43,49,60,69,74
+  s_20bacb74f9047a::t_95ad5e260bb041 72
+  s_0c6aecd85ed366::t_75bacd027b838b 76
+.agents/skills/readable-html-dossier/SKILL.md
+  s_20bacb74f9047a::t_c9ebc995a3af5d 26-27
+  s_5eac92196540d2::t_495877d1b89e74 39
+  s_20bacb74f9047a::t_9743154d2a635a 23-25
+  s_20bacb74f9047a::t_1d5536a8471f7a 41-43
+  s_20bacb74f9047a::t_80963c3c411249 29-30
+  s_d3ebcec8c0fc31::t_a222b476c8be1f 34-35
+  s_d3ebcec8c0fc31::t_5f64a747ad403a 40
+  s_d3ebcec8c0fc31::t_e48cc1b5afbb97 8
+  s_20bacb74f9047a::t_620fdd704c6fde 3
+  s_69194a28319a3f::t_bc48eb128beb97 58
+  s_13f595f7582ca9::t_91399e102869e4 37-38
+  s_32eab4903756e3::t_6fdacd087d66e6 9-22,28,31-33,36,44-47,52,54,56
+.config/opencode/opencode.json
+  s_02aa9a8b1dd86e::t_5cf6b83c169d7b 81
+  s_519d75f696eca3::t_e4b514688a3ad6 12
+  s_32eab4903756e3::t_6fdacd087d66e6 13-19,74
+.config/opencode/oh-my-openagent.json
+  s_3138d37d4b6935::t_ee6cbb1eeeadd7 68
+  s_1c22beb1670273::t_076b93f65784d7 5-6,14
+  s_32eab4903756e3::t_6fdacd087d66e6 65,71
+.agents/skills/posting-pr-review-comments/GITHUB-API.md
+  s_e2a7aaa67fac55::t_3227f6dfe95e2e 11
+  s_e2a7aaa67fac55::t_aa0fada92758b1 1-10,12-16,23,56,58-59,83,112,115-117,122-130,132,145-154,156,169-170,174-177,179,236-259
+  s_64ccd0823e1b63::t_16264ed23ec802 143
+  s_e2a7aaa67fac55::t_3bd534cd723823 171,173
+  s_7fd91ef0134f1f::t_042b0648e2b316 95
+  s_e2a7aaa67fac55::t_6bbf724cbbfd10 133-142,144
+  s_64ccd0823e1b63::t_f47c2b46af4954 25,29-30,50-51,53
+  s_7fd91ef0134f1f::t_4c4bd7575f8f3e 70-72
+  s_e2a7aaa67fac55::t_54aefd48ab9b5d 155
+  s_02aa9a8b1dd86e::t_e40bb76d5246a4 131
+  s_e2a7aaa67fac55::t_9c53901384a0fb 157-163,165-168
+  s_3900f6a427cc36::t_e44e3f7882110f 31
+  s_7fd91ef0134f1f::t_d891885c7040ba 206-207,226
+  s_7fd91ef0134f1f::t_d2483d0e287e2f 26-27,39,41,46-48,52,68,73-82,84-94,96-111,113
+  s_02aa9a8b1dd86e::t_45c494985ba191 204,227-228,234
+  s_7fd91ef0134f1f::t_bce15500363d67 182-189
+  s_7fd91ef0134f1f::t_c29fafbd138f62 233,235
+  s_e2a7aaa67fac55::t_7977ebe4e44541 60
+  s_3900f6a427cc36::t_2783c2f9f379e7 19-20,22,24,28,37,40,43,61-62,114,215-216
+  s_64ccd0823e1b63::t_b20a3625bf20bd 17-18,21
+  s_7fd91ef0134f1f::t_24e37e51c93586 190
+  s_64ccd0823e1b63::t_48e9328cb7e115 164
+  s_7fd91ef0134f1f::t_4c6b69e2915544 178,180-181,191-200
+  s_7fd91ef0134f1f::t_ad026225ad6e66 54-55,57,63-67
+  s_02aa9a8b1dd86e::t_b567b19998d169 42,45
+  s_64ccd0823e1b63::t_f39503a6a5eba5 118
+  s_3900f6a427cc36::t_273c2c1820aa56 32-36,38,44,49,119,172,201-203,205,208,212-214,224-225,229-232
+  s_64ccd0823e1b63::t_c64c64345fc415 120-121
+  s_7fd91ef0134f1f::t_66ec0a0fe0e722 209-211,217-223
+  s_519d75f696eca3::t_0a23db2ab7622f 69
+.agents/skills/posting-pr-review-comments/SKILL.md
+  s_64ccd0823e1b63::t_52fcabd4254c78 237
+  s_e2a7aaa67fac55::t_05248d1149d4ac 114
+  s_e2a7aaa67fac55::t_d2726d51e26959 342-343
+  s_7fd91ef0134f1f::t_ee5259437aa00f 615,617,619-624,632
+  s_02aa9a8b1dd86e::t_51250996573159 389,393-396,398,402-410,412-422,443-444,446-447
+  s_3900f6a427cc36::t_a2557da32cd75c 52,64-68,83,85-95,119,132,138,290-291,345,347,349-362,385-388,390,399,470,494-495,528,550-554,558-561,581,583-585,587-588,590-595,597-602,604,611-613
+  s_3900f6a427cc36::t_8156309f2abf89 596
+  s_64ccd0823e1b63::t_b47302cd831574 242
+  s_02aa9a8b1dd86e::t_19576bd9a29862 889-890,894
+  s_7fd91ef0134f1f::t_489507bb39d02e 699-701,707-709,712-715,744-747,750,753-759,762-763,767,769,774-775,777-778,784-793,796-797,803-806,814,818-823,828,831-832,834-840
+  s_7fd91ef0134f1f::t_35abda65059ef1 496,500-508
+  s_64ccd0823e1b63::t_fb962739a0f254 634,875,917,928,938
+  s_9d454aa6e20ceb::t_d48bb370def4b4 145
+  s_7fd91ef0134f1f::t_6481f4969858f0 461,464-469,472
+  s_7fd91ef0134f1f::t_400c9b81667c0b 636,640,642-649,651-655,677-694,852-860,863-866,868,870-871
+  s_7fd91ef0134f1f::t_c3f7bff5fd8113 829-830
+  s_e2a7aaa67fac55::t_26e6eb12c0e90a 311-312,316,318-323,325-326,329
+  s_64ccd0823e1b63::t_8712e6475d35fe 21-31,35
+  s_64ccd0823e1b63::t_084e55d4cd0574 348,497-499,512,514-516,518-522,524-527,529-532,534-539,542-543,545,547-548,626-627,629-630
+  s_7fd91ef0134f1f::t_b15610c54d9b16 451
+  s_02aa9a8b1dd86e::t_2c7915ed082b9c 919,921-922
+  s_02aa9a8b1dd86e::t_c622a178b9885d 411,453-454,456-458
+  s_7fd91ef0134f1f::t_6d36a7248f844d 183,202,204
+  s_e2a7aaa67fac55::t_a6f55a686c2837 1-2,5-20,32-34,36,41-42,45-49,51,53,100,113,139,225-233,235-236,238-240,243-253,255-289,292-310,313-315,317,324,327-328,330-332,334,336,338,340,344,346,541,544,555-556,631,633,635,637,869,872,874,876,899,915-916,940-946,953-955,958
+  s_7fd91ef0134f1f::t_0d1d9254b6f24f 761,766
+  s_7fd91ef0134f1f::t_b00ebc124a8509 509
+  s_7fd91ef0134f1f::t_b3ece53164dcbb 800
+  s_7fd91ef0134f1f::t_fbce5a728336d7 657,661,664-676
+  s_7fd91ef0134f1f::t_ae4a848c86ae6b 533
+  s_64ccd0823e1b63::t_e578a90df4bf68 241
+  s_3900f6a427cc36::t_c28d190c0f5344 98,101-102,104,107-108,111-112
+  s_7fd91ef0134f1f::t_cf1a820a958207 363-384
+  s_7fd91ef0134f1f::t_3a0949b7a5019e 900-902,908-914
+  s_7fd91ef0134f1f::t_4990258c3a3769 37-40
+  s_7fd91ef0134f1f::t_00a15611fb1b48 638-639
+  s_e2a7aaa67fac55::t_57cae8e8e1000b 333,335,337,339
+  s_7fd91ef0134f1f::t_dd915c31e4d961 948
+  s_64ccd0823e1b63::t_87ca740288401f 951
+  s_e2a7aaa67fac55::t_01a45f8783c3b8 234
+  s_3900f6a427cc36::t_000ef67779dceb 62,70-81
+  s_7fd91ef0134f1f::t_a1d22fae3ebe51 397
+  s_64ccd0823e1b63::t_747964cd796fd1 947,950
+  s_e2a7aaa67fac55::t_0c4ffee80d2940 44
+  s_7fd91ef0134f1f::t_cbf9f5e1fb10c7 656,658-660,662-663
+  s_e2a7aaa67fac55::t_2cefd2d69ba735 878,903-905,918,927
+  s_3900f6a427cc36::t_bc1165d0fd9052 471
+  s_64ccd0823e1b63::t_62eb59ae3549b1 557,562-568,572-580,582,614,616
+  s_7fd91ef0134f1f::t_e3b67cbe6ba22a 882-884,891,893
+  s_3900f6a427cc36::t_41aa0fe9b3a4bb 589
+  s_3900f6a427cc36::t_bdc43f2d6f3b0f 341,449-450,452,459-460,462-463,473-487,489-493,510-511,513,517,523,546,569-571,586,605-608,610,618,628,906-907,949,952,956-957
+  s_7fd91ef0134f1f::t_0fc55825b91a64 867
+  s_e2a7aaa67fac55::t_f16630d18e5238 540,625
+  s_7fd91ef0134f1f::t_af4911182526d7 794-795,798-799,802
+  s_02aa9a8b1dd86e::t_c7a24911dec675 877,879-881,885-888,895-898,920,923-924,926,929,931-932,934-935,939
+  s_3900f6a427cc36::t_08e23cebdd0abb 43
+  s_7fd91ef0134f1f::t_fabfab8e3f4da9 861-862
+  s_7fd91ef0134f1f::t_3a0798d659d91a 140-144,146-178,180-181,203,206-224
+  s_7fd91ef0134f1f::t_91078312420f66 179,184-188,190-197,205
+  s_64ccd0823e1b63::t_8b06e615aade29 50,99
+  s_7fd91ef0134f1f::t_cd1c91a138db71 936-937
+  s_7fd91ef0134f1f::t_29babb72586792 760,764-765,768
+  s_7fd91ef0134f1f::t_6db0fc83fa318a 925
+  s_7fd91ef0134f1f::t_70fbe242e1edbe 391-392,400-401,445,448
+  s_e2a7aaa67fac55::t_a9bc8b9d73108d 3
+  s_7fd91ef0134f1f::t_2e81274d75d52e 423-442
+  s_64ccd0823e1b63::t_964ebee6c970b8 254
+  s_7fd91ef0134f1f::t_954c8591356a6e 930,933
+  s_7fd91ef0134f1f::t_ee856378a1a2c7 695-698,702-706,710-711,716-737,739-743,748,751-752,770-773,776,779-783,801,807,809-813,816-817,824-827,841-842,844-851
+  s_7fd91ef0134f1f::t_0b796e26e1d06b 182,189,198-201
+  s_7fd91ef0134f1f::t_b6ebaa7bcbff41 873
+  s_3900f6a427cc36::t_6e121e32cc6f53 549
+  s_64ccd0823e1b63::t_da4328d3b74505 54-61,63,82,84,96-97,103,105-106,109-110,115-118,120-131,133-137
+  s_519d75f696eca3::t_0a23db2ab7622f 69,455,603,609,641,650,738,749,808,815,833,843
+  s_519d75f696eca3::t_bb4d775a90a50e 488
+  s_519d75f696eca3::t_326ac461622435 892
+  s_7ab0c09a3463b2::t_db2e679d5d1126 4
+.agents/skills/subagent-retry/SKILL.md
+  s_1c22beb1670273::t_d67eeeb4ceb325 1-78
+docs/adr/001-remove-redundant-superpowers-skills.md
+  s_0b21f82433ff00::t_35a57919910687 1-43
+.agents/skills/nuclear-fan-out-review/SKILL.md
+  s_f9a1fd03f9aabe::t_6a6b37732b37df 2-3
+  s_32eab4903756e3::t_6fdacd087d66e6 1,4-26
+.gitconfig
+  s_32eab4903756e3::t_6fdacd087d66e6 162
+todo.md
+  s_32eab4903756e3::t_6fdacd087d66e6 19-30
+.tmux.conf
+  s_32eab4903756e3::t_6fdacd087d66e6 97-100
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.12",
+  "base_commit_sha": "ca20dfb2d3e56a5a04264da75159d85cb34f7406",
+  "prompts": {},
+  "sessions": {
+    "s_02aa9a8b1dd86e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_09d408d48ffewr5Fa25R57VitY",
+        "model": "unknown"
+      },
+      "human_author": "Elhaam Basheer Chaudhry <e4elhaam@gmail.com>"
+    },
+    "s_0b21f82433ff00": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_07d0d959affemdfVM62aESSlQp",
+        "model": "unknown"
+      },
+      "human_author": "Elhaam Basheer Chaudhry <e4elhaam@gmail.com>"
+    },
+    "s_0c6aecd85ed366": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_0a2ad2cf1ffeqMqGWBx64qsWGZ",
+        "model": "unknown"
+      },
+      "human_author": "Elhaam Basheer Chaudhry <e4elhaam@gmail.com>"
+    },
+    "s_13f595f7582ca9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_058b11236ffe7bvAfVsaD6t0O5",
+        "model": "unknown"
+      },
+      "human_author": "Elhaam Basheer Chaudhry <e4elhaam@gmail.com>"
+    },
+    "s_18c93dd5a42f92": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_0ab416966ffeAlB9fFL8HeBO9I",
+        "model": "unknown"
+      },
+      "human_author": "Elhaam Basheer Chaudhry <e4elhaam@gmail.com>"
+    },
+    "s_1c22beb1670273": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_09527ca2fffe24kJ0GUQKfhB7k",
+        "model": "unknown"
+      },
+      "human_author": "Elhaam Basheer Chaudhry <e4elhaam@gmail.com>"
+    },
+    "s_20bacb74f9047a": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_0ab7590bfffeF3P2wGkFpY4Z7h",
+        "model": "deepseek-v4-flash"
+      },
+      "human_author": "Elhaam Basheer Chaudhry <e4elhaam@gmail.com>"
+    },
+    "s_230b0984630c73": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_0961e27bfffemki0mOTvaDbhtk",
+        "model": "deepseek-v4-flash"
+      },
+      "human_author": "Elhaam Basheer Chaudhry <e4elhaam@gmail.com>"
+    },
+    "s_3138d37d4b6935": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_09ff9b1bcffeS4HV3VmRmU2xeo",
+        "model": "unknown"
+      },
+      "human_author": "Elhaam Basheer Chaudhry <e4elhaam@gmail.com>"
+    },
+    "s_32eab4903756e3": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_04d5d7525ffeIkuLOg1Guw6VDH",
+        "model": "unknown"
+      },
+      "human_author": "Elhaam Basheer Chaudhry <e4elhaam@gmail.com>"
+    },
+    "s_3900f6a427cc36": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_09fe0495dffeXSfFtTtQt9jigO",
+        "model": "unknown"
+      },
+      "human_author": "Elhaam Basheer Chaudhry <e4elhaam@gmail.com>"
+    },
+    "s_3be51b25aeb097": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_0b15841daffetbRM962737ncec",
+        "model": "unknown"
+      },
+      "human_author": "Elhaam Basheer Chaudhry <e4elhaam@gmail.com>"
+    },
+    "s_4d003e4759a7fa": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_0b05d23b6ffeMLcejDNA102vbm",
+        "model": "deepseek-v4-flash"
+      },
+      "human_author": "Elhaam Basheer Chaudhry <e4elhaam@gmail.com>"
+    },
+    "s_519d75f696eca3": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_09503ba52ffebksd9SQz2iVTOD",
+        "model": "unknown"
+      },
+      "human_author": "Elhaam Basheer Chaudhry <e4elhaam@gmail.com>"
+    },
+    "s_5eac92196540d2": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_0ab6b6d2effeyabty6P5g0AJNs",
+        "model": "unknown"
+      },
+      "human_author": "Elhaam Basheer Chaudhry <e4elhaam@gmail.com>"
+    },
+    "s_64ccd0823e1b63": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_09ff1e339ffe1WZlGNB9YqyDza",
+        "model": "unknown"
+      },
+      "human_author": "Elhaam Basheer Chaudhry <e4elhaam@gmail.com>"
+    },
+    "s_6501422988ad39": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_0b05d23b6ffeMLcejDNA102vbm",
+        "model": "unknown"
+      },
+      "human_author": "Elhaam Basheer Chaudhry <e4elhaam@gmail.com>"
+    },
+    "s_69194a28319a3f": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_058b11236ffe7bvAfVsaD6t0O5",
+        "model": "deepseek-v4-flash"
+      },
+      "human_author": "Elhaam Basheer Chaudhry <e4elhaam@gmail.com>"
+    },
+    "s_7ab0c09a3463b2": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_07d0b89d3ffepoVggOx6Bny4eO",
+        "model": "unknown"
+      },
+      "human_author": "Elhaam Basheer Chaudhry <e4elhaam@gmail.com>"
+    },
+    "s_7fd91ef0134f1f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_09d2c2de7ffeDY2exQ1U4TIQS2",
+        "model": "unknown"
+      },
+      "human_author": "Elhaam Basheer Chaudhry <e4elhaam@gmail.com>"
+    },
+    "s_84eef4fda69eb3": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_0b8c74755ffeQPJgE3e4bgON4V",
+        "model": "unknown"
+      },
+      "human_author": "Elhaam Basheer Chaudhry <e4elhaam@gmail.com>"
+    },
+    "s_9d454aa6e20ceb": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_09d2c2de7ffeDY2exQ1U4TIQS2",
+        "model": "deepseek-v4-flash"
+      },
+      "human_author": "Elhaam Basheer Chaudhry <e4elhaam@gmail.com>"
+    },
+    "s_b270984f3843fc": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_0961e27bfffemki0mOTvaDbhtk",
+        "model": "unknown"
+      },
+      "human_author": "Elhaam Basheer Chaudhry <e4elhaam@gmail.com>"
+    },
+    "s_d3ebcec8c0fc31": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_09ba78b78ffe6S5MASu8vY4Wx4",
+        "model": "unknown"
+      },
+      "human_author": "Elhaam Basheer Chaudhry <e4elhaam@gmail.com>"
+    },
+    "s_e2a6315a362cf0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_05933fa8bffePp6V0bLhyTUIPM",
+        "model": "unknown"
+      },
+      "human_author": "Elhaam Basheer Chaudhry <e4elhaam@gmail.com>"
+    },
+    "s_e2a7aaa67fac55": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_0a00d35efffeNtf57WBh084Y5O",
+        "model": "unknown"
+      },
+      "human_author": "Elhaam Basheer Chaudhry <e4elhaam@gmail.com>"
+    },
+    "s_f9a1fd03f9aabe": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_059005c2bffe6r3hZjLRRvoYyj",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Elhaam Basheer Chaudhry <e4elhaam@gmail.com>"
+    }
+  }
+}
