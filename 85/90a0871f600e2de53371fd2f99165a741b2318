@@ -1,0 +1,24 @@
+.config/opencode/oh-my-openagent.json
+  s_32eab4903756e3::t_a0cc867deddd06 3-10
+.config/opencode/context/domain/opencode-system.md
+  s_32eab4903756e3::t_232156a09d975f 75-77
+.config/opencode/opencode.json
+  s_32eab4903756e3::t_fe0ab875abc619 4-10,18
+  s_32eab4903756e3::t_ff797f7176b035 82
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.18",
+  "base_commit_sha": "8590a0871f600e2de53371fd2f99165a741b2318",
+  "prompts": {},
+  "sessions": {
+    "s_32eab4903756e3": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_04d5d7525ffeIkuLOg1Guw6VDH",
+        "model": "unknown"
+      },
+      "human_author": "Elhaam Basheer Chaudhry <e4elhaam@gmail.com>"
+    }
+  }
+}
