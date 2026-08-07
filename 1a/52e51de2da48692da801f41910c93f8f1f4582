@@ -1,0 +1,19 @@
+.config/opencode/opencode.json
+  s_32eab4903756e3::t_9de2941debdedf 30-32
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.21",
+  "base_commit_sha": "1a52e51de2da48692da801f41910c93f8f1f4582",
+  "prompts": {},
+  "sessions": {
+    "s_32eab4903756e3": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_04d5d7525ffeIkuLOg1Guw6VDH",
+        "model": "unknown"
+      },
+      "human_author": "Elhaam Basheer Chaudhry <e4elhaam@gmail.com>"
+    }
+  }
+}
