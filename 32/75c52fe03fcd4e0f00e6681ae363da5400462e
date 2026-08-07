@@ -1,0 +1,23 @@
+.config/opencode/context/domain/dotfiles-architecture.md
+  s_32eab4903756e3::t_ec011a8dff871b 75
+.config/opencode/command/commit.md
+  s_32eab4903756e3::t_468681cab85565 53
+.config/opencode/AGENTS.md
+  s_32eab4903756e3::t_06ae8edd0b7748 27-32
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.21",
+  "base_commit_sha": "3275c52fe03fcd4e0f00e6681ae363da5400462e",
+  "prompts": {},
+  "sessions": {
+    "s_32eab4903756e3": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_04d5d7525ffeIkuLOg1Guw6VDH",
+        "model": "unknown"
+      },
+      "human_author": "Elhaam Basheer Chaudhry <e4elhaam@gmail.com>"
+    }
+  }
+}
