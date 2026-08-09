@@ -14,6 +14,8 @@ AI agent skills for code review, Git workflows, documentation, and structured da
 | **local-change-review** | Review uncommitted local changes by grouping related hunks into small, intentional commits. |
 | **conflict-rebase-resolution** | Merge or rebase by gathering a holistic view of conflicts, then resolving them safely. |
 | **readable-html-dossier** | Create standalone, reading-first HTML reports for research, reviews, and investigations. |
+| **understand-code-like-an-owner** | Explain code to someone who did not write it — an ownership-grade data-flow narrative anchored on a small dataset traced from the user's eyes into the app, in the reader's product language. Phase A of bug-explainer; standalone for onboarding and code walkthroughs. |
+| **bug-explainer** | Explain a bug found by an agent to the human who owns the product but did not write the code — symptom-first, plain-language report anchored on a small dataset traced from the user's eyes to where the issue is, with impact & severity proposal, mechanism vs trigger, fix end state, and evidence appendix. |
 | **doc-map** | Maintain a branch-aware DOC_MAP.html registry with document summaries, reading metadata, and persistent read status. |
 | **github-graphql-first** | Fetch structured GitHub data — PRs, reviews, review threads, comments, project items, timelines — using `gh api graphql`. |
 | **linear-issue-recon** | Pull full context from a Linear issue (description, comments, linked issues and PRs), explore the codebase, and produce an HTML dossier with a way-ahead recommendation. |
