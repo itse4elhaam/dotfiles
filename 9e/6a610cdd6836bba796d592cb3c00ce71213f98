@@ -1,0 +1,16 @@
+.config/opencode/lsp-install-decisions.json
+  h_d8075e92abae71 1-6
+.config/opencode/tui.json
+  h_d8075e92abae71 9-13
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.21",
+  "base_commit_sha": "9e6a610cdd6836bba796d592cb3c00ce71213f98",
+  "prompts": {},
+  "humans": {
+    "h_d8075e92abae71": {
+      "author": "Elhaam Basheer Chaudhry <e4elhaam@gmail.com>"
+    }
+  }
+}
