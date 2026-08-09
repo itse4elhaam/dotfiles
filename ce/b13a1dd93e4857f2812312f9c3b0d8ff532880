@@ -1,0 +1,29 @@
+.agents/skills/readable-html-dossier/SKILL.md
+  s_6ecd6194597e5e::t_a4f6ac93c7d604 38-39
+  s_6ecd6194597e5e::t_89507497cfea82 45-54
+  s_1f48f3574b37a6::t_397b7f92664557 55
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.21",
+  "base_commit_sha": "ceb13a1dd93e4857f2812312f9c3b0d8ff532880",
+  "prompts": {},
+  "sessions": {
+    "s_1f48f3574b37a6": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_01c22d08fffeklwmyfFj9NjMI9",
+        "model": "deepseek-v4-flash"
+      },
+      "human_author": "Elhaam Basheer Chaudhry <e4elhaam@gmail.com>"
+    },
+    "s_6ecd6194597e5e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_01bf59796ffe9ttuhTxCdsnILG",
+        "model": "unknown"
+      },
+      "human_author": "Elhaam Basheer Chaudhry <e4elhaam@gmail.com>"
+    }
+  }
+}
