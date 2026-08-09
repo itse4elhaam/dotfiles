@@ -1,0 +1,29 @@
+.gitconfig
+  s_15a45dfa8754e9::t_0b618bd88d092d 87
+.config/git/ignore
+  s_95c8e776871384::t_8661ff97c6b31c 1
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.21",
+  "base_commit_sha": "6337d4a569fe36afb2c10368bc531aaca58199ab",
+  "prompts": {},
+  "sessions": {
+    "s_15a45dfa8754e9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_01a8bd933ffeQJZcYmLk2j0fUW",
+        "model": "unknown"
+      },
+      "human_author": "Elhaam Basheer Chaudhry <e4elhaam@gmail.com>"
+    },
+    "s_95c8e776871384": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_01a8bd933ffeQJZcYmLk2j0fUW",
+        "model": "deepseek-v4-flash"
+      },
+      "human_author": "Elhaam Basheer Chaudhry <e4elhaam@gmail.com>"
+    }
+  }
+}
