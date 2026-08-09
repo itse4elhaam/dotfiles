@@ -35,12 +35,23 @@ Create a self-contained HTML dossier that turns dense evidence into a clear read
 5. **Install reading-progress tracking.** Add the percentage tracker defined in [REFERENCES.md](REFERENCES.md#reading-progress-tracker).
    Completion: a dossier opened from a trusted opener reports monotonic 0–100% progress and reaches 100% only at the document end; direct opening and unavailable browser APIs leave it fully readable.
 
-6. **Verify once from source.** Run a single pass checking only: (1) the HTML opens as `file://` without manifest errors, (2) no empty sections remain, (3) prose width respects `min(65ch, 100% - 2rem)`. That is the entire check. Do not do type checks, linting, or any codebase-level validation — this is an HTML report, not application code. Do not launch browser automation, Playwright, screenshots, or browser tests of any kind. Do not re-read or re-verify after this single pass.
-   Completion: the three checks pass; the dossier file exists and is ready for delivery.
+6. **Verify once from source.** Run a single pass checking only: (1) the HTML opens as `file://` without manifest errors, (2) no empty sections remain, (3) prose width respects `min(65ch, 100% - 2rem)`, (4) when narration is included, the reading controller works from the directly opened `file://` file: it renders, Play reads the first block, and the active block highlights and scrolls. That is the entire check. Do not do type checks, linting, or any codebase-level validation — this is an HTML report, not application code. Do not launch browser automation, Playwright, screenshots, or browser tests of any kind. Do not re-read or re-verify after this single pass.
+   Completion: the checks pass; the dossier file exists and is ready for delivery.
 
 7. **Open the dossier.** Open the HTML file directly with the user's browser. Provide the absolute path.
 
    Read [REFERENCES.md](REFERENCES.md#browser-opening) for the exact direct-file browser procedure and its hard guardrails.
+
+## Narration (optional)
+
+When the reader may prefer listening, add the self-contained read-aloud controller. Load the `html-read-aloud` skill from `~/.agents/skills/html-read-aloud` and embed its standalone controller: the CSS into `<head>`, the markup and script before `</body>`. Mark the main content as the predictable reading root:
+
+```html
+<article data-readable-root>
+```
+
+Narration must work from a `file://` URL with no server, framework, or build step. Use `data-readable` to force-read a block and `data-reader-ignore` to exclude one; the defaults handle the rest. Read `~/.agents/skills/html-read-aloud/REFERENCES.md` for the exact embedding contract.
+Completion: when narration is included, the dossier opens from `file://` with a working reading controller.
 
 ## Evidence card
 
