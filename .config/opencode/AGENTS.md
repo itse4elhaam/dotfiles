@@ -24,5 +24,10 @@ Configuration for OpenCode AI environment, defining agents, tools, and commands.
 - **Schema**: JSON for config, Markdown+YAML for agents/commands
 - **Paths**: relative to project root or `~/.config/opencode`
 
+## Browser Automation
+
+- Use `agent-browser` (skill or CLI) for ALL browser operations: navigation, screenshots, scraping, form interaction, E2E.
+- Playwright, playwright-cli, dev-browser, Puppeteer, Selenium are BLOCKED. If you get a denial/permission error when trying them, switch to `agent-browser` immediately.
+- If agent-browser is unavailable, stop and report. Never fall back.
+
 ## NOTES
-- **Guide**: See `docs/ai-guide.md` for behavioral protocols.

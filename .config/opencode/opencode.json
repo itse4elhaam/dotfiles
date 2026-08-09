@@ -1,6 +1,14 @@
 {
   "$schema": "https://opencode.ai/config.json",
+  "snapshot": false,
   "permission": {
+    "skill": {
+      "*": "allow",
+      "playwright": "deny",
+      "playwright-cli": "deny",
+      "dev-browser": "deny",
+      "agent-browser": "allow"
+    },
     "bash": {
       "tmux kill-server": "deny",
       "git push --force": "ask",
@@ -8,6 +16,7 @@
       "rm -rf /": "deny",
       "rm -rf /home/elhaam/dotfiles": "deny",
       "git reset --hard": "deny",
+      "*playwright*": "deny",
       "*build": "ask",
       "gh pr merge*": "ask"
     },
@@ -17,6 +26,9 @@
     "linear_list_*": "allow",
     "linear_search*": "allow",
     "linear_extract_images": "allow"
+  },
+  "experimental": {
+    "continue_loop_on_deny": true
   },
   "autoupdate": false,
   "lsp": {
@@ -71,7 +83,7 @@
         "LINEAR_API_KEY": "{env:LINEAR_API_KEY}"
       },
       "timeout": 30000,
-      "enabled": true,
+      "enabled": true
     }
   },
   "plugin": [

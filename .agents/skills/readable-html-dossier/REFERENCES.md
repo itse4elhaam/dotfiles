@@ -13,7 +13,7 @@ Use this normative presentation contract:
 - Layout: semantic landmarks and ordered headings; tables only for tabular data; no page-level horizontal overflow at narrow widths or 200% zoom.
 - Links: visibly underlined and distinguishable without color alone.
 - Print: force a light palette and expose external URLs.
-- Dependencies: inline required CSS and JavaScript. Use a CDN only when a diagram genuinely requires Mermaid; the report remains readable when that resource is unavailable.
+- Dependencies: inline required CSS and JavaScript. When a diagram is deemed required, use the `architecture-diagram` skill from `~/.agents/skills/architecture-diagram`; keep the dossier readable when that resource is unavailable.
 - Text size floors: body text minimum effective rendered size 18px; secondary, label, and metadata text minimum 14px. When a control's text would fall below the minimum, enlarge the control rather than shrinking the text.
 - Responsive layout: above 768px viewport width use the full width with sidebar or columnar hierarchy as the dossier structure requires. At or below 768px, switch to single-column with no sidebar; search and filter controls appear inline at section tops.
 

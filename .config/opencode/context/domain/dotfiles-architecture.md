@@ -72,7 +72,7 @@ User command
 2. **Symlinks**: Never copy, always link
 3. **Version Control**: Everything tracked in git
 4. **Idempotency**: Scripts can run multiple times safely
-5. **Documentation**: AGENTS.md and ai-guide.md guide AI behavior
+5. **Documentation**: AGENTS.md files guide AI behavior
 
 ## Relationships
 

@@ -50,7 +50,7 @@ Create a git commit following these STRICT rules:
 
    - Subject is clear and specific (no vague "update" or "fix")
    - Body explains WHY if the change is non-obvious
-   - Follows @docs/ai-guide.md: "Keep commit message short and descriptive"
+   - Keep commit message short and descriptive
    - MATCHES the author's previous commit style (PAST TENSE)
 
 6. **Execute commit**: Use `git commit -m "<subject>" -m "<body>"` if body needed

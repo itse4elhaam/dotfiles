@@ -540,7 +540,6 @@ Edit `.config/opencode/opencode.json`:
 - **augments**: Framework examples (enable with context7)
 
 **Enable Rarely (Low Priority)**:
-- **playwright**: Only for UI testing
 - **next-devtools**: Only for Next.js debugging
 - **ddg-search**: Only for web research
 
