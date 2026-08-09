@@ -1,0 +1,99 @@
+.agents/skills/html-read-aloud/REFERENCES.md
+  s_6ecd6194597e5e::t_7ee41277d6068f 1-731
+.agents/skills/elhaam-voice/evals/cases.md
+  s_4174b0728c0d86::t_fc75dbd3444399 1-105
+.agents/skills/README.md
+  s_5577c7181cccbd::t_ec50a706fd9be8 12
+  s_5577c7181cccbd::t_e4f049e5316662 21
+  s_5577c7181cccbd::t_c5c845ebe8c25b 22
+  s_5577c7181cccbd::t_6e1238f0631309 18
+.agents/skills/elhaam-voice/evals/baseline.md
+  s_4174b0728c0d86::t_f501d0f2df929c 1-101
+.agents/skills/elhaam-voice/VOICE.md
+  s_4174b0728c0d86::t_b9b26cc4cffb85 1-82
+.agents/skills/document-ux/SKILL.md
+  s_5577c7181cccbd::t_e32ae8f8a88509 32
+  s_5577c7181cccbd::t_950fc37c6d2039 77-79
+  s_5577c7181cccbd::t_9a97d553e26d24 89-91
+  s_5577c7181cccbd::t_d684152ddeaf4e 6-18
+  s_5577c7181cccbd::t_e32537c948a920 2-3
+  s_5577c7181cccbd::t_c3fb896e3c28fc 71
+  s_5577c7181cccbd::t_6278e73bf860eb 22-26
+  s_5577c7181cccbd::t_09763ebc0ae104 52
+  s_5577c7181cccbd::t_6eb839b96c0ed7 95
+  s_5577c7181cccbd::t_6f36296a23bcf8 111-126
+  s_5577c7181cccbd::t_533a554508a342 138
+  s_5577c7181cccbd::t_b8cb2a8c061f92 157
+  s_5577c7181cccbd::t_482835f578b62f 86
+  s_5577c7181cccbd::t_da03c45f17fb7d 101
+  s_1f48f3574b37a6::t_6cfa68818a7d6e 1,4-5,19-21,27-31,33-51,53-70,72-76,80-85,87-88,92-94,96-100,102-110,127-137,139-156
+.agents/skills/implementation-ownership/SKILL.md
+  s_73121ef9653653::t_b5acaa4b072df0 105-113
+  s_73121ef9653653::t_48c233da544e78 1-9,11-104,114-129
+  s_73121ef9653653::t_f13f3151905cab 10
+.agents/skills/html-read-aloud/SKILL.md
+  s_6ecd6194597e5e::t_8912ac66faeda7 1-128
+.agents/skills/elhaam-voice/SKILL.md
+  s_4174b0728c0d86::t_5929a942de3f84 1-71
+.agents/skills/document-ux/REFERENCES.md
+  s_5577c7181cccbd::t_76ad3cf52d453b 1-60,62-555
+  s_5577c7181cccbd::t_cdc4c7d08f29a9 61
+.agents/skills/no-bs/SKILL.md
+  s_7e5271eeceefa5::t_1ef6db4198b5ef 1-7
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.21",
+  "base_commit_sha": "612964082d189b2a07d65f744528325ea729de2a",
+  "prompts": {},
+  "sessions": {
+    "s_1f48f3574b37a6": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_01c22d08fffeklwmyfFj9NjMI9",
+        "model": "deepseek-v4-flash"
+      },
+      "human_author": "Elhaam Basheer Chaudhry <e4elhaam@gmail.com>"
+    },
+    "s_4174b0728c0d86": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_01bf5ebd0ffeyLjiLYa2oywdKQ",
+        "model": "unknown"
+      },
+      "human_author": "Elhaam Basheer Chaudhry <e4elhaam@gmail.com>"
+    },
+    "s_5577c7181cccbd": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_01bf7936affe3i5z7ayyz8eS1J",
+        "model": "unknown"
+      },
+      "human_author": "Elhaam Basheer Chaudhry <e4elhaam@gmail.com>"
+    },
+    "s_6ecd6194597e5e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_01bf59796ffe9ttuhTxCdsnILG",
+        "model": "unknown"
+      },
+      "human_author": "Elhaam Basheer Chaudhry <e4elhaam@gmail.com>"
+    },
+    "s_73121ef9653653": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_01bf60ae7ffe5KkXMki0sxfhlL",
+        "model": "unknown"
+      },
+      "human_author": "Elhaam Basheer Chaudhry <e4elhaam@gmail.com>"
+    },
+    "s_7e5271eeceefa5": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_01a1b434affeYlBe2EB07FuJzQ",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Elhaam Basheer Chaudhry <e4elhaam@gmail.com>"
+    }
+  }
+}
