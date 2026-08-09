@@ -84,6 +84,7 @@
   fsync = none
   whitespace = error  # threat incorrect whitespace as errors
 	attributesfile = /home/elhaam/dotfiles/.gitattributes
+	excludesfile = ~/.config/git/ignore
 
 [advice]  # disable advices
   addEmptyPathspec = false
