@@ -1,0 +1,43 @@
+docs/opencode-reload-restart.md
+  s_10da880cbf5cca::t_f7044d7684a32d 1-174
+.config/opencode/command/paste-image.sh
+  s_1a33f1225fa316::t_8f4c58488ef5ea 1-39
+.config/opencode/command/reload.sh
+  s_1a33f1225fa316::t_1364eae27fb462 1-24
+.config/opencode/command/paste-image.md
+  s_c48d1d0e558235::t_d6cb0c5de5e7f5 1-10
+.config/opencode/command/reload.md
+  s_c48d1d0e558235::t_f758dd970c70bd 1-8
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.21",
+  "base_commit_sha": "6a7caf9cd4a33e328ed6feb7e551ffbc5d6e1c36",
+  "prompts": {},
+  "sessions": {
+    "s_10da880cbf5cca": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_01b276842ffeIt5lyp2IDnWEzf",
+        "model": "unknown"
+      },
+      "human_author": "Elhaam Basheer Chaudhry <e4elhaam@gmail.com>"
+    },
+    "s_1a33f1225fa316": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_01b2cb266ffewa3TDfzjLzIFQg",
+        "model": "deepseek-v4-flash"
+      },
+      "human_author": "Elhaam Basheer Chaudhry <e4elhaam@gmail.com>"
+    },
+    "s_c48d1d0e558235": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_01b2cb266ffewa3TDfzjLzIFQg",
+        "model": "unknown"
+      },
+      "human_author": "Elhaam Basheer Chaudhry <e4elhaam@gmail.com>"
+    }
+  }
+}
