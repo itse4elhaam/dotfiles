@@ -1,0 +1,20 @@
+.agents/skills/README.md
+  h_d8075e92abae71 17-18
+.agents/skills/bug-explainer/SKILL.md
+  h_d8075e92abae71 1-94
+.agents/skills/elhaam-commit/SKILL.md
+  h_d8075e92abae71 1-49
+.agents/skills/understand-code-like-an-owner/SKILL.md
+  h_d8075e92abae71 1-76
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.21",
+  "base_commit_sha": "7f0e75c380b739be1d949aac5f73e156e6b89893",
+  "prompts": {},
+  "humans": {
+    "h_d8075e92abae71": {
+      "author": "Elhaam Basheer Chaudhry <e4elhaam@gmail.com>"
+    }
+  }
+}
