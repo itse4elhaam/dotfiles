@@ -1,22 +1,50 @@
 ---
 name: analyze-pr-review
-description: Pull down review comments on the raised PR using graphql and present an analysis
+description: Pull down review comments on the raised PR using graphql and present an analysis.
 disable-model-invocation: true
 ---
 
-Pull down review comments from the current raised PR, for each of the pulled comment, strive to gather relevant context and then present an analysis with these included:
+Pull down unresolved review comments from the current raised PR.
 
-Use /github-graphql-first to pull down the comments.
+Use `/github-graphql-first` to retrieve review threads and comments.
 
-1. Stated severity vs actual severity
-2. Blocking vs non-blocking
-3. Is this suggesting a solution to a problem that only exists in theory?
-4. What real user experience does this impact?
-5. If an architectural issue, at what scale would this become a problem?
-6. What is the risk level implementing this vs not implementing this?
-7. What tests do we have related to this that would ensure this "suggested" change doesn't cause a regression?
-8. If it is a bug, why didn't our tests catch this?
-9. Is this a problem that's caused by how our AGENTs.md, linting and tests are structed? Can we make a structural change to prevent this in the future?
-10. Is the suggested solution too complex for a simpler problem?
+For each comment, gather the relevant code, callers, tests, and surrounding context before judging it.
 
-At the end, state the fastest and simplest way to, without compromising correctness and quality, get this merged.
+Evaluate each comment using:
+
+* **Claim** — What is the reviewer saying?
+* **Verify** — Does the problem actually exist on current HEAD?
+* **Severity** — Stated severity vs actual severity.
+* **Blocking** — Should this block merge?
+* **Reality** — Demonstrated problem, plausible risk, or theoretical concern?
+* **Reproduce** — What concrete state/input causes it?
+* **Impact** — What real user experience does this affect?
+* **Scale** — If architectural/performance-related, when does it become a real problem?
+* **Risk** — Risk of implementing the change vs leaving it unchanged.
+* **Coverage** — What existing tests protect this behavior?
+* **Regression** — For a confirmed bug, what is the smallest test that fails before the fix and passes after?
+* **Gap** — If this is a bug, why did the existing tests miss it?
+* **Prevention** — Could AGENTS.md, linting, types, tests, tooling, or architecture prevent this class of issue?
+* **Complexity** — Is the suggested solution proportional to the demonstrated problem?
+* **Staleness** — Has the referenced code changed since the comment was written?
+* **Confidence** — High / medium / low, based on evidence.
+* **Simplest correct action** — What is the smallest change, if any, that fully resolves the concern?
+
+End every comment with exactly one disposition:
+
+* **FIX NOW**
+* **REPLY & RESOLVE**
+* **DEFER**
+* **CLARIFY**
+
+Do not expand the PR with speculative refactors.
+
+At the end, provide the **Merge Path**:
+
+1. What must change before merge.
+2. What only needs a reply/resolution.
+3. What should be deferred.
+4. What tests must pass or be added.
+5. The fastest and simplest path to merge without compromising correctness or quality.
+
+**Complete when:** every unresolved actionable comment has evidence, confidence, a disposition, and a simplest correct action.
