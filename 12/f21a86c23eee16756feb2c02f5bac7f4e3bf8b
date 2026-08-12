@@ -1,0 +1,14 @@
+.tmux.conf
+  h_d8075e92abae71 15-18,107
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "12f21a86c23eee16756feb2c02f5bac7f4e3bf8b",
+  "prompts": {},
+  "humans": {
+    "h_d8075e92abae71": {
+      "author": "Elhaam Basheer Chaudhry <e4elhaam@gmail.com>"
+    }
+  }
+}
