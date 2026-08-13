@@ -12,6 +12,7 @@ AI agent skills for code review, Git workflows, and GitHub data access. These sk
 | **pr-review-dossier** | Read-only investigation of GitHub PR review feedback. Fetches review threads via GraphQL and produces an evidence-backed HTML dossier with a recommended decision or way ahead. |
 | **local-change-review** | Review uncommitted local changes by grouping related hunks into small, intentional commits. |
 | **triage-proposed-change** | Read-only pre-implementation triage: risk, patch-size estimate, test impact, existing behavior pins, data-flow changes, and long-term architecture impact. |
+| **upwork-proposal** | Write short, proof-led Upwork proposals with a locked hook → three build bullets → client proof → one-question CTA structure. |
 | **conflict-rebase-resolution** | Merge or rebase by gathering a holistic view of conflicts, then resolving them safely. |
 | **readable-html-dossier** | Create standalone, reading-first HTML reports for research, reviews, and investigations. |
 | **github-graphql-first** | Fetch structured GitHub data — PRs, reviews, review threads, comments, project items, timelines — using `gh api graphql`. |
