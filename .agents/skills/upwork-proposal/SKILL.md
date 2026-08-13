@@ -49,13 +49,16 @@ Completion: the three bullets cover the core product without becoming a feature 
 
 Add one short proof paragraph after the bullets.
 
-Read [PROOF-BANK.md](PROOF-BANK.md) and choose the closest **different** proof from the hook when possible.
+Choose the closest **different** proof from the hook when possible.
+
+Evidence may come only from facts already available to the agent through the user's supplied context, profile, attached material, or verified project data.
 
 - Prefer a client quote when one is relevant.
 - Otherwise use one quantified result or comparable shipped product.
-- Never invent a metric, testimonial, client, responsibility, or technology.
+- Never invent a metric, testimonial, client, responsibility, technology, or project outcome.
 - Do not stack multiple testimonials or turn this into a case-study paragraph.
 - Keep it to 1-2 sentences.
+- If no verified proof exists anywhere in context, ask for one instead of fabricating it.
 
 Completion: the proof answers "can this person actually deliver?" without repeating the hook.
 
