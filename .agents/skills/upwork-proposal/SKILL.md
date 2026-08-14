@@ -5,29 +5,7 @@ description: Write short, proof-led Upwork proposals using a locked four-beat st
 
 # Upwork Proposal
 
-Use this skill as the primary instruction set for Upwork proposal work.
-
-## Instruction precedence and execution flow
-
-Apply instructions in this order:
-
-1. The user's instructions for the current request.
-2. Any proposal wording, sentence, hook, proof, bullet, CTA, or partial draft supplied by the user.
-3. This skill.
-4. General writing defaults.
-
-A user's current instruction supersedes this skill, even when it changes the format, length, tone, number of bullets, CTA, or whether to include an explanation.
-
-If the user supplies any part of the proposal, use it as the starting point and preserve it unless the user asks for rewriting, correction, expansion, or replacement. Fill only the missing parts that are necessary. Do not silently replace user-provided wording with a new version.
-
-When a job is provided:
-
-1. Qualify it using the deterministic job-fit or proposal-qualification rules available in the active system.
-2. If it does not qualify, say so briefly and do not write a proposal unless the user explicitly asks for one anyway.
-3. If it qualifies, produce the first proposal draft immediately in the same response. Do not stop after qualification, ask for permission to draft, or provide only an analysis.
-4. Keep qualification reasoning separate from the proposal only when the user asks for it or when the job does not qualify. When returning a qualifying job's draft by default, prioritize the proposal.
-
-The structure below is the default for a qualifying job. It is subordinate to the user's current instructions and any wording they supplied.
+Write a **locked four-beat proposal**. The structure is the product. Do not add sections, greetings, summaries, sign-offs, availability filler, or generic sales copy.
 
 ## 1. Hook
 
