@@ -1,0 +1,73 @@
+#!/usr/bin/bash
+set -euo pipefail
+
+VERSION="0.1.0"
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+lib_dir="$(cd "$script_dir/../test/helpers" && pwd)"
+
+usage() {
+  cat <<EOF
+Usage: opencode-continue-pane [--pick] [--version] [--help]
+
+Restore the exact OpenCode session for the current tmux pane.
+
+When no binding exists, falls back to 'opencode --continue'.
+With --pick, shows an FZF picker for OpenCode sessions in the current project.
+
+Environment:
+  OPENCODE_PANE_RESTORE  Set to 0/false/no/disabled to disable (default: enabled)
+  OPENCODE_CMD           OpenCode CLI command (default: opencode)
+  OPENCODE_FZF_CMD       FZF command (default: fzf)
+EOF
+}
+
+# Source helper libraries
+# shellcheck source=../test/helpers/feature-flag.bash
+source "$lib_dir/feature-flag.bash"
+# shellcheck source=../test/helpers/pane-identity.bash
+source "$lib_dir/pane-identity.bash"
+# shellcheck source=../test/helpers/binding-store.bash
+source "$lib_dir/binding-store.bash"
+
+OPENCODE_CMD="${OPENCODE_CMD:-opencode}"
+OPENCODE_FZF_CMD="${OPENCODE_FZF_CMD:-fzf}"
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --pick) PICK_MODE=1; shift ;;
+    --version) echo "opencode-continue-pane version $VERSION"; exit 0 ;;
+    --help) usage; exit 0 ;;
+    *) echo "Unknown option: $1"; usage; exit 1 ;;
+  esac
+done
+
+if ! pane_restore_enabled; then
+  exec "$OPENCODE_CMD" --continue
+fi
+
+tmux_get_pane_identity
+key="${pane_identity:-}"
+if [[ -z "$key" || "$key" != *"|"* ]]; then
+  exec "$OPENCODE_CMD" --continue
+fi
+session_id=""
+
+if [[ -n "${PICK_MODE:-}" ]]; then
+  sessions="$("$OPENCODE_CMD" --list-sessions 2>/dev/null | jq -r '.[]' || true)"
+  if [[ -z "$sessions" ]]; then
+    exec "$OPENCODE_CMD" --continue
+  fi
+  picked="$("$OPENCODE_FZF_CMD" <<< "$sessions")"
+  if [[ -n "$picked" ]]; then
+    session_id="$picked"
+    pane_binding_set "$key" "$session_id"
+  fi
+else
+  session_id="$(pane_binding_get "$key" 2>/dev/null || true)"
+fi
+
+if [[ -n "$session_id" ]]; then
+  exec "$OPENCODE_CMD" --session "$session_id"
+else
+  exec "$OPENCODE_CMD" --continue
+fi

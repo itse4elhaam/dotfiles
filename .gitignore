@@ -15,6 +15,12 @@ node_modules/
 # test files
 pi-readability-test.md
 
+# mutation test reports
+reports/
+
+# tsc output
+dist/
+
 # lockfiles in skill directories (keep root lockfile)
 .pi/agent/skills/**/package-lock.json
 .pi/agent/skills/**/bun.lock
