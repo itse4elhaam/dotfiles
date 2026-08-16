@@ -1,0 +1,48 @@
+test/continue-with-pane-loader.test.js
+  s_331c7038253361::t_e294ac8cdcc156 1-13
+.config/opencode/plugins/copy-session.ts
+  s_4e0248980303fb::t_0c57e6ffa2fad2 53
+  s_4e0248980303fb::t_5aab032322b849 1,3-6,20,64,66-67
+  s_4e0248980303fb::t_0cbe86519cf330 2,7-19,21-52,54-63,65,68
+test/continue-with-pane-plugin.test.js
+  s_331c7038253361::t_2c181489578827 13-14,18-19,23-26,79-94
+  s_331c7038253361::t_26c00fc93aa4d5 1-8,11-12,15-17,20-22,27-78,95-96
+  s_331c7038253361::t_78314f6dd78c8a 9-10
+test/continue-with-pane-cli.bats
+  s_331c7038253361::t_2c181489578827 91-98
+  s_331c7038253361::t_0373061748a303 1-90,99-118
+.config/opencode/lib/continue-with-pane.ts
+  s_331c7038253361::t_78314f6dd78c8a 1-84
+.config/opencode/plugins/continue-with-pane.ts
+  s_331c7038253361::t_78314f6dd78c8a 2-9,17-18,24,26
+  s_331c7038253361::t_96ab2faec2acab 1,10-16,19-23,25,27-39
+scripts/opencode
+  s_331c7038253361::t_96ab2faec2acab 1-19,21-80
+  s_331c7038253361::t_2c181489578827 20
+dev-setup/runs/opencode-pane-continuation.sh
+  s_331c7038253361::t_96ab2faec2acab 1-21
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "7d49f425d31c64c1a750e5d0e6fa8f1aa1b7f593",
+  "prompts": {},
+  "sessions": {
+    "s_331c7038253361": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_013ed9883ffeu0Si2ngXWXeofX",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Elhaam Basheer Chaudhry <e4elhaam@gmail.com>"
+    },
+    "s_4e0248980303fb": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_013e87693ffehREU38WUqtxqAV",
+        "model": "unknown"
+      },
+      "human_author": "Elhaam Basheer Chaudhry <e4elhaam@gmail.com>"
+    }
+  }
+}
