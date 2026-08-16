@@ -1,0 +1,23 @@
+.agents/skills/triage-proposed-change/SKILL.md
+  s_ae9d6f21d03a04::t_21bcd80b9c670a 16
+  s_ae9d6f21d03a04::t_813d3f25650595 66,68-73,78
+  s_ae9d6f21d03a04::t_53f7ea68e4cd4c 1-15,17-65,67,74-77,79-83,85-89,91-93,95-118,121-156
+  s_ae9d6f21d03a04::t_65f88d0538b134 84,90,94
+  s_ae9d6f21d03a04::t_ce0de21f4bebd9 119-120
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "ebec4b134c3ed8cc3bcb61692786003832b2c8e0",
+  "prompts": {},
+  "sessions": {
+    "s_ae9d6f21d03a04": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_00975b6b3ffe6k3Ircpo5HBWoF",
+        "model": "unknown"
+      },
+      "human_author": "Elhaam Basheer Chaudhry <e4elhaam@gmail.com>"
+    }
+  }
+}
