@@ -1,6 +1,6 @@
 ---
 name: github-graphql-first
-description: Use when fetching structured GitHub data with gh — especially PR review threads, nested repository data, or any data that forms a graph.
+description: Use this whenever you use gh
 ---
 
 # GitHub GraphQL First

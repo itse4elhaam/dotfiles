@@ -1,6 +1,6 @@
 ---
 name: no-bs
-description: Keep the response jargon-free and without assumptions about reader's knowledge.
+description: Use this whenever you are explaining something to the user.
 disable-model-invocation: true
 ---
 
