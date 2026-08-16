@@ -2,5 +2,17 @@
   "typescript": {
     "decision": "declined",
     "decidedAt": "2026-08-03T10:37:05.043Z"
+  },
+  "biome": {
+    "decision": "declined",
+    "decidedAt": "2026-08-10T09:37:17.247Z"
+  },
+  "bash": {
+    "decision": "declined",
+    "decidedAt": "2026-08-10T14:34:37.063Z"
+  },
+  "basedpyright": {
+    "decision": "declined",
+    "decidedAt": "2026-08-15T23:12:50.203Z"
   }
 }

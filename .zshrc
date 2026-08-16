@@ -448,8 +448,8 @@ zle -N zff-widget
 bindkey '^@' zff-widget # Ctrl + space
 # naval-cli --no-ascii
 
-# opencode
-export PATH=/home/$USER/.opencode/bin:$PATH
+# Keep the local wrapper ahead of the upstream OpenCode binary.
+export PATH="$HOME/.local/bin:$HOME/.opencode/bin:$PATH"
 
 # wtc - worktree code: parallel development with git worktrees
 wtc() {

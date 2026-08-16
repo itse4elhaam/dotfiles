@@ -92,7 +92,6 @@
     "opencode-pty",
     "@koriit/opencode-tmux-window-status",
     ["opencode-session-recall", { "autoRecall": true, "compactionRecall": true }],
-    "opencode-autotitle"
   ],
   "provider": {
     "opencode-go": {
