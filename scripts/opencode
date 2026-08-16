@@ -1,0 +1,80 @@
+#!/bin/bash
+set -euo pipefail
+
+real_opencode="${OPENCODE_REAL_BIN:-$HOME/.opencode/bin/opencode}"
+
+if [[ ! -x "$real_opencode" ]]; then
+  printf 'opencode wrapper: real OpenCode binary is not executable: %s\n' "$real_opencode" >&2
+  exit 127
+fi
+
+continue_with_pane=0
+show_top_level_help=0
+forwarded_args=()
+
+for argument in "$@"; do
+  case "$argument" in
+    --continue-with-pane)
+      continue_with_pane=1
+      ;;
+    --continue|-c|--continue=*|--session|-s|--session=*|--fork)
+      if [[ "$continue_with_pane" -eq 1 || " $* " == *" --continue-with-pane "* ]]; then
+        printf 'opencode: --continue-with-pane cannot be combined with %s\n' "$argument" >&2
+        exit 2
+      fi
+      forwarded_args+=("$argument")
+      ;;
+    --help|-h)
+      if [[ "$#" -eq 1 ]]; then
+        show_top_level_help=1
+      fi
+      forwarded_args+=("$argument")
+      ;;
+    *)
+      forwarded_args+=("$argument")
+      ;;
+  esac
+done
+
+if [[ "$continue_with_pane" -eq 0 ]]; then
+  if [[ "$show_top_level_help" -eq 1 ]]; then
+    "$real_opencode" "${forwarded_args[@]}"
+    cat <<'EOF'
+
+Custom options:
+  --continue-with-pane  continue the OpenCode session remembered for this tmux pane
+EOF
+    exit 0
+  fi
+  exec "$real_opencode" "${forwarded_args[@]}"
+fi
+
+if [[ -z "${TMUX_PANE:-}" ]]; then
+  printf 'opencode: --continue-with-pane must be run inside tmux\n' >&2
+  exit 2
+fi
+
+pane_identity="${OPENCODE_PANE_IDENTITY:-}"
+if [[ -z "$pane_identity" ]]; then
+  pane_identity="$(tmux display-message -p -t "$TMUX_PANE" '#{session_name}:#{window_index}.#{pane_index}')"
+fi
+
+if [[ ! "$pane_identity" =~ ^[^:]+:[0-9]+\.[0-9]+$ ]]; then
+  printf 'opencode: could not determine the current tmux pane\n' >&2
+  exit 2
+fi
+
+data_home="${XDG_DATA_HOME:-$HOME/.local/share}"
+binding_digest="$(printf '%s' "$pane_identity" | sha256sum | cut -d' ' -f1)"
+binding_file="$data_home/opencode/pane-sessions/$binding_digest.json"
+session_id=""
+
+if [[ -f "$binding_file" ]]; then
+  session_id="$(jq -er --arg pane "$pane_identity" 'select(.pane == $pane) | .sessionID | select(type == "string" and length > 0)' "$binding_file" 2>/dev/null || true)"
+fi
+
+if [[ -n "$session_id" ]]; then
+  exec "$real_opencode" "${forwarded_args[@]}" --session "$session_id"
+fi
+
+exec "$real_opencode" "${forwarded_args[@]}"
