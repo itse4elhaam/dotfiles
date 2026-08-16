@@ -12,7 +12,7 @@ type SessionInfo = {
   readonly directory?: unknown
 }
 
-const ContinueWithPanePlugin: Plugin = async ({ directory } = {} as never) => {
+const ContinueWithPanePlugin: Plugin = async (ctx) => {\n  const directory = ctx.directory
   const pane = currentPaneIdentity()
   if (!pane) {
     return {}
