@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test"
-import { mkdtempSync, readFileSync, rmSync } from "node:fs"
+import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import {
@@ -92,5 +92,69 @@ describe("ContinueWithPanePlugin", () => {
 
     const stored = JSON.parse(readFileSync(bindingFilePath(testRoot, "peasy:2.3"), "utf8"))
     expect(stored.sessionID).toBe("ses_from_hook")
+  })
+
+  test("records a brand-new root session before its first message", async () => {
+    process.env.XDG_DATA_HOME = testRoot
+    process.env.OPENCODE_PANE_IDENTITY = "peasy:2.3"
+    const hooks = await ContinueWithPanePlugin({ directory: "/repo" })
+    const event = hooks.event
+    expect(event).toBeFunction()
+    if (!event) return
+
+    await event({
+      event: {
+        type: "session.created",
+        properties: { info: { id: "ses_new", directory: "/repo" } },
+      },
+    })
+
+    const stored = JSON.parse(readFileSync(bindingFilePath(testRoot, "peasy:2.3"), "utf8"))
+    expect(stored.sessionID).toBe("ses_new")
+  })
+
+  test("refreshes a known root session when it becomes idle", async () => {
+    process.env.XDG_DATA_HOME = testRoot
+    process.env.OPENCODE_PANE_IDENTITY = "peasy:2.3"
+    const hooks = await ContinueWithPanePlugin({ directory: "/repo" })
+    const event = hooks.event
+    expect(event).toBeFunction()
+    if (!event) return
+
+    await event({
+      event: {
+        type: "session.updated",
+        properties: { info: { id: "ses_existing", directory: "/repo" } },
+      },
+    })
+    await event({
+      event: {
+        type: "session.idle",
+        properties: { sessionID: "ses_existing" },
+      },
+    })
+
+    const stored = JSON.parse(readFileSync(bindingFilePath(testRoot, "peasy:2.3"), "utf8"))
+    expect(stored.sessionID).toBe("ses_existing")
+  })
+
+  test("does not bind the pane to a child session", async () => {
+    process.env.XDG_DATA_HOME = testRoot
+    process.env.OPENCODE_PANE_IDENTITY = "peasy:2.3"
+    const hooks = await ContinueWithPanePlugin({ directory: "/repo" })
+    const event = hooks.event
+    expect(event).toBeFunction()
+    if (!event) return
+
+    await event({
+      event: {
+        type: "session.created",
+        properties: {
+          info: { id: "ses_child", parentID: "ses_root", directory: "/repo" },
+        },
+      },
+    })
+
+    expect(existsSync(bindingFilePath(testRoot, "peasy:2.3"))).toBeFalse()
   })
 })
