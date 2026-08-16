@@ -1,0 +1,33 @@
+.config/opencode/AGENTS.md
+  h_d8075e92abae71 2-3
+.zshrc
+  s_331c7038253361::t_96ab2faec2acab 451-452
+tsconfig.json
+  s_331c7038253361::t_cc7e29b571586e 11
+  s_331c7038253361::t_96ab2faec2acab 1-10,12-25
+package.json
+  s_331c7038253361::t_96ab2faec2acab 1-14
+.config/opencode/lsp-install-decisions.json
+  h_d8075e92abae71 5-16
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "b38d5903fdfc02a5f52ca4b3a8569d2a69075ea7",
+  "prompts": {},
+  "humans": {
+    "h_d8075e92abae71": {
+      "author": "Elhaam Basheer Chaudhry <e4elhaam@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_331c7038253361": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_013ed9883ffeu0Si2ngXWXeofX",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Elhaam Basheer Chaudhry <e4elhaam@gmail.com>"
+    }
+  }
+}
