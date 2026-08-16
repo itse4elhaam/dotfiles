@@ -1,0 +1,16 @@
+.config/opencode/AGENTS.md
+  h_d8075e92abae71 2-3
+.config/opencode/lsp-install-decisions.json
+  h_d8075e92abae71 5-16
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "1940ae0459cb1731ef7d39a45c3ce95ca747d476",
+  "prompts": {},
+  "humans": {
+    "h_d8075e92abae71": {
+      "author": "Elhaam Basheer Chaudhry <e4elhaam@gmail.com>"
+    }
+  }
+}
