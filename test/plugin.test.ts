@@ -5,6 +5,7 @@ import {
   getBindingStorePath,
   isPaneRestoreEnabled,
   isInTmux,
+  rootSessionFromEvent,
 } from "../.config/opencode/plugins/tmux-pane-bind"
 import { readFileSync, writeFileSync, mkdirSync, rmSync, existsSync } from "fs"
 import { join } from "path"
@@ -297,5 +298,40 @@ describe("createTmuxPaneBindPlugin", () => {
 
     const content = JSON.parse(readFileSync(storePath, "utf-8"))
     expect(content["crash-test:1.1|/tmp"].sessionID).toBe("ses_recovery")
+  })
+})
+
+
+describe("rootSessionFromEvent", () => {
+  it("captures a newly created root session", () => {
+    const event = {
+      type: "session.created",
+      properties: { info: { id: "ses_new", directory: "/repo" } },
+    }
+    expect(rootSessionFromEvent(event, "/repo")).toBe("ses_new")
+  })
+
+  it("captures an updated root session", () => {
+    const event = {
+      type: "session.updated",
+      properties: { info: { id: "ses_existing", directory: "/repo" } },
+    }
+    expect(rootSessionFromEvent(event, "/repo")).toBe("ses_existing")
+  })
+
+  it("ignores child sessions", () => {
+    const event = {
+      type: "session.created",
+      properties: { info: { id: "ses_child", parentID: "ses_root", directory: "/repo" } },
+    }
+    expect(rootSessionFromEvent(event, "/repo")).toBeNull()
+  })
+
+  it("ignores sessions from another directory", () => {
+    const event = {
+      type: "session.updated",
+      properties: { info: { id: "ses_other", directory: "/other" } },
+    }
+    expect(rootSessionFromEvent(event, "/repo")).toBeNull()
   })
 })
