@@ -91,5 +91,5 @@
       "model": "openai/gpt-5.6-sol"
     }
   },
-  "disabled_hooks": ["todo-continuation-enforcer"]
+  "disabled_hooks": ["todo-continuation-enforcer", "hephaestus-agents-md-injector"]
 }
