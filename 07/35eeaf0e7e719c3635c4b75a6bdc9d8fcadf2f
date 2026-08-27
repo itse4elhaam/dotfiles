@@ -1,0 +1,14 @@
+.agents/skills/readable-html-dossier/SKILL.md
+  h_d8075e92abae71 30
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.0",
+  "base_commit_sha": "0735eeaf0e7e719c3635c4b75a6bdc9d8fcadf2f",
+  "prompts": {},
+  "humans": {
+    "h_d8075e92abae71": {
+      "author": "Elhaam Basheer Chaudhry <e4elhaam@gmail.com>"
+    }
+  }
+}
