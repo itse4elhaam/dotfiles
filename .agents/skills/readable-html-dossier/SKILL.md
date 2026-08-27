@@ -27,7 +27,7 @@ Create a self-contained HTML dossier that turns dense evidence into a clear read
    For the language, load the `wait-what` skill from `~/.agents/skills/wait-what` and follow it — it enforces ASD-STE100 Simplified Technical English and the ubiquitous language from `CONTEXT.md`. It is the single source of truth for the writing; keep no separate language rules in this skill.
    Completion: each section advances the reader from orientation to evidence to action, with no empty or orphaned section, and every resumable heading has a stable ID.
 
-4. **Write the standalone HTML.** Save where the caller asks, or in the invocation folder when no path is specified. Use semantic HTML, inline CSS, responsive reflow, dark-default theme variables, a print stylesheet, and no build step. Add a visible theme toggle only when interactive switching serves the reader. When a diagram is deemed required, use the `architecture-diagram` skill from `~/.agents/skills/architecture-diagram`.
+4. **Write the standalone HTML.** Save where the caller asks, or in `/tmp` when no path is specified. Use semantic HTML, inline CSS, responsive reflow, dark-default theme variables, a print stylesheet, and no build step. Add a visible theme toggle only when interactive switching serves the reader. When a diagram is deemed required, use the `architecture-diagram` skill from `~/.agents/skills/architecture-diagram`.
    Completion: one HTML file opens directly through `file://`, contains its required styling, and needs no local server.
 
    Read [REFERENCES.md](REFERENCES.md#visual-contract) before writing; it is the single source of truth for typography, layout, scaffold, and interaction details.
