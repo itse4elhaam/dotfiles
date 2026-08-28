@@ -14,16 +14,14 @@
       "prompt_append": "ALWAYS create/append todo-list based on the user-request. DONOT start work until you have a todo list. Post-compression, the first task to do is bring back the todo-list"
     },
     "librarian": {
-      "model": "opencode-go/deepseek-v4-flash",
+      "model": "openai/gpt-5.6-luna",
       "fallback_models": [
-        "opencode-go/deepseek-v4-flash",
         "opencode-go/glm-5.2"
       ]
     },
     "explore": {
-      "model": "opencode-go/deepseek-v4-flash",
+      "model": "openai/gpt-5.6-luna",
       "fallback_models": [
-        "opencode-go/deepseek-v4-flash",
         "opencode-go/glm-5.2"
       ]
     },
@@ -74,10 +72,9 @@
       "disable": true
     },
     "sisyphus-junior": {
-      "model": "opencode-go/deepseek-v4-flash",
+      "model": "openai/gpt-5.6-luna",
       "variant": "high",
       "fallback_models": [
-        "opencode-go/deepseek-v4-flash",
         "opencode-go/glm-5.2"
       ]
     },
