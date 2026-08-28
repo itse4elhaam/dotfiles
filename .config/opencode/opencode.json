@@ -84,6 +84,15 @@
       },
       "timeout": 30000,
       "enabled": true
+    },
+    "supabase": {
+      "type": "remote",
+      "url": "https://mcp.supabase.com/mcp?project_ref=pjbpkfpnmxoiuaoqbosk&read_only=true&features=docs%2Caccount%2Cdatabase%2Cdebugging%2Cdevelopment%2Cfunctions%2Cbranching",
+      "enabled": true
+    },
+    "railway": {
+      "type": "remote",
+      "url": "https://mcp.railway.com"
     }
   },
   "plugin": [
@@ -91,7 +100,13 @@
     "opencode-supermemory@latest",
     "opencode-pty",
     "@koriit/opencode-tmux-window-status",
-    ["opencode-session-recall", { "autoRecall": true, "compactionRecall": true }],
+    [
+      "opencode-session-recall",
+      {
+        "autoRecall": true,
+        "compactionRecall": true
+      }
+    ],
   ],
   "provider": {
     "opencode-go": {
