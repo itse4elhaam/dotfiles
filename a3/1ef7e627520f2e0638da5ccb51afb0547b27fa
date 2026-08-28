@@ -1,0 +1,25 @@
+.config/opencode/AGENTS.md
+  s_0695620e83e2cc::t_873b8f6b210436 4-17
+.config/opencode/docs/agents/domain.md
+  s_0695620e83e2cc::t_0109cefb2775ae 1-51
+.config/opencode/docs/agents/issue-tracker.md
+  s_0695620e83e2cc::t_af6f4bcb857f94 1-32
+.config/opencode/docs/agents/triage-labels.md
+  s_0695620e83e2cc::t_d09d2c408c75ce 1-15
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.0",
+  "base_commit_sha": "a31ef7e627520f2e0638da5ccb51afb0547b27fa",
+  "prompts": {},
+  "sessions": {
+    "s_0695620e83e2cc": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_fbca8bcf7ffekbJ4o1VEzXi5dI",
+        "model": "unknown"
+      },
+      "human_author": "Elhaam Basheer Chaudhry <e4elhaam@gmail.com>"
+    }
+  }
+}
