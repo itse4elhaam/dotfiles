@@ -9,6 +9,7 @@ AI agent skills for code review, Git workflows, and GitHub data access. These sk
 | Skill | Description |
 |---|---|
 | **elhaam-review** | Personal code review with seven lenses: codebase boundary, simplicity, test confidence, security/server boundaries, scalability, maintainability, and automation feedback. Defaults to an HTML findings report. |
+| **good-tests** | Write and review behaviour-focused tests using a Detroit/classical default: stable seams, real collaborators, minimal boundary mocks, and red-to-green regression proof. |
 | **pr-review-dossier** | Read-only investigation of GitHub PR review feedback. Fetches review threads via GraphQL and produces an evidence-backed HTML dossier with a recommended decision or way ahead. |
 | **local-change-review** | Review uncommitted local changes by grouping related hunks into small, intentional commits. |
 | **triage-proposed-change** | Read-only pre-implementation triage: risk, patch-size estimate, test impact, existing behavior pins, data-flow changes, and long-term architecture impact. |
