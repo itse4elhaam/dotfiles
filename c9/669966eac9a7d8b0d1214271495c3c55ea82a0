@@ -1,0 +1,14 @@
+.config/opencode/opencode.json
+  h_d8075e92abae71 87-95,103-109
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.0",
+  "base_commit_sha": "c9669966eac9a7d8b0d1214271495c3c55ea82a0",
+  "prompts": {},
+  "humans": {
+    "h_d8075e92abae71": {
+      "author": "Elhaam Basheer Chaudhry <e4elhaam@gmail.com>"
+    }
+  }
+}
