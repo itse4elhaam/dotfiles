@@ -1,0 +1,14 @@
+.zshrc
+  h_d8075e92abae71 742-744
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.0",
+  "base_commit_sha": "852161e4b31cbd3e34dc63ed60c1128149aa14e2",
+  "prompts": {},
+  "humans": {
+    "h_d8075e92abae71": {
+      "author": "Elhaam Basheer Chaudhry <e4elhaam@gmail.com>"
+    }
+  }
+}
