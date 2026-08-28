@@ -1,0 +1,19 @@
+.config/opencode/omo.jsonc
+  s_321f6f8d820a96::t_cef1a1d20464e3 1-96
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.0",
+  "base_commit_sha": "8116356432546b1d7672953be732be9567016d03",
+  "prompts": {},
+  "sessions": {
+    "s_321f6f8d820a96": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_fb82d36b6ffe6642vr6L3GmfeE",
+        "model": "unknown"
+      },
+      "human_author": "Elhaam Basheer Chaudhry <e4elhaam@gmail.com>"
+    }
+  }
+}
