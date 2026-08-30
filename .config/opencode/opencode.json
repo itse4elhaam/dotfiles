@@ -17,7 +17,6 @@
       "rm -rf /home/elhaam/dotfiles": "deny",
       "git reset --hard": "deny",
       "*playwright*": "deny",
-      "*build": "ask",
       "gh pr merge*": "ask"
     },
     "linear_*": "ask",
@@ -107,6 +106,7 @@
         "compactionRecall": true
       }
     ],
+    "opencode-mermaid-renderer@0.0.1"
   ],
   "provider": {
     "opencode-go": {
@@ -118,6 +118,34 @@
                 "type": "disabled"
               }
             }
+          }
+        }
+      }
+    },
+    "openai": {
+      "models": {
+        "gpt-5.6-sol": {
+          "limit": {
+            "context": 270000,
+            "output": 128000
+          }
+        },
+        "gpt-5.6-luna": {
+          "limit": {
+            "context": 270000,
+            "output": 128000
+          }
+        },
+        "gpt-5.6-sol-fast": {
+          "limit": {
+            "context": 270000,
+            "output": 128000
+          }
+        },
+        "gpt-5.6-luna-fast": {
+          "limit": {
+            "context": 270000,
+            "output": 128000
           }
         }
       }
