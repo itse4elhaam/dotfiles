@@ -88,3 +88,63 @@ User command
 - OpenCode agents must follow XML structure
 - All commits use conventional commits format
 - MCP servers disabled by default for performance
+
+## OpenCode Session Fork & Session ID Copy
+
+The repo provides two complementary features for working with OpenCode sessions inside tmux:
+
+### Architecture
+
+```
+Plugin (session-expose.ts)
+  ↓ writes pane-keyed file
+/tmp/opencode-session-<TMUX_PANE>  →  JSON: { sessionId, directory, timestamp }
+  ↓ read by
+scripts/oc-fork (invoked via tmux keybind)
+```
+
+### Components
+
+1. **Plugin** (`.config/opencode/plugins/session-expose.ts`):
+   - Auto-loaded by OpenCode (local `.ts` files in `plugins/` are auto-discovered)
+   - On each tool execution, writes the current session ID, working directory, and timestamp to
+     `/tmp/opencode-session-<TMUX_PANE>` (pane-keyed to prevent race conditions after forking)
+   - Errors are silently caught — never breaks a tool call
+
+2. **Helper script** (`scripts/oc-fork`):
+   - Two modes: fork (default) and copy session ID (`-c` / `--copy-id`)
+   - Invoked via `run-shell` from tmux keybinds (uses `tmux display -p` — NOT `$TMUX`/`$TMUX_PANE`)
+   - Reads session ID from the pane-keyed file, validates freshness (10-minute staleness window)
+   - Fork mode: `tmux split-window -h -c "$CWD" opencode --session "$ID" --fork`
+   - Copy mode: loads session ID into tmux buffer + system clipboard (xclip on X11)
+   - Error handling covers: outside tmux, missing session data, stale data, opencode not in PATH
+   - Supports `--dry-run` for testing
+   - ShellCheck-clean, `set -euo pipefail`
+
+3. **Tests** (`scripts/oc-fork.test.sh`):
+   - Lightweight source-and-assert harness (no bats dependency)
+   - Tests: missing/malformed/stale session files, arg parsing, prerequisite checks
+   - Sources the script directly to test pure functions in isolation
+
+4. **tmux keybinds** (`.tmux.conf`):
+   - `prefix+F` → Fork current OpenCode session to new right-split pane
+   - `prefix+C-f` → Copy current OpenCode session ID to clipboard
+
+### Keybind Reference
+
+| Key | Action | Context |
+|-----|--------|---------|
+| `prefix+F` | Fork session to new pane | Inside opencode, after at least one message sent |
+| `prefix+C-f` | Copy session ID to clipboard | Inside opencode, after at least one message sent |
+
+### Changing Keybinds
+
+Edit `.tmux.conf` and modify or duplicate the `bind F` / `bind C-f` lines.
+Reload with `tmux source-file ~/.tmux.conf` or `prefix+r`.
+
+### Requirements
+
+- OpenCode v1.17+ with `@opencode-ai/plugin` API
+- tmux 3.x (for `#{pane_current_path}` format)
+- `opencode` in PATH
+- Optional: `xclip` for system clipboard on X11

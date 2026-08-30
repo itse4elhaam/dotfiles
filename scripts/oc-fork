@@ -1,0 +1,219 @@
+#!/usr/bin/env bash
+# oc-fork — Fork the current OpenCode session into a new tmux pane,
+#           or copy the session ID to the clipboard.
+#
+# Usage:
+#   oc-fork              Fork current session to new tmux pane (right split)
+#   oc-fork -c           Copy current session ID to clipboard
+#   oc-fork --copy-id    Copy current session ID to clipboard
+#   oc-fork --help       Show this help
+#   oc-fork --dry-run    Print what would be done (for testing)
+#
+# This script must be invoked from a tmux keybind (run-shell). It reads the
+# session ID from a pane-keyed file written by the session-expose OpenCode
+# plugin (.config/opencode/plugins/session-expose.ts).
+#
+# Dependencies: tmux, opencode (in PATH)
+# Optional:      xclip (for system clipboard on X11)
+#
+# Acceptence criteria for the feature:
+#   https://github.com/itse4elhaam/dotfiles/issues/3
+
+set -euo pipefail
+
+STALENESS_MS=$((10 * 60 * 1000))  # 10 minutes
+readonly STALENESS_MS
+
+# ---- helpers ----------------------------------------------------------------
+
+die() {
+  local msg="$*"
+  # try tmux display first (we're usually in run-shell), fall back to stderr
+  tmux display-message "oc-fork: $msg" 2>/dev/null || echo "oc-fork: $msg" >&2
+  exit 1
+}
+
+usage() {
+  cat <<EOF
+Usage: $(basename "$0") [OPTION]
+
+Fork the current OpenCode session into a new tmux pane, or copy the session ID.
+
+Options:
+  -c, --copy-id  Copy the current OpenCode session ID to clipboard (tmux buffer + xclip)
+  --dry-run      Print the command that would be executed (for testing)
+  --help         Show this help message and exit
+
+Without options, forks the current session into a new right-split tmux pane
+in the current working directory.
+EOF
+  exit 0
+}
+
+# ---- pure functions (testable by sourcing this script) -----------------------
+
+MODE="fork"
+DRY_RUN=0
+
+parse_args() {
+  MODE="fork"
+  DRY_RUN=0
+
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      -c|--copy-id)
+        MODE="copy"
+        shift
+        ;;
+      --dry-run)
+        DRY_RUN=1
+        shift
+        ;;
+      --help)
+        usage
+        ;;
+      *)
+        die "unknown option: $1 (try --help)"
+        ;;
+    esac
+  done
+}
+
+read_session_file() {
+  local file="$1" max_age_ms="$2" now_ms="$3"
+  local session_id
+
+  if [[ ! -f "$file" ]]; then
+    echo "SESSION_FILE_MISSING"
+    return
+  fi
+
+  local content
+  content=$(cat "$file" 2>/dev/null) || {
+    echo "SESSION_FILE_UNREADABLE"
+    return
+  }
+
+  # Parse JSON fields using bash — relies on a specific key order
+  local parsed_id parsed_ts
+
+  parsed_id=$(echo "$content" | sed -n 's/.*"sessionId"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')
+  parsed_ts=$(echo "$content" | sed -n 's/.*"timestamp"[[:space:]]*:[[:space:]]*\([0-9]*\).*/\1/p')
+
+  if [[ -z "$parsed_id" ]]; then
+    echo "SESSION_ID_MISSING"
+    return
+  fi
+
+  if [[ -z "$parsed_ts" ]]; then
+    echo "SESSION_TIMESTAMP_MISSING"
+    return
+  fi
+
+  local age=$(( now_ms - parsed_ts )) || true
+  if [[ "$age" -gt "$max_age_ms" ]]; then
+    echo "SESSION_STALE:${age}ms"
+    return
+  fi
+
+  echo "$parsed_id"
+}
+
+check_prereqs() {
+  command -v tmux >/dev/null 2>&1 || { echo "tmux_missing"; return; }
+  command -v opencode >/dev/null 2>&1 || { echo "opencode_missing"; return; }
+  echo "ok"
+}
+
+# ---- main (side effects) ----------------------------------------------------
+
+main() {
+  parse_args "$@"
+
+  # Validate prerequisites before doing anything else
+  local prereq
+  prereq=$(check_prereqs)
+  case "$prereq" in
+    tmux_missing)
+      die "tmux not found in PATH — this command must run inside tmux"
+      ;;
+    opencode_missing)
+      die "opencode not found in PATH"
+      ;;
+  esac
+
+  # Get the active pane ID (run-shell doesn't set $TMUX_PANE)
+  local pane_id pane_cwd
+  pane_id=$(tmux display -p '#{pane_id}' 2>/dev/null) || die "not inside tmux (tmux display failed)"
+  pane_cwd=$(tmux display -p '#{pane_current_path}' 2>/dev/null) || die "failed to get pane CWD"
+
+  local session_file="/tmp/opencode-session-${pane_id}"
+  local now_ms
+  now_ms=$(date +%s%3N) 2>/dev/null || now_ms=$(python3 -c 'import time; print(int(time.time() * 1000))')
+
+  local session_id
+  session_id=$(read_session_file "$session_file" "$STALENESS_MS" "$now_ms")
+
+  case "$session_id" in
+    SESSION_FILE_MISSING)
+      die "no session data found — send a message in OpenCode first, then retry"
+      ;;
+    SESSION_FILE_UNREADABLE)
+      die "session data file ($session_file) exists but is unreadable"
+      ;;
+    SESSION_ID_MISSING)
+      die "session data file is malformed (missing sessionId)"
+      ;;
+    SESSION_TIMESTAMP_MISSING)
+      die "session data file is malformed (missing timestamp)"
+      ;;
+    SESSION_STALE:*)
+      local age="${session_id#SESSION_STALE:}"
+      die "session data is stale (${age} old) — send a message in OpenCode to refresh"
+      ;;
+  esac
+
+  if [[ -z "$session_id" ]]; then
+    die "could not determine current session ID"
+  fi
+
+  # Defensive: session IDs from OpenCode are alphanumeric
+  [[ "$session_id" =~ ^[A-Za-z0-9_-]+$ ]] \
+    || die "session ID has unexpected format: $session_id"
+
+  # ---- mode dispatch ----
+  if [[ "$MODE" == "copy" ]]; then
+    # Copy to tmux buffer + system clipboard
+    if [[ "$DRY_RUN" == "1" ]]; then
+      echo "DRY: printf '%s' '$session_id' | tmux load-buffer -"
+      echo "DRY: printf '%s' '$session_id' | xclip -selection clipboard"
+      echo "DRY: tmux display-message 'Copied session ID: $session_id'"
+      return
+    fi
+
+    printf '%s' "$session_id" | tmux load-buffer - || die "failed to load tmux buffer"
+    if command -v xclip >/dev/null 2>&1; then
+      printf '%s' "$session_id" | xclip -selection clipboard 2>/dev/null || true
+    fi
+    tmux display-message "Copied session ID: $session_id"
+  else
+    # Fork: split window, run opencode with session ID
+    local cmd="opencode --session ${session_id} --fork"
+
+    if [[ "$DRY_RUN" == "1" ]]; then
+      echo "DRY: tmux split-window -h -c '${pane_cwd}' '${cmd}'"
+      return
+    fi
+
+    # Quote CWD to handle spaces/metacharacters
+    tmux split-window -h -c "${pane_cwd}" "${cmd}" || {
+      local rc=$?
+      die "tmux split-window failed (exit $rc)"
+    }
+  fi
+}
+
+# Only run main if executed directly (not sourced by tests)
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+  main "$@"
+fi
