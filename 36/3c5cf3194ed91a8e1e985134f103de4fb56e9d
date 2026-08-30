@@ -1,0 +1,14 @@
+.config/opencode/oh-my-openagent.json
+  h_d8075e92abae71 17,20,22,69
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.0",
+  "base_commit_sha": "363c5cf3194ed91a8e1e985134f103de4fb56e9d",
+  "prompts": {},
+  "humans": {
+    "h_d8075e92abae71": {
+      "author": "Elhaam Basheer Chaudhry <e4elhaam@gmail.com>"
+    }
+  }
+}
