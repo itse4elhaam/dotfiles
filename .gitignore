@@ -19,3 +19,5 @@ pi-readability-test.md
 .pi/agent/skills/**/package-lock.json
 .pi/agent/skills/**/bun.lock
 .pi/agent/skills/**/yarn.lock
+
+lsp-install-decisions.json
