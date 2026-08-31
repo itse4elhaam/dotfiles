@@ -1,0 +1,19 @@
+.agents/skills/handoff-to-new-session/SKILL.md
+  s_1a3f45d6c2312f::t_8d7f72fbff594f 1-25
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.0",
+  "base_commit_sha": "f40b4368bb38656ef785aa9a9cb04b8a7e665a95",
+  "prompts": {},
+  "sessions": {
+    "s_1a3f45d6c2312f": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_fac3be8a6ffetJ5xq50HVbBA5w",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Elhaam Basheer Chaudhry <e4elhaam@gmail.com>"
+    }
+  }
+}
