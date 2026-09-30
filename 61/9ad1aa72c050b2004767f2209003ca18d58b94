@@ -1,0 +1,53 @@
+scripts/fixwifi
+  s_b970c6c3e1c381::t_25991f35d6e0c5 55
+  s_b970c6c3e1c381::t_31d8f2ee89e947 1-54,56-116
+.config/opencode/omo.jsonc
+  s_6719413e471e38::t_75e3e02b6d6f6a 19,22,27,64,75,79,89-90
+.gitignore
+  s_0e2875120aaa4c::t_9aa096b4229ff5 2-8
+.claude/keybindings.json
+  s_668f94a3d9cb7f::t_f32061e9c3a659 1-10,13-18,22-27,31-34
+  s_668f94a3d9cb7f::t_2a1be8ecadc7bc 11-12,19-21,28-30
+.local/share/applications/slack_slack.desktop
+  s_0e2875120aaa4c::t_3db70009fe72bb 1-13
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "619ad1aa72c050b2004767f2209003ca18d58b94",
+  "prompts": {},
+  "sessions": {
+    "s_0e2875120aaa4c": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_fa3dd5ab4ffeONnpg5XIlL61U9",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Elhaam Basheer Chaudhry <e4elhaam@gmail.com>"
+    },
+    "s_668f94a3d9cb7f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "46caaf03-d18a-45c2-9d4f-cecd388b454c",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Elhaam Basheer Chaudhry <e4elhaam@gmail.com>"
+    },
+    "s_6719413e471e38": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f750a2e9bffeLFAztxx0nuNQaN",
+        "model": "gpt-5.6-luna"
+      },
+      "human_author": "Elhaam Basheer Chaudhry <e4elhaam@gmail.com>"
+    },
+    "s_b970c6c3e1c381": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "730b1598-b5e1-453d-b7b7-5d4563a9d437",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Elhaam Basheer Chaudhry <e4elhaam@gmail.com>"
+    }
+  }
+}
