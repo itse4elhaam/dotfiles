@@ -1,0 +1,19 @@
+.agents/skills/break-the-spec/SKILL.md
+  s_f26db0eb980b94::t_7af80fe3c3b1cc 1-22
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "d4130bfd2708b36aa3575bcb28904f3c4386cfa0",
+  "prompts": {},
+  "sessions": {
+    "s_f26db0eb980b94": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "17995cb5-e79b-4335-bc0f-94ac0eefca7f",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Elhaam Basheer Chaudhry <e4elhaam@gmail.com>"
+    }
+  }
+}
