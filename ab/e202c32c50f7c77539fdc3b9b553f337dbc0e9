@@ -1,0 +1,20 @@
+.agents/skills/requirements-edge-cases/SKILL.md
+  s_f26db0eb980b94::t_58e817013ba3c6 1-8
+  s_f26db0eb980b94::t_c1edcff2a4db0f 9-11
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "abe202c32c50f7c77539fdc3b9b553f337dbc0e9",
+  "prompts": {},
+  "sessions": {
+    "s_f26db0eb980b94": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "17995cb5-e79b-4335-bc0f-94ac0eefca7f",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Elhaam Basheer Chaudhry <e4elhaam@gmail.com>"
+    }
+  }
+}
