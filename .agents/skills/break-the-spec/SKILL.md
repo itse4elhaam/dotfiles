@@ -1,9 +1,9 @@
 ---
-name: requirements-edge-cases
+name: break-the-spec
 description: Use this skill when the user gives you initial requirements, asks you to build something e2e or ship a fix.
 ---
 
-# Requirements edge cases
+# Break the spec
 
 Your purpose is to dissect the issue more than just the surface that's visibile.
 
