@@ -1,70 +1,86 @@
 ---
 name: readable-html-dossier
-description: Use when dense research, review, investigation, onboarding, or audit evidence must become a standalone HTML report, or when a document needs a reading-first visual contract.
+description: Use when creating a standalone HTML report, dossier, investigation brief, review findings document, or human-readable context page from agent research.
 ---
 
 # Readable HTML Dossier
 
-Create a self-contained HTML dossier that turns dense evidence into a clear reading journey. The dossier is the narrative; a standalone HTML report that tells the full reading journey.
+Create a self-contained HTML document optimized for humans reading dense context. Default to dark theme; support light mode through CSS variables and add a visible toggle only when the report is meant for interactive theme switching.
 
-## Steps
+## Design contract
 
-1. **Name the reader job.** Choose one primary job: decide, review, onboard, debug, or audit. State the intended reader, the decision or understanding available after reading, and the dossier's freshness boundary.
-   Completion: the title and opening paragraph identify the reader, purpose, and outcome without requiring the rest of the report.
+- **Reading first:** body text targets `65ch`, line-height `1.6–1.75`, 16–18px equivalent via `rem`/`clamp()`.
+- **Responsive by default:** no horizontal scrolling at normal zoom, 200% zoom, or laptop widths.
+- **Dark default:** use softened dark colors, not pure black/white. Light mode must be available through CSS variables and `data-theme="light"`; visible toggles are optional unless interactivity is required.
+- **Standalone:** inline CSS; no build step. Only use CDN scripts when diagrams genuinely need Mermaid.
+- **Semantic:** `main`, `section`, `article`, headings in order, tables only for tabular data.
+- **Context-rich:** include background, evidence, uncertainty, and domain links when those help a human make a decision.
+- **Typography:** body text in Source Sans 3 (18px/1.7), headings in Inter (weight 650, -0.02em letter-spacing), code in JetBrains Mono (14px/1.6). Prose column capped at 760px. See [REFERENCES.md](REFERENCES.md#typography) for the full spec.
 
-2. **Build the evidence spine.** Gather the background, findings, uncertainty, actions, source links, domain documents, and external resources needed for the reader job. Use relevant research skills when external material would deepen the reader's mental model.
-   Completion: every conclusion can be traced to evidence, every uncertainty is visible, and every recommended action has a reason.
+## Workflow
 
-3. **Shape the reading journey.** Prefer this order when the evidence supports it:
-   - executive summary;
-   - background and vocabulary;
-   - findings or evidence cards;
-   - recommended actions;
-   - open questions and stale items;
-   - source links, domain documents, and curated external resources.
+1. **Choose the reader job.** Decide whether the dossier is for decision, review, onboarding, debugging, or audit.
+   Completion: the title and first paragraph say what a human can decide after reading.
 
-   Remove sections that have no reader job. Give every resumable heading a stable, unique ID derived from meaning rather than position.
-   For the language, load the `wait-what` skill from `~/.agents/skills/wait-what` and follow it — it enforces ASD-STE100 Simplified Technical English and the ubiquitous language from `CONTEXT.md`. It is the single source of truth for the writing; keep no separate language rules in this skill.
-   Completion: each section advances the reader from orientation to evidence to action, with no empty or orphaned section, and every resumable heading has a stable ID.
+2. **Shape the document.** Use this default order:
+   - Executive summary
+   - Background context
+   - Findings or evidence cards
+   - Recommended actions
+   - Open questions / stale items
+   - Source links and domain documents
+   Completion: every major section has a clear reader purpose.
 
-4. **Write the standalone HTML.** Save where the caller asks, or in `/tmp` when no path is specified. Use semantic HTML, inline CSS, responsive reflow, dark-default theme variables, a print stylesheet, and no build step. Add a visible theme toggle only when interactive switching serves the reader. When a diagram is deemed required, use the `architecture-diagram` skill from `~/.agents/skills/architecture-diagram`.
-   Completion: one HTML file opens directly through `file://`, contains its required styling, and needs no local server.
+3. **Write the HTML.** Save where the caller asks; use `/tmp` only for explicitly one-off reports and always report the path.
+   Completion: the file opens directly in a browser without a server.
 
-   Read [REFERENCES.md](REFERENCES.md#visual-contract) before writing; it is the single source of truth for typography, layout, scaffold, and interaction details.
+4. **Verify readability.** Check line length, heading order, contrast, zoom/reflow, and print behavior.
+   Completion: the document remains readable on a laptop, large monitor, and browser zoom.
 
-5. **Install reading-progress tracking.** Add the percentage tracker defined in [REFERENCES.md](REFERENCES.md#reading-progress-tracker).
-   Completion: a dossier opened from a trusted opener reports monotonic 0–100% progress and reaches 100% only at the document end; direct opening and unavailable browser APIs leave it fully readable.
+5. **Open in browser (default).** Detect which browser is open (Chrome, Firefox, Brave, Edge, etc.), collect the absolute path of the HTML document, and open it as a new tab in that browser. Skip this step only if the user explicitly asks not to open it.
+   Completion: the dossier is open in the user's browser for immediate reading.
+   See [REFERENCES.md](REFERENCES.md) for the exact detection and opening process per browser.
 
-6. **Verify once from source.** Run a single pass checking only: (1) the HTML opens as `file://` without manifest errors, (2) no empty sections remain, (3) prose width respects `min(65ch, 100% - 2rem)`, (4) when narration is included, the reading controller works from the directly opened `file://` file: it renders, Play reads the first block, and the active block highlights and scrolls. That is the entire check. Do not do type checks, linting, or any codebase-level validation — this is an HTML report, not application code. Do not launch browser automation, Playwright, screenshots, or browser tests of any kind. Do not re-read or re-verify after this single pass.
-   Completion: the checks pass; the dossier file exists and is ready for delivery.
-
-7. **Open the dossier.** Open the HTML file directly with the user's browser. Provide the absolute path.
-
-   Read [REFERENCES.md](REFERENCES.md#browser-opening) for the exact direct-file browser procedure and its hard guardrails.
-
-## Narration (optional)
-
-When the reader may prefer listening, add the self-contained read-aloud controller. Load the `html-read-aloud` skill from `~/.agents/skills/html-read-aloud` and embed its standalone controller: the CSS into `<head>`, the markup and script before `</body>`. Mark the main content as the predictable reading root:
+## Minimal scaffold
 
 ```html
-<article data-readable-root>
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Dossier</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700&family=Inter:wght@400;650&family=JetBrains+Mono:wght@400;500&display=swap');
+    :root{color-scheme:dark light;--bg:#121212;--panel:#1b1b1b;--text:#e6e1d9;--muted:#aaa39a;--accent:#8ab4ff;--border:#333;--font-body:"Source Sans 3",system-ui,sans-serif;--font-heading:"Inter","Source Sans 3",system-ui,sans-serif;--font-code:"JetBrains Mono","SFMono-Regular",Consolas,monospace}
+    [data-theme="light"]{--bg:#fafafa;--panel:#fff;--text:#1f1f1f;--muted:#5f5f5f;--accent:#0057b3;--border:#ddd}
+    body{margin:0;background:var(--bg);color:var(--text);font:400 1.125rem/1.7 var(--font-body)}
+    main{max-width:min(760px,100% - 2rem);margin:auto;padding:clamp(1.5rem,4vw,4rem) 0}
+    .card{background:var(--panel);border:1px solid var(--border);border-radius:16px;padding:1.25rem;margin:1rem 0}
+    h1,h2,h3{font-family:var(--font-heading);font-weight:650;line-height:1.2;letter-spacing:-0.02em}
+    a{color:var(--accent)} code{font-family:var(--font-code);font-size:.9em} pre{font-family:var(--font-code);font-size:.875rem;line-height:1.6;overflow-x:auto}
+    @media print{body{background:#fff!important;color:#000!important;font-size:11pt}.card{break-inside:avoid}a[href^="http"]::after{content:" (" attr(href) ")";font-size:.85em}}
+  </style>
+</head>
+<body><main><article><h1>Dossier title</h1></article></main></body>
+</html>
 ```
 
-Narration must work from a `file://` URL with no server, framework, or build step. Use `data-readable` to force-read a block and `data-reader-ignore` to exclude one; the defaults handle the rest. Read `~/.agents/skills/html-read-aloud/REFERENCES.md` for the exact embedding contract.
-Completion: when narration is included, the dossier opens from `file://` with a working reading controller.
+## Evidence writing
 
-## Evidence card
-
-Each finding answers:
-
+Each finding should answer:
 - What happened?
 - Why does it matter?
 - What evidence supports it?
 - What should a human or agent do next?
-- What could make it stale?
+- What could make this stale?
 
-Use tables for genuine comparisons, cards for findings, and callouts for uncertainty. Keep actions visible.
+Use tables for comparisons, cards for findings, and callouts for uncertainty. Do not bury actions inside prose.
 
-## Completion contract
+## Quality checks
 
-The run is complete only when the dossier is readable as a standalone file and reports its path.
+- Body text column stays near 45–75 characters.
+- Contrast meets WCAG AA; aim higher for long reading.
+- Links are underlined or otherwise not color-only.
+- Print stylesheet forces light background and exposes URLs.
+- Empty sections are removed.

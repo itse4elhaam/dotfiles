@@ -9,10 +9,12 @@ AI agent skills for code review, Git workflows, documentation, and structured da
 | Skill | Description |
 |---|---|
 | **elhaam-review** | Personal code review with seven lenses: codebase boundary, simplicity, test confidence, security/server boundaries, scalability, maintainability, and automation feedback. Defaults to an HTML findings report. |
+| **static-pr-dry-run** | Bounded static pre-ship review of a PR or diff. Builds a traceable obligation ledger, source-traces each case, reports exact ledger counts, exposes runtime gaps, and returns `SHIP`, `SHIP AFTER CHECKS`, or `DO NOT SHIP`. |
 | **elhaam-voice** | Write or rewrite text in Elhaam's personal voice — warm, direct, thoughtful, commercially aware, leading with a clear position. Preserves conviction and user-authored language while removing generic AI polish and corporate fog. Model-invoked for first-person writing; never for code or tech docs. |
 | **pr-review-dossier** | Read-only investigation of GitHub PR review feedback. Fetches review threads via GraphQL and produces an evidence-backed HTML dossier with a recommended decision or way ahead. |
 | **posting-pr-review-comments** | Publish inline review comments to a GitHub PR as a single batched review. Write-side counterpart to read-only review skills. OpenCode config provides defense-in-depth via `ask` gates on `gh api` and `gh pr` mutations — see [opencode.json](../../.config/opencode/opencode.json) `permission.bash`. The current-turn user directive is the primary authorization, not the permission prompt. |
 | **local-change-review** | Review uncommitted local changes by grouping related hunks into small, intentional commits. |
+| **using-git-worktrees** | Create or move Git worktrees only after the user confirms the location. Defaults to `/home/elhaam/workspace/coding/bluum/worktrees/` and preserves uncommitted changes during moves. |
 | **conflict-rebase-resolution** | Merge or rebase by gathering a holistic view of conflicts, then resolving them safely. |
 | **readable-html-dossier** | Create standalone, reading-first HTML reports for research, reviews, and investigations. |
 | **html-read-aloud** | Add in-browser narration and synchronized scrolling to standalone HTML documents via the Web Speech API — block-by-block reading, active-block highlighting, voice/rate controls, progress persistence. Works from `file://` with no server, framework, or external dependency. Composes with readable-html-dossier. |

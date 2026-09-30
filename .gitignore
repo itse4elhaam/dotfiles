@@ -1,4 +1,11 @@
 *.local
+!/.local/
+/.local/*
+!/.local/share/
+/.local/share/*
+!/.local/share/applications/
+/.local/share/applications/*
+!/.local/share/applications/slack_slack.desktop
 tmp
 installation_id
 oauth_creds*

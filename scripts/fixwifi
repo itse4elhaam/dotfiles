@@ -1,0 +1,116 @@
+#!/usr/bin/env bash
+# fixwifi — recover Wi-Fi when NetworkManager leaves the adapter "unmanaged".
+#
+# Root cause on this EliteBook 840 G10: an ACPI firmware mutex deadlock
+# (EC/battery/thermal AML) hangs the lid-close suspend. logind never emits
+# "resume", so NetworkManager stays ASLEEP and unmanages Wi-Fi (reason
+# 'sleeping'). Restarting NM clears its sleep state. The ACPI deadlock itself
+# only clears on reboot.
+#
+# Usage: fixwifi [--check]   (--check: diagnose only, change nothing)
+
+set -uo pipefail
+
+check_only=0
+case "${1:-}" in
+  --check|-n|--dry-run) check_only=1 ;;
+  -h|--help) sed -n '2,11p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+  "") ;;
+  *) echo "fixwifi: unknown option '$1'" >&2; exit 2 ;;
+esac
+
+bold=$'\e[1m'; red=$'\e[31m'; yel=$'\e[33m'; grn=$'\e[32m'; off=$'\e[0m'
+say()  { printf '%s==>%s %s\n' "$bold" "$off" "$*"; }
+warn() { printf '%s!! %s%s\n' "$yel" "$*" "$off" >&2; }
+die()  { printf '%sxx %s%s\n' "$red" "$*" "$off" >&2; exit 1; }
+
+# --- detect Wi-Fi interface (sysfs first: works even when NM is unhealthy) ---
+iface=""
+for d in /sys/class/net/*; do
+  [[ -d "$d/wireless" || -e "$d/phy80211" ]] || continue
+  n=${d##*/}
+  [[ $n == p2p-* ]] && continue
+  iface=$n; break
+done
+if [[ -z $iface ]] && command -v nmcli >/dev/null; then
+  iface=$(nmcli -t -f DEVICE,TYPE device 2>/dev/null | awk -F: '$2=="wifi"{print $1; exit}')
+fi
+[[ -n $iface ]] || die "No Wi-Fi adapter detected (nothing in /sys/class/net with wireless/phy80211, nothing of type wifi in nmcli). Check 'lspci -k | grep -A3 -i net' and 'rfkill'."
+say "Wi-Fi interface: ${bold}${iface}${off}"
+say "Current state:   $(nmcli -t -f DEVICE,STATE device 2>/dev/null | awk -F: -v i="$iface" '$1==i{print $2}')"
+
+# --- detect the stuck-suspend condition that causes this ---
+stuck=0
+prep=$(busctl get-property org.freedesktop.login1 /org/freedesktop/login1 \
+       org.freedesktop.login1.Manager PreparingForSleep 2>/dev/null | awk '{print $2}')
+susp=$(systemctl is-active systemd-suspend.service 2>/dev/null)
+if [[ $prep == true || $susp == activating ]]; then
+  stuck=1
+  warn "A suspend is STUCK (logind PreparingForSleep=${prep:-?}, systemd-suspend.service=${susp:-?})."
+  warn "Almost certainly the ACPI firmware deadlock. Until you reboot:"
+  warn "  - closing the lid will NOT suspend (battery drains in the bag)"
+  warn "  - battery/AC readings may hang"
+  warn "fixwifi restores Wi-Fi now; REBOOT soon (shutdown may hang, so hold power ~10s if it does)."
+fi
+if [[ $(journalctl -k -b --no-pager -o cat 2>/dev/null | grep -c 'acpi_os_wait_semaphore') -gt 0 ]]; then
+  warn "Kernel log this boot shows ACPI tasks hung on a firmware mutex (acpi_os_wait_semaphore)."
+fi
+if rfkill list wifi 2>/dev/null | grep -q 'Hard blocked: yes'; then
+  warn "Wi-Fi is HARD-blocked (physical switch/BIOS). Software can't fix that."
+fi
+
+cmds=(
+  "sudo rfkill unblock wifi"
+  "sudo nmcli device set $iface managed yes"
+  "sudo ip link set $iface up"
+  "sudo systemctl restart NetworkManager"
+)
+
+if (( check_only )); then
+  say "--check: would run:"
+  printf '    %s\n' "${cmds[@]}"
+  exit 0
+fi
+
+# --- recovery (every step is idempotent) ---
+sudo -v || die "sudo authentication failed."
+sudo rfkill unblock wifi
+# Can fail while NM is wedged; the restart below is the part that matters.
+sudo nmcli device set "$iface" managed yes || warn "'nmcli device set managed yes' failed; continuing to restart NM."
+sudo ip link set "$iface" up || warn "'ip link set $iface up' failed."
+say "Restarting NetworkManager..."
+sudo systemctl restart NetworkManager || die "NetworkManager failed to restart. See: journalctl -u NetworkManager -n 50"
+
+# --- wait for NM, then for the device to leave 'unavailable' ---
+for _ in $(seq 1 20); do
+  [[ $(nmcli -t -f RUNNING general 2>/dev/null) == running ]] && break
+  sleep 0.5
+done
+state=""
+for _ in $(seq 1 20); do
+  state=$(nmcli -t -f DEVICE,STATE device 2>/dev/null | awk -F: -v i="$iface" '$1==i{print $2}')
+  [[ -n $state && $state != unavailable && $state != unmanaged ]] && break
+  sleep 0.5
+done
+
+say "nmcli device:"
+nmcli device | grep -vE '^(veth|br-|docker|lo )'
+echo
+
+if [[ $state == unmanaged || $state == unavailable || -z $state ]]; then
+  warn "$iface is still '${state:-missing}'. If a suspend is stuck (see above), reboot."
+  exit 1
+fi
+
+# --- rescan (non-fatal; the device can refuse for a few seconds after restart) ---
+for _ in 1 2 3; do
+  nmcli device wifi rescan ifname "$iface" 2>/dev/null && break
+  sleep 2
+done
+sleep 2
+say "Available networks:"
+nmcli device wifi list ifname "$iface"
+
+printf '\n%s✓ %s is %s%s\n' "$grn" "$iface" "$state" "$off"
+(( stuck )) && warn "Reminder: the suspend is still stuck. Reboot soon."
+exit 0
