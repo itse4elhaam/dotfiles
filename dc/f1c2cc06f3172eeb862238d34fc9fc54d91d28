@@ -1,0 +1,19 @@
+.agents/skills/elhaam-review/SKILL.md
+  s_c79d7981d6973b::t_ad51be7c0fbed0 50,70,80,105
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "dcf1c2cc06f3172eeb862238d34fc9fc54d91d28",
+  "prompts": {},
+  "sessions": {
+    "s_c79d7981d6973b": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a13c7d-1d93-7081-bd52-90736cd93aa6",
+        "model": "unknown"
+      },
+      "human_author": "Elhaam Basheer Chaudhry <e4elhaam@gmail.com>"
+    }
+  }
+}
