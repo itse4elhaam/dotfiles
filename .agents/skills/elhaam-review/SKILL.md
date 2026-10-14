@@ -47,6 +47,7 @@ Tests are required when the hunk has logic, risk, or future extension pressure.
 - Complex function or transformed data? Ask for focused unit tests.
 - User flow? Prefer behavior/user-experience tests over implementation-heavy tests.
 - Risky production path? Require multiple scenarios, not only happy-path manual QA.
+- Choose scenarios from the conditions that change execution: feature enabled/disabled, fresh/persisted state, and slow/failed dependencies. For asynchronous UI, verify eventual recovery and the next user action. Assert relevant external-call counts and blocking behavior, alongside returned values.
 - Repeatable issue? Ask whether a test or lint rule should prevent it next time.
 
 ### 4. Server, database, and security boundary
@@ -66,6 +67,7 @@ Look across hunks, not just inside one line. Grouped hunks can create N+1 or rep
 - `Promise.all`: decide whether one failure should fail everything.
 - Check caching, ISR/SSG, background jobs, and data type mismatches under production data.
 - Ask how the change behaves with more users, tenants, records, feature flags, and retries.
+- For shared hooks, middleware, and workflows, enumerate the user actions that trigger them. Trace awaited DB/API calls through completion. Does each action need that work before returning? Check timeouts, retries, and queued writes. Distinguish immediate optimistic UI feedback from actual request completion.
 
 ### 6. Future maintainer clarity
 
@@ -75,6 +77,7 @@ Ask whether a new engineer can safely extend this next month.
 - Assumptions are explicit, not hidden in branches or magic strings: tenant scope, ordering, data shape, feature flags, retries, time zones, and nullability.
 - Client/server boundaries are localized.
 - Adding one more case does not require copying fragile code.
+- For loading flags, locks, pending counters, and disabled controls, trace entry and exit through success, failure, cancellation, and overlapping operations. Verify that completion updates every consumer, including same-tab state and cross-tab listeners.
 
 ### 7. Automation feedback loop
 
@@ -99,6 +102,7 @@ Separate **Blockers** (security/correctness/data loss/missing confidence), **Sho
 - **Classify every export by caller and effect.** A `use server` export that client code calls is an action with auth and ownership requirements, not a helper.
 - **Search existing patterns before judging each hunk.** Every diff sits inside established conventions — find them first.
 - **Require evidence proportional to risk.** Happy-path manual QA is insufficient for data/server/payment logic; demand multi-scenario tests.
+- Separate what the diff proves from production hypotheses. When attributing a regression, distinguish code introduction, deployment, feature activation, and symptom onset. Support latency claims with measurements or label them unmeasured.
 - **Name the behaviour, edge cases, and contracts before suggesting simplification.** Silent behaviour removal is not simplification.
 - **Pair every style flag with a maintainability or extension risk.** Style without consequence is noise.
 - **Convert every repeatable finding into leverage.** Each repeated issue should produce a test, lint rule, shared helper, or agent instruction.
