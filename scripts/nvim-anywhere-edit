@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Edit a selected range or a whole GUI field in the user's Neovim (X11)."""
+"""Edit a whole GUI field or a selected range in the user's Neovim (X11)."""
 import argparse
 import fcntl
 import os
@@ -34,10 +34,12 @@ def clipboard(data):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     mode = parser.add_mutually_exclusive_group()
-    mode.add_argument('--whole-field', action='store_true')
+    mode.add_argument('--whole-field', action='store_true', help='Edit the whole focused field (default)')
+    mode.add_argument('--selection', action='store_true', help='Edit only the selected text')
     mode.add_argument('--blank', action='store_true', help='Compose new text and insert at the cursor')
     parser.add_argument('--windowed', action='store_true')
     args = parser.parse_args()
+    args.whole_field = not (args.selection or args.blank)
     for command in ('ghostty', 'nvim', 'xdotool', 'wmctrl', 'xclip', 'notify-send'):
         if not shutil.which(command):
             parser.error(f'Missing command: {command}')
@@ -85,7 +87,7 @@ def main():
         if captured == sentinel:
             if previous is not None:
                 clipboard(previous)
-            notify('Nothing copied. Select text first, or copy a space into an empty field.')
+            notify('No text copied. Focus a textbox and retry. For an empty field, use Super+Shift+E to compose.')
             return
         session = Path(tempfile.mkdtemp(prefix='draft-', dir=state))
         draft = session / 'draft.md'

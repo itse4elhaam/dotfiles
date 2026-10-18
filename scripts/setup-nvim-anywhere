@@ -23,9 +23,9 @@ if not backup.exists():
 settings.set_strv('email', [key for key in settings.get_strv('email') if key != '<Super>e'])
 import shlex
 for suffix, name, extra, binding in (
-    ('nvim-selection/', 'Edit selection in Neovim', '', '<Super>e'),
-    ('nvim-field/', 'Edit field in Neovim', ' --whole-field', '<Super><Shift>e'),
-    ('nvim-blank/', 'Compose in Neovim', ' --blank', '<Super><Control>e'),
+    ('nvim-selection/', 'Edit selection in Neovim', ' --selection', '<Super><Control>e'),
+    ('nvim-field/', 'Edit field in Neovim', '', '<Super>e'),
+    ('nvim-blank/', 'Compose in Neovim', ' --blank', '<Super><Shift>e'),
 ):
     path = base + suffix
     entry = Gio.Settings.new_with_path(schema, path)
@@ -40,4 +40,4 @@ time.sleep(0.5)
 settings.set_strv('custom-keybindings', paths)
 Gio.Settings.sync()
 PY
-printf '%s\n' 'Neovim shortcuts installed: Super+E selection, Super+Shift+E field, Super+Ctrl+E compose.'
+printf '%s\n' 'Neovim shortcuts installed: Super+E whole field, Super+Ctrl+E selection, Super+Shift+E compose.'

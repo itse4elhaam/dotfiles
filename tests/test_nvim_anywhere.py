@@ -50,9 +50,10 @@ class EditorProtocol(unittest.TestCase):
 
 class DesktopHandoff(unittest.TestCase):
     def test_blank_commit_and_failure_recovery(self):
-        for mode, fail_return in ((mode, failed) for mode in ('--blank', '--whole-field', '') for failed in (False, True)):
+        for mode, fail_return in ((mode, failed) for mode in ('--blank', '--whole-field', '--selection', '') for failed in (False, True)):
             with self.subTest(mode=mode, fail_return=fail_return), tempfile.TemporaryDirectory() as folder:
                 pasted = []
+                keys = []
                 notices = []
                 def fake_run(*args, **kwargs):
                     if args[0] == 'ghostty':
@@ -61,11 +62,15 @@ class DesktopHandoff(unittest.TestCase):
                         editor = shlex.split(args[-1])
                         self.assertEqual(editor, ['/bin/tool', '--cmd', 'lua dofile(vim.env.NVIM_ANYWHERE_LUA)', env['NVIM_ANYWHERE_DRAFT']])
                         self.assertEqual(env['NVIM_ANYWHERE_LUA'], str(ROOT / 'scripts/nvim-anywhere/editor.lua'))
+                        self.assertEqual(Path(env['NVIM_ANYWHERE_DRAFT']).read_bytes(), b'' if mode == '--blank' else b'captured text')
+                        self.assertEqual('ctrl+a' in keys, mode not in ('--blank', '--selection'))
                         Path(env['NVIM_ANYWHERE_DRAFT']).write_text('new text')
                         Path(env['NVIM_ANYWHERE_COMMIT']).touch()
                         return subprocess.CompletedProcess(args, 0)
                     if fail_return and args[1] == 'windowactivate':
                         raise subprocess.CalledProcessError(1, args)
+                    if args[0] == 'xdotool' and args[1] == 'key':
+                        keys.append(args[-1])
                     if args[-1] == 'ctrl+v':
                         pasted.append(True)
                     return subprocess.CompletedProcess(args, 0)
