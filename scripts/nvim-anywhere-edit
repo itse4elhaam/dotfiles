@@ -71,19 +71,33 @@ def main():
                 clipboard(previous)
             notify('Source window changed before capture. Try again.')
             return
-        if args.whole_field:
-            run('xdotool', 'key', '--clearmodifiers', 'ctrl+a')
-        if not args.blank:
-            run('xdotool', 'key', '--clearmodifiers', 'ctrl+c')
         captured = b'' if args.blank else sentinel
-        for _ in range(0 if args.blank else 20):
-            time.sleep(0.05)
-            try:
-                captured = copy_text()
-            except subprocess.SubprocessError:
-                continue
+        for attempt in range(0 if args.blank else 2):
+            if output('xdotool', 'getactivewindow') != source:
+                break
+            if args.whole_field:
+                run('xdotool', 'key', '--clearmodifiers', 'ctrl+a')
+                time.sleep(0.03)  # Browser editors can update selection asynchronously.
+            run('xdotool', 'key', '--clearmodifiers', 'ctrl+c')
+            for _ in range(6):
+                time.sleep(0.05)
+                try:
+                    candidate = copy_text()
+                except subprocess.SubprocessError:
+                    continue
+                # Some clipboard owners briefly advertise empty text before
+                # publishing the actual selection. Never open that as a draft.
+                if candidate and candidate != sentinel:
+                    captured = candidate
+                    break
             if captured != sentinel:
                 break
+        if args.whole_field:
+            # Collapse Select All before opening the editor so the field does
+            # not remain highlighted. Re-select only when committing a replacement.
+            run('xdotool', 'key', '--clearmodifiers', 'Right')
+            if captured == sentinel:
+                captured = b''  # Empty textboxes should open the same editor.
         if captured == sentinel:
             if previous is not None:
                 clipboard(previous)
@@ -117,7 +131,10 @@ def main():
             if output('xdotool', 'getactivewindow') != source:
                 raise RuntimeError('Source window lost focus')
             clipboard(draft.read_bytes())
-            run('xdotool', 'key', '--clearmodifiers', 'ctrl+v')
+            if args.whole_field and captured:
+                run('xdotool', 'key', '--clearmodifiers', 'ctrl+a', 'ctrl+v')
+            else:
+                run('xdotool', 'key', '--clearmodifiers', 'ctrl+v')
             # Keep edited text on clipboard for recovery; paste completion cannot
             # be acknowledged by an arbitrary app. Original text is saved below.
             notify(f'Text returned. Draft retained: {draft}')

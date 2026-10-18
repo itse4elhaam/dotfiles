@@ -24,7 +24,7 @@ settings.set_strv('email', [key for key in settings.get_strv('email') if key != 
 import shlex
 for suffix, name, extra, binding in (
     ('nvim-selection/', 'Edit selection in Neovim', ' --selection', '<Super><Control>e'),
-    ('nvim-field/', 'Edit field in Neovim', '', '<Super>e'),
+    ('nvim-field/', 'Edit field in Neovim', ' --whole-field', '<Super>e'),
     ('nvim-blank/', 'Compose in Neovim', ' --blank', '<Super><Shift>e'),
 ):
     path = base + suffix

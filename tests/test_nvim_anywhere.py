@@ -64,6 +64,7 @@ class DesktopHandoff(unittest.TestCase):
                         self.assertEqual(env['NVIM_ANYWHERE_LUA'], str(ROOT / 'scripts/nvim-anywhere/editor.lua'))
                         self.assertEqual(Path(env['NVIM_ANYWHERE_DRAFT']).read_bytes(), b'' if mode == '--blank' else b'captured text')
                         self.assertEqual('ctrl+a' in keys, mode not in ('--blank', '--selection'))
+                        self.assertEqual('Right' in keys, mode not in ('--blank', '--selection'))
                         Path(env['NVIM_ANYWHERE_DRAFT']).write_text('new text')
                         Path(env['NVIM_ANYWHERE_COMMIT']).touch()
                         return subprocess.CompletedProcess(args, 0)
@@ -78,7 +79,7 @@ class DesktopHandoff(unittest.TestCase):
                      patch('sys.argv', ['nvim-anywhere-edit'] + ([mode] if mode else [])), \
                      patch.object(helper.shutil, 'which', return_value='/bin/tool'), \
                      patch.object(helper, 'output', return_value='123'), \
-                     patch.object(helper, 'copy_text', side_effect=([b'old clipboard'] if mode == '--blank' else [b'old clipboard', subprocess.CalledProcessError(1, ['xclip']), b'captured text'])), \
+                     patch.object(helper, 'copy_text', side_effect=([b'old clipboard'] if mode == '--blank' else [b'old clipboard', subprocess.CalledProcessError(1, ['xclip']), b'', b'captured text'])), \
                      patch.object(helper, 'clipboard'), patch.object(helper.time, 'sleep'), \
                      patch.object(helper, 'notify', side_effect=notices.append), \
                      patch.object(helper, 'run', side_effect=fake_run), \
