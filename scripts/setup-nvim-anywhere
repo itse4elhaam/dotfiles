@@ -1,0 +1,43 @@
+#!/bin/bash
+set -euo pipefail
+script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+export NVIM_ANYWHERE_HELPER="$script_dir/nvim-anywhere-edit"
+/usr/bin/python3 <<'PY'
+import json
+import os
+import time
+from pathlib import Path
+from gi.repository import Gio
+settings = Gio.Settings.new('org.gnome.settings-daemon.plugins.media-keys')
+schema = 'org.gnome.settings-daemon.plugins.media-keys.custom-keybinding'
+base = '/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/'
+paths = list(settings.get_strv('custom-keybindings'))
+backup = Path.home() / '.local/state/nvim-anywhere/shortcuts-before.json'
+backup.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+if not backup.exists():
+    backup.write_text(json.dumps({'email': list(settings.get_strv('email')), 'paths': paths, 'entries': {
+        p: {k: Gio.Settings.new_with_path(schema, p).get_string(k)
+            for k in ('name', 'command', 'binding')} for p in paths
+    }}, indent=2))
+# Super+E is GNOME's default email launcher; retain other email bindings.
+settings.set_strv('email', [key for key in settings.get_strv('email') if key != '<Super>e'])
+import shlex
+for suffix, name, extra, binding in (
+    ('nvim-selection/', 'Edit selection in Neovim', '', '<Super>e'),
+    ('nvim-field/', 'Edit field in Neovim', ' --whole-field', '<Super><Shift>e'),
+    ('nvim-blank/', 'Compose in Neovim', ' --blank', '<Super><Control>e'),
+):
+    path = base + suffix
+    entry = Gio.Settings.new_with_path(schema, path)
+    for key, value in (('name', name), ('command', shlex.quote(os.environ['NVIM_ANYWHERE_HELPER']) + extra), ('binding', binding)):
+        entry.set_string(key, value)
+    if path not in paths:
+        paths.append(path)
+# Re-register our shortcuts even when re-running this installer.
+settings.set_strv('custom-keybindings', [p for p in paths if '/nvim-' not in p])
+Gio.Settings.sync()
+time.sleep(0.5)
+settings.set_strv('custom-keybindings', paths)
+Gio.Settings.sync()
+PY
+printf '%s\n' 'Neovim shortcuts installed: Super+E selection, Super+Shift+E field, Super+Ctrl+E compose.'

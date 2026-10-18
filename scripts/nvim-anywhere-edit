@@ -1,0 +1,134 @@
+#!/usr/bin/env python3
+"""Edit a selected range or a whole GUI field in the user's Neovim (X11)."""
+import argparse
+import fcntl
+import os
+from pathlib import Path
+import shutil
+import shlex
+import subprocess
+import tempfile
+import time
+
+
+def run(*args, **kwargs):
+    return subprocess.run(args, check=True, **kwargs)
+
+
+def output(*args):
+    return subprocess.check_output(args).decode().strip()
+
+
+def notify(message):
+    subprocess.run(['notify-send', 'Neovim anywhere', message], check=False)
+
+
+def copy_text():
+    return subprocess.check_output(['xclip', '-selection', 'clipboard', '-out', '-target', 'UTF8_STRING'], timeout=2, stderr=subprocess.DEVNULL)
+
+
+def clipboard(data):
+    run('xclip', '-selection', 'clipboard', '-in', input=data)
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument('--whole-field', action='store_true')
+    mode.add_argument('--blank', action='store_true', help='Compose new text and insert at the cursor')
+    parser.add_argument('--windowed', action='store_true')
+    args = parser.parse_args()
+    for command in ('ghostty', 'nvim', 'xdotool', 'wmctrl', 'xclip', 'notify-send'):
+        if not shutil.which(command):
+            parser.error(f'Missing command: {command}')
+    if os.environ.get('XDG_SESSION_TYPE') != 'x11':
+        parser.error('This helper currently requires X11.')
+    os.umask(0o077)
+    state = Path(os.environ.get('XDG_STATE_HOME', str(Path.home() / '.local/state'))) / 'nvim-anywhere'
+    state.mkdir(parents=True, exist_ok=True, mode=0o700)
+    with (state / 'lock').open('w') as lock:
+        try:
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            subprocess.run(['wmctrl', '-xa', 'com.elhaam.NvimAnywhere'], check=False)
+            return
+        source = output('xdotool', 'getactivewindow')
+        # Remember the focused child too. Many GUI toolkits expose only the window.
+        focused = output('xdotool', 'getwindowfocus')
+        previous = None
+        try:
+            previous = copy_text()
+        except (subprocess.SubprocessError, OSError):
+            pass
+        # A unique sentinel distinguishes a failed copy from an empty field.
+        sentinel = os.urandom(24).hex().encode()
+        clipboard(sentinel)
+        time.sleep(0.2)  # Let the global shortcut modifiers be released.
+        if output('xdotool', 'getactivewindow') != source:
+            if previous is not None:
+                clipboard(previous)
+            notify('Source window changed before capture. Try again.')
+            return
+        if args.whole_field:
+            run('xdotool', 'key', '--clearmodifiers', 'ctrl+a')
+        if not args.blank:
+            run('xdotool', 'key', '--clearmodifiers', 'ctrl+c')
+        captured = b'' if args.blank else sentinel
+        for _ in range(0 if args.blank else 20):
+            time.sleep(0.05)
+            try:
+                captured = copy_text()
+            except subprocess.SubprocessError:
+                continue
+            if captured != sentinel:
+                break
+        if captured == sentinel:
+            if previous is not None:
+                clipboard(previous)
+            notify('Nothing copied. Select text first, or copy a space into an empty field.')
+            return
+        session = Path(tempfile.mkdtemp(prefix='draft-', dir=state))
+        draft = session / 'draft.md'
+        draft.write_bytes(captured)
+        marker = session / 'commit'
+        env = dict(os.environ, NVIM_ANYWHERE_DRAFT=str(draft), NVIM_ANYWHERE_COMMIT=str(marker))
+        lua = Path(__file__).resolve().parent / 'nvim-anywhere/editor.lua'
+        command = ['ghostty', '--gtk-single-instance=false', '--class=com.elhaam.NvimAnywhere',
+                   '--title=Neovim anywhere', '--font-size=17', f'--fullscreen={str(not args.windowed).lower()}',
+                   '--keybind=ctrl+shift+f=toggle_fullscreen', '-e',
+                   shlex.join([shutil.which('nvim'), '--cmd',
+                               'lua dofile(vim.env.NVIM_ANYWHERE_LUA)', str(draft)])]
+        env['NVIM_ANYWHERE_LUA'] = str(lua)
+        try:
+            with (session / 'editor.log').open('w') as log:
+                result = subprocess.run(command, env=env, cwd=session, stdout=log, stderr=log)
+            if result.returncode != 0 or not marker.exists():
+                if previous is not None:
+                    clipboard(previous)
+                notify(f'Edit cancelled. Recovery draft: {draft}')
+                return
+            run('xdotool', 'windowactivate', '--sync', source)
+            if output('xdotool', 'getactivewindow') != source:
+                raise RuntimeError('Could not restore the source window')
+            run('xdotool', 'windowfocus', '--sync', focused)
+            time.sleep(0.15)
+            if output('xdotool', 'getactivewindow') != source:
+                raise RuntimeError('Source window lost focus')
+            clipboard(draft.read_bytes())
+            run('xdotool', 'key', '--clearmodifiers', 'ctrl+v')
+            # Keep edited text on clipboard for recovery; paste completion cannot
+            # be acknowledged by an arbitrary app. Original text is saved below.
+            notify(f'Text returned. Draft retained: {draft}')
+        except (subprocess.SubprocessError, OSError, RuntimeError) as error:
+            notify(f'Return failed: {error}. Recovery draft: {draft}')
+        finally:
+            if previous is not None:
+                (session / 'clipboard-before.txt').write_bytes(previous)
+
+
+if __name__ == '__main__':
+    try:
+        main()
+    except (subprocess.SubprocessError, OSError, RuntimeError) as error:
+        notify(f'Could not open editor: {error}')
+        raise
