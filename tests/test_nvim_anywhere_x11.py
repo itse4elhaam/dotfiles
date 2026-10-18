@@ -79,7 +79,7 @@ class X11Capture(unittest.TestCase):
                     real_output = helper.output
                     def active_window(*args):
                         return window if args == ('xdotool', 'getactivewindow') else real_output(*args)
-                    with patch.object(helper, 'output', side_effect=active_window), patch('sys.argv', ['nvim-anywhere-edit']), patch.object(helper.subprocess, 'run', side_effect=launch), patch.object(helper, 'notify'):
+                    with patch.object(helper, 'output', side_effect=active_window), patch('sys.argv', ['nvim-anywhere-edit']), patch.object(helper.subprocess, 'run', side_effect=launch), patch.object(helper, 'log_status'):
                         helper.main()
                     for _ in range(30):
                         if result_file.exists() and result_file.read_text() == 'edited in neovim\n':

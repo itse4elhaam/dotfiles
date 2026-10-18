@@ -9,6 +9,7 @@ import shlex
 import subprocess
 import tempfile
 import time
+import sys
 
 
 def run(*args, **kwargs):
@@ -19,8 +20,8 @@ def output(*args):
     return subprocess.check_output(args).decode().strip()
 
 
-def notify(message):
-    subprocess.run(['notify-send', 'Neovim anywhere', message], check=False)
+def log_status(message):
+    print(message, file=sys.stderr)
 
 
 def copy_text():
@@ -40,7 +41,7 @@ def main():
     parser.add_argument('--windowed', action='store_true')
     args = parser.parse_args()
     args.whole_field = not (args.selection or args.blank)
-    for command in ('ghostty', 'nvim', 'xdotool', 'wmctrl', 'xclip', 'notify-send'):
+    for command in ('ghostty', 'nvim', 'xdotool', 'wmctrl', 'xclip'):
         if not shutil.which(command):
             parser.error(f'Missing command: {command}')
     if os.environ.get('XDG_SESSION_TYPE') != 'x11':
@@ -69,7 +70,7 @@ def main():
         if output('xdotool', 'getactivewindow') != source:
             if previous is not None:
                 clipboard(previous)
-            notify('Source window changed before capture. Try again.')
+            log_status('Source window changed before capture. Try again.')
             return
         captured = b'' if args.blank else sentinel
         for attempt in range(0 if args.blank else 2):
@@ -101,7 +102,7 @@ def main():
         if captured == sentinel:
             if previous is not None:
                 clipboard(previous)
-            notify('No text copied. Focus a textbox and retry. For an empty field, use Super+Shift+E to compose.')
+            log_status('No text copied. Focus a textbox and retry. For an empty field, use Super+Shift+E to compose.')
             return
         session = Path(tempfile.mkdtemp(prefix='draft-', dir=state))
         draft = session / 'draft.md'
@@ -121,7 +122,7 @@ def main():
             if result.returncode != 0 or not marker.exists():
                 if previous is not None:
                     clipboard(previous)
-                notify(f'Edit cancelled. Recovery draft: {draft}')
+                log_status(f'Edit cancelled. Recovery draft: {draft}')
                 return
             run('xdotool', 'windowactivate', '--sync', source)
             if output('xdotool', 'getactivewindow') != source:
@@ -137,9 +138,9 @@ def main():
                 run('xdotool', 'key', '--clearmodifiers', 'ctrl+v')
             # Keep edited text on clipboard for recovery; paste completion cannot
             # be acknowledged by an arbitrary app. Original text is saved below.
-            notify(f'Text returned. Draft retained: {draft}')
+            log_status(f'Text returned. Draft retained: {draft}')
         except (subprocess.SubprocessError, OSError, RuntimeError) as error:
-            notify(f'Return failed: {error}. Recovery draft: {draft}')
+            log_status(f'Return failed: {error}. Recovery draft: {draft}')
         finally:
             if previous is not None:
                 (session / 'clipboard-before.txt').write_bytes(previous)
@@ -149,5 +150,5 @@ if __name__ == '__main__':
     try:
         main()
     except (subprocess.SubprocessError, OSError, RuntimeError) as error:
-        notify(f'Could not open editor: {error}')
+        log_status(f'Could not open editor: {error}')
         raise

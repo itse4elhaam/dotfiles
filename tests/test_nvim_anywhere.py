@@ -81,7 +81,7 @@ class DesktopHandoff(unittest.TestCase):
                      patch.object(helper, 'output', return_value='123'), \
                      patch.object(helper, 'copy_text', side_effect=([b'old clipboard'] if mode == '--blank' else [b'old clipboard', subprocess.CalledProcessError(1, ['xclip']), b'', b'captured text'])), \
                      patch.object(helper, 'clipboard'), patch.object(helper.time, 'sleep'), \
-                     patch.object(helper, 'notify', side_effect=notices.append), \
+                     patch.object(helper, 'log_status', side_effect=notices.append), \
                      patch.object(helper, 'run', side_effect=fake_run), \
                      patch.object(helper.subprocess, 'run', side_effect=lambda args, **kw: fake_run(*args, **kw)):
                     helper.main()

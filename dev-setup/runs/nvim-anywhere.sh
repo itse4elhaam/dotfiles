@@ -8,9 +8,9 @@ if [[ "${XDG_SESSION_TYPE:-}" != "x11" ]]; then
 fi
 
 script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
-for command in xdotool wmctrl xclip notify-send; do
+for command in xdotool wmctrl xclip; do
   if ! command -v "$command" >/dev/null 2>&1; then
-    sudo apt-get install -y xdotool wmctrl xclip libnotify-bin python3-gi
+    sudo apt-get install -y xdotool wmctrl xclip python3-gi
     break
   fi
 done
