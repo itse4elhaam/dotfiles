@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <title>RecIt</title>
+  <desc>A mint camera frame forms an R, with a coral recording dot.</desc>
+  <defs>
+    <linearGradient id="tile" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#22383e"/>
+      <stop offset="1" stop-color="#101c23"/>
+    </linearGradient>
+    <linearGradient id="mint" x1="0" y1="0" x2="0.8" y2="1">
+      <stop stop-color="#c7f6df"/>
+      <stop offset="1" stop-color="#83cfb4"/>
+    </linearGradient>
+    <linearGradient id="coral" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#ffb18f"/>
+      <stop offset="1" stop-color="#f4776d"/>
+    </linearGradient>
+    <mask id="letter" maskUnits="userSpaceOnUse" x="0" y="0" width="512" height="512">
+      <path d="M144 359V164c0-17.7 14.3-32 32-32h104c57.4 0 104 46.6 104 104s-46.6 104-104 104h-72v19c0 17.7-14.3 32-32 32s-32-14.3-32-32Zm64-83h72c22.1 0 40-17.9 40-40s-17.9-40-40-40h-72Z" fill="white" fill-rule="evenodd"/>
+      <path d="m274 304 92 92c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3l-92-92Z" fill="white"/>
+    </mask>
+  </defs>
+  <rect x="8" y="8" width="496" height="496" rx="122" fill="url(#tile)"/>
+  <rect x="9" y="9" width="494" height="494" rx="121" fill="none" stroke="#fff" stroke-opacity=".07" stroke-width="2"/>
+  <g transform="translate(-24 0)">
+    <rect x="144" y="132" width="278" height="278" fill="url(#mint)" mask="url(#letter)"/>
+    <circle cx="280" cy="236" r="23" fill="url(#coral)"/>
+  </g>
+</svg>
