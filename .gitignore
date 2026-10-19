@@ -28,3 +28,4 @@ pi-readability-test.md
 .pi/agent/skills/**/yarn.lock
 
 lsp-install-decisions.json
+**/__pycache__
