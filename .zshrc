@@ -742,3 +742,6 @@ autoload -Uz compinit && compinit -C
 
 # Composio CLI
 export PATH="$HOME/.local/bin:$PATH"
+
+# bend
+export PATH="$HOME/.bend/bin:$PATH"
