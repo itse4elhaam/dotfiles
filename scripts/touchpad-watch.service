@@ -1,0 +1,23 @@
+[Unit]
+Description=ELAN touchpad incident recorder (no automatic resets)
+After=systemd-udevd.service
+
+[Service]
+Type=simple
+User=root
+Group=@USER_GROUP@
+ExecStart=/usr/bin/python3 -I /usr/local/libexec/touchpad-watch.py --watch
+Restart=on-failure
+RestartSec=3
+RuntimeDirectory=touchpad-watch
+RuntimeDirectoryMode=0750
+StateDirectory=touchpad-watch
+StateDirectoryMode=0750
+UMask=0027
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,43 @@
+#!/bin/bash
+# Install root-owned recovery tools without installing or upgrading packages.
+set -euo pipefail
+[[ $EUID -eq 0 && $# -eq 0 ]] || {
+    echo 'Run: sudo /home/elhaam/dotfiles/scripts/install-touchpad-watch' >&2
+    exit 1
+}
+user_name=${SUDO_USER:-}
+[[ -n $user_name && $user_name != root && $user_name =~ ^[a-z_][a-z0-9_-]*$ ]] || {
+    echo 'Run this using sudo from your normal account.' >&2
+    exit 1
+}
+user_group=$(id -gn "$user_name")
+[[ $user_group =~ ^[a-z_][a-z0-9_-]*$ ]] || exit 1
+script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+staging_dir=$(mktemp -d)
+trap 'rm -rf -- "$staging_dir"' EXIT
+printf '%s ALL=(root) NOPASSWD: /usr/local/sbin/reset-touchpad-driver ""\n' "$user_name" > "$staging_dir/sudoers"
+visudo -cf "$staging_dir/sudoers"
+sed "s/@USER_GROUP@/$user_group/" "$script_dir/touchpad-watch.service" > "$staging_dir/touchpad-watch.service"
+systemd-analyze verify "$staging_dir/touchpad-watch.service"
+install -d -o root -g root -m 0755 /usr/local/libexec
+install -o root -g root -m 0755 "$script_dir/touchpad-watch.py" /usr/local/libexec/touchpad-watch.py
+install -o root -g root -m 0755 "$script_dir/reset-touchpad-driver" /usr/local/sbin/reset-touchpad-driver
+install -o root -g root -m 0644 "$staging_dir/touchpad-watch.service" /etc/systemd/system/touchpad-watch.service
+install -o root -g root -m 0440 "$staging_dir/sudoers" /etc/sudoers.d/touchpad-recovery
+systemctl daemon-reload
+systemctl enable touchpad-watch.service
+systemctl restart touchpad-watch.service
+systemctl is-active --quiet touchpad-watch.service
+for attempt in {1..30}; do
+    if /usr/bin/python3 -I -c 'import json; from pathlib import Path; raise SystemExit(set(json.loads(Path("/run/touchpad-watch/status").read_text())["sources"]) != {"mouse", "touchpad"})' 2>/dev/null; then
+        echo 'Verified: recording both ELAN touchpad and mouse input nodes.'
+        break
+    fi
+    if [[ $attempt -eq 30 ]]; then
+        echo 'Service started but has not opened both input nodes. Check: sudo journalctl -u touchpad-watch -n 30' >&2
+        exit 1
+    fi
+    sleep 0.5
+done
+echo 'Recorder installed and started. Automatic driver resets remain off.'
+echo 'For the next fault: fixtouchpad --hardware (records first, then reconnects the driver).'

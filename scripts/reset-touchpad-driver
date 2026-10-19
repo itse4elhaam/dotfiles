@@ -1,0 +1,81 @@
+#!/bin/bash
+# Reconnect only this laptop's ELAN I2C touchpad, without unloading modules.
+set -euo pipefail
+umask 077
+
+sysfs_root='/sys'
+runtime_dir='/run'
+if [[ $# -eq 2 && $1 == --sysfs-root && $EUID -ne 0 ]]; then
+    sysfs_root=$(readlink -f -- "$2")
+    [[ $sysfs_root != /sys && -d $sysfs_root/run ]] || exit 2
+    runtime_dir="$sysfs_root/run"
+elif [[ $# -ne 0 ]]; then
+    echo 'Usage: sudo reset-touchpad-driver (non-root tests: --sysfs-root DIR)' >&2
+    exit 2
+elif [[ $EUID -ne 0 ]]; then
+    echo 'A device-driver reset requires administrator access.' >&2
+    exit 1
+fi
+
+device_id='i2c-ELAN07AC:00'
+device_path="$sysfs_root/bus/i2c/devices/$device_id"
+driver_path="$sysfs_root/bus/i2c/drivers/i2c_hid_acpi"
+touchpad_name='ELAN07AC:00 04F3:31EC Touchpad'
+[[ -d "$device_path" && -w "$driver_path/bind" && -w "$driver_path/unbind" ]] || {
+    echo 'The expected ELAN touchpad and I2C HID driver are unavailable.' >&2
+    exit 1
+}
+if [[ -e "$device_path/driver" ]]; then
+    [[ $(readlink -f "$device_path/driver") == "$driver_path" ]] || {
+        echo 'Touchpad is using an unexpected driver; refusing to reset another driver.' >&2
+        exit 1
+    }
+fi
+
+input_identity() {
+    local name_path input_path event_path hid_path input_name
+    for name_path in "$device_path"/*/input/input*/name; do
+        [[ -f $name_path ]] || continue
+        IFS= read -r input_name < "$name_path" || continue
+        [[ $input_name == "$touchpad_name" ]] || continue
+        input_path=${name_path%/name}
+        hid_path=${input_path%/input/*}
+        for event_path in "$input_path"/event*; do
+            [[ -e $event_path ]] || continue
+            printf '%s|%s|%s\n' "${hid_path##*/}" "${input_path##*/}" "${event_path##*/}"
+            return 0
+        done
+    done
+}
+
+exec 9>"$runtime_dir/reset-touchpad-driver.lock"
+flock -n 9 || { echo 'A touchpad driver reset is already running.'; exit 0; }
+before=$(input_identity)
+IFS='|' read -r before_hid before_input before_event <<< "$before"
+restore_driver() {
+    if [[ ! -e "$device_path/driver" ]]; then
+        printf '%s' "$device_id" > "$driver_path/bind"
+    fi
+}
+trap restore_driver EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
+if [[ -e "$device_path/driver" ]]; then
+    printf '%s' "$device_id" > "$driver_path/unbind"
+    sleep 0.5
+fi
+printf '%s' "$device_id" > "$driver_path/bind"
+trap - EXIT INT TERM
+
+for attempt in {1..25}; do
+    after=$(input_identity)
+    IFS='|' read -r after_hid after_input after_event <<< "$after"
+    if [[ -n $after && $after_hid != "$before_hid" && $after_input != "$before_input" && -e $device_path/driver ]] &&
+        [[ $(readlink -f "$device_path/driver") == "$driver_path" ]]; then
+        echo "ELAN touchpad driver reconnected: ${before:-missing} -> $after"
+        exit 0
+    fi
+    sleep 0.2
+done
+echo "Touchpad input identity unchanged or missing after reset: ${before:-missing} -> ${after:-missing}" >&2
+exit 1

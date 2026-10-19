@@ -1,0 +1,112 @@
+#!/bin/bash
+# Manual X11 recovery, with incident capture before a hardware reset.
+set -euo pipefail
+
+touchpad_name='ELAN07AC:00 04F3:31EC Touchpad'
+mode=${1:-}
+[[ $# -le 1 ]] || { echo 'Usage: fixtouchpad [--check|--mark|--hardware]' >&2; exit 2; }
+case "$mode" in
+    -h|--help)
+        echo 'Usage: fixtouchpad [--check|--mark|--hardware]'
+        echo 'Default: soft input reset. --hardware records then reconnects the driver; --mark only records.'
+        exit 0
+        ;;
+    ''|--check|--auto|--mark|--hardware) ;;
+    *) echo "Unknown option: $mode" >&2; exit 2 ;;
+esac
+[[ ${XDG_SESSION_TYPE:-x11} == x11 && -n ${DISPLAY:-} ]] || {
+    echo 'fixtouchpad requires an X11 desktop session.' >&2
+    exit 1
+}
+
+runtime_dir=${XDG_RUNTIME_DIR:?XDG_RUNTIME_DIR is required for the recovery lock}
+exec 9>>"$runtime_dir/fixtouchpad.lock"
+flock -n 9 || { echo 'A touchpad reset is already running.'; exit 0; }
+mark_incident() {
+    /usr/bin/python3 -I - <<'PY'
+import json
+from pathlib import Path
+import time
+import uuid
+marker = Path('/run/touchpad-watch/mark')
+try:
+    stamp = uuid.uuid4().hex
+    marker.write_text(stamp)
+except OSError as error:
+    raise SystemExit(f'Incident recorder unavailable: {error}')
+deadline = time.monotonic() + 3
+while time.monotonic() < deadline:
+    try:
+        saved = json.loads(Path('/run/touchpad-watch/last-marker').read_text())
+        if saved.get('marker') == stamp:
+            print('Incident recorded: ' + saved['path'])
+            break
+    except (OSError, ValueError):
+        pass
+    time.sleep(0.1)
+else:
+    raise SystemExit('Recorder did not acknowledge the incident within 3 seconds.')
+PY
+}
+if [[ $mode == --mark ]]; then
+    mark_incident
+    exit 0
+fi
+if [[ $mode == --hardware ]]; then
+    mark_incident || echo 'Continuing manual reset without a confirmed recording.' >&2
+    sudo -n /usr/local/sbin/reset-touchpad-driver
+    for attempt in {1..25}; do
+        if xinput list-props "$touchpad_name" >/dev/null 2>&1; then
+            xinput enable "$touchpad_name"
+            if xinput list-props "$touchpad_name" | awk '
+                /Device Enabled \(/ { enabled = ($NF == 1) }
+                END { exit !enabled }
+            '; then
+                echo 'Driver recreated; X11 lists an enabled touchpad. Check how movement feels.'
+                exit 0
+            fi
+        fi
+        sleep 0.2
+    done
+    echo 'Driver reset completed, but X11 does not list an enabled touchpad.' >&2
+    exit 1
+fi
+props=$(xinput list-props "$touchpad_name")
+if [[ $mode == --check ]]; then
+    printf '%s\n' "$props" | awk '/Device Enabled \(/ || /Device Node \(/'
+    if [[ -r /run/touchpad-watch/status ]]; then
+        cat /run/touchpad-watch/status
+        echo
+    else
+        echo 'Raw-event recorder is not installed or running.'
+    fi
+    exit 0
+fi
+if [[ $mode == --auto ]]; then
+    setting=$(timeout 5s gsettings get org.gnome.desktop.peripherals.touchpad send-events) || exit 1
+    [[ $setting == "'enabled'" ]] || { echo 'Skipping reset: touchpad disabled in GNOME.'; exit 0; }
+    printf '%s\n' "$props" | awk '
+        /Device Enabled \(/ { enabled = ($NF == 1) }
+        END { exit !enabled }
+    ' || { echo 'Skipping reset: touchpad disabled in X11.'; exit 0; }
+    screen_state=$(timeout 5s gdbus call --session --dest org.gnome.ScreenSaver \
+        --object-path /org/gnome/ScreenSaver --method org.gnome.ScreenSaver.GetActive) || exit 1
+    [[ $screen_state == '(false,)' ]] || { echo 'Skipping reset: desktop locked.'; exit 0; }
+fi
+
+restore_touchpad() {
+    xinput enable "$touchpad_name"
+}
+trap restore_touchpad EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
+xinput disable "$touchpad_name"
+sleep 0.3
+xinput enable "$touchpad_name"
+trap - EXIT INT TERM
+xinput list-props "$touchpad_name" | awk '
+    /Device Enabled \(/ { enabled = ($NF == 1) }
+    END { exit !enabled }
+' || { echo 'Touchpad did not re-enable after the reset.' >&2; exit 1; }
+touch -- "$runtime_dir/fixtouchpad.last-reset"
+echo 'Touchpad input reset and verified enabled.'
