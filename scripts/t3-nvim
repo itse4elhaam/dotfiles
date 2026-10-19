@@ -1,0 +1,15 @@
+#!/bin/bash
+set -euo pipefail
+
+# Open the current worktree, or a file at an optional line, in Neovim.
+target="${1:-$PWD}"
+line="${2:-1}"
+if [[ ! "$line" =~ ^[1-9][0-9]*$ ]]; then
+    printf 'Usage: t3-nvim [file-or-directory] [positive-line-number]\n' >&2
+    exit 2
+fi
+target="$(realpath -m -- "$target")"
+if [[ -d "$target" ]]; then
+    exec ghostty --fullscreen=false --working-directory="$target" -e nvim -- "$target"
+fi
+exec ghostty --fullscreen=false --working-directory="$(dirname -- "$target")" -e nvim "+$line" -- "$target"
