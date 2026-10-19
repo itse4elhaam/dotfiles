@@ -15,3 +15,7 @@ Five canonical roles, each using its own name as the `Status:` string: `needs-tr
 ### Domain docs
 
 Single-context — one `CONTEXT.md` + `docs/adr/` at the repo root (a `CONTEXT-MAP.md` switches to multi-context where present). See `docs/agents/domain.md`.
+
+## Screen readers and accessibility settings
+
+Never enable screen readers, Orca, speech-dispatcher, accessibility speech, or desktop accessibility settings. Never set `ScreenReaderEnabled`, `screen-reader-enabled`, or `toolkit-accessibility` to true, even temporarily for testing. Never unmask speech services or remove the speech safeguards. This applies to every task, including Neovim textbox integration. Only a new, explicit user request to enable speech can override this rule.
