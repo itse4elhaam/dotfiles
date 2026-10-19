@@ -1,0 +1,22 @@
+matches:
+  - trigger: ":today"
+    replace: "{{today}}"
+    vars:
+      - name: today
+        type: date
+        params:
+          format: "%Y-%m-%d"
+
+  - trigger: ":now"
+    replace: "{{now}}"
+    vars:
+      - name: now
+        type: date
+        params:
+          format: "%Y-%m-%d %H:%M"
+
+  - trigger: ":tz"
+    replace: "Pakistan time (UTC+05:00)"
+
+  - trigger: ":shrug"
+    replace: '¯\_(ツ)_/¯'

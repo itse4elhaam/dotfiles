@@ -1,0 +1,76 @@
+#!/bin/bash
+set -euo pipefail
+
+# Requires Emote (Snap), a running CopyQ (Flatpak), and GNOME on X11.
+flatpak info com.github.hluk.copyq >/dev/null
+flatpak run com.github.hluk.copyq count >/dev/null
+command -v xdotool >/dev/null
+command -v wmctrl >/dev/null
+[[ -x /snap/bin/emote ]]
+
+/usr/bin/python3 <<'PY'
+from gi.repository import Gio
+from pathlib import Path
+import json
+
+settings = Gio.Settings.new('org.gnome.settings-daemon.plugins.media-keys')
+schema = 'org.gnome.settings-daemon.plugins.media-keys.custom-keybinding'
+base = '/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/'
+paths = list(settings.get_strv('custom-keybindings'))
+backup = Path.home() / '.local/state/desktop-pickers/shortcuts-before.json'
+if not backup.exists():
+    backup.parent.mkdir(parents=True, exist_ok=True)
+    backup.write_text(json.dumps({'paths': paths, 'entries': {
+        p: {k: Gio.Settings.new_with_path(schema, p).get_string(k)
+            for k in ('name', 'command', 'binding')} for p in paths
+    }}, indent=2))
+
+for suffix, name, command, binding in (
+    ('emoji-picker/', 'Emoji picker',
+     str(Path.home() / 'dotfiles/scripts/toggle-emoji-picker'), '<Control>period'),
+    ('clipboard-history/', 'Clipboard history',
+     '/usr/bin/flatpak run com.github.hluk.copyq toggle', '<Super>v'),
+):
+    path = base + suffix
+    entry = Gio.Settings.new_with_path(schema, path)
+    for key, value in (('name', name), ('command', command), ('binding', binding)):
+        entry.set_string(key, value)
+    if path not in paths:
+        paths.append(path)
+settings.set_strv('custom-keybindings', paths)
+Gio.Settings.sync()
+PY
+
+mkdir -p "$HOME/.config/autostart"
+cat > "$HOME/.config/autostart/desktop-copyq.desktop" <<'EOF'
+[Desktop Entry]
+Type=Application
+Name=Clipboard history
+Exec=/usr/bin/flatpak run com.github.hluk.copyq
+X-GNOME-Autostart-enabled=true
+EOF
+cat > "$HOME/.config/autostart/desktop-emote.desktop" <<'EOF'
+[Desktop Entry]
+Type=Application
+Name=Emoji picker
+Exec=/snap/bin/emote
+X-GNOME-Autostart-enabled=true
+EOF
+
+# CopyQ must already be running to receive these preferences.
+flatpak run com.github.hluk.copyq eval '
+config("activate_closes", true);
+config("activate_focuses", true);
+config("activate_pastes", true);
+config("activate_item_with_single_click", true);
+config("close_on_unfocus", true);
+config("hide_main_window", true);
+config("hide_main_window_in_task_bar", true);
+config("frameless_window", true);
+config("hide_tabs", true);
+config("hide_toolbar", true);
+// X11 already checks target focus; skip the extra fixed wait before pasting.
+config("window_wait_after_raised_ms", 0);
+'
+
+echo 'Configured Ctrl+. for emoji and Super+V for clipboard history.'

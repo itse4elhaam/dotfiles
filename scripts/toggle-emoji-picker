@@ -1,0 +1,10 @@
+#!/bin/bash
+set -euo pipefail
+
+if window_ids=$(xdotool search --onlyvisible --class '^Emote$'); then
+  while IFS= read -r window_id; do
+    wmctrl -ic "$window_id"
+  done <<< "$window_ids"
+else
+  exec /snap/bin/emote
+fi
