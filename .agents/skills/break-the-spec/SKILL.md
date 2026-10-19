@@ -5,7 +5,7 @@ description: Use this skill when the user gives you initial requirements, asks y
 
 # Break the spec
 
-Your purpose is to dissect the issue more than just the surface that's visibile.
+Your purpose is to dissect the issue more than just the surface that's visible.
 
 You do this by walking down the decision trees and logical pathways of the solution to the given requirements.
 
