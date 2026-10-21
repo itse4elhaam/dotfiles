@@ -1,22 +1,24 @@
 ---
 name: elhaam-review
-description: Review code changes and PRs for codebase fit, simplicity, test confidence, security, whole-flow correctness and scale, maintainability, and prevention of repeat findings.
+description: "Review code changes across seven lenses: codebase fit, simplicity, test confidence, security, whole-flow correctness and scale, maintainability, and automation feedback."
 ---
 
 # Elhaam Review
 
-Review the interaction between each diff hunk and the surrounding system. Catch boundary mistakes, unnecessary complexity, missing confidence, hidden assumptions, and opportunities to make future agents/tools catch the same issue automatically.
+Review each diff hunk against the surrounding system. Catch boundary mistakes, unnecessary complexity, missing confidence, and hidden assumptions. Turn repeat findings into prevention.
 
 ## Required context gathering
 
-1. **Establish scope and behavior.** Record the reviewed base/head or working-tree state. Read the diff and changed files against the requested outcome, relevant requirements, and agreed non-goals. Trace the affected user or consumer action through its callers and dependencies.
-   Completion: every changed file is read and categorized by risk; the intended behavior and relevant boundaries are understood.
+1. **Read the diff and changed files.** Identify feature intent, touched layers, and risky hunks. Record base/head and the promised user outcome, including non-goals.
+   Completion: every changed file is read and categorized by risk.
 2. **Search before judging.** Find existing helpers, constants, types, server/data patterns, tests, and naming conventions near touched code.
    Completion: existing patterns near each hunk are known before any opinion is formed.
 3. **For GitHub PR review data, use `/github-graphql-first` when available; otherwise query GraphQL `reviewThreads` directly.** Inline thread context matters; REST-flattened comments are not enough.
-   Completion: all review threads and replies are collected, including resolved/outdated threads. Verify claimed fixes against the reviewed code; distinguish implemented, deferred, and withdrawn concerns.
-4. **Try to disprove each candidate finding.** Check caller guarantees, existing validation, installed framework/runtime versions, author explanations, and the intended product contract. For a defect, name a concrete actor/action/state, the observable failure, and the causal code path. A static proof can suffice; state any assumption that still needs verification.
-   Completion: each reported defect survives this check. Keep standards feedback, confidence gaps, and open questions distinct from proved defects.
+   Completion: all threads and replies are collected, including resolved/outdated ones. Verify claimed fixes against current code; distinguish implemented, deferred, and withdrawn concerns.
+4. **Falsify candidate findings.** Check callers, validation, installed versions, author replies, and product intent. Name the actor/action/state, observable failure, and causal path. Static proof can suffice.
+   Completion: defects survive counterevidence; standards feedback, confidence gaps, and questions remain distinct.
+5. **Deliver findings** using the [output contract](#output-contract).
+   Completion: HTML is produced; publication occurs only when explicitly authorized.
 
 ## Review lenses
 
@@ -25,7 +27,8 @@ Review the interaction between each diff hunk and the surrounding system. Catch 
 Ask whether each hunk fits the boundary it touches.
 
 - Existing helper available? Prefer it over a local duplicate (`tryCatch`, formatters, validators, query helpers).
-- Shared policy or concept? Keep its constants, types, and logic under one owner, and check that the real callers use it. Reuse should preserve each caller's contract; choose placement from actual consumers and local conventions.
+- Shared concept? Move to constants/types/enums/options instead of scattering strings or shapes.
+- **Single source of truth.** Give shared policy one owner; verify real callers use it. Share meaning, not coincidentally equal values.
 - New pattern? Require justification; otherwise align locally.
 - Good pattern? Call it out so the author repeats it.
 
@@ -34,27 +37,33 @@ Ask whether each hunk fits the boundary it touches.
 Push for simple, linear code without feature loss. Before suggesting simplification, name the behavior, edge cases, auth behavior, UX, and API contracts that must remain unchanged.
 
 - Prefer guard clauses over nested conditionals.
-- Extract meaningful functions, variables, or components when logic becomes hard to follow or needs comments to narrate its steps. Keep private extractions beside their sole consumer. Preserve comments explaining constraints or non-obvious rationale.
+- Extract named functions/variables when logic stops reading like English.
+- Keep private functions/components beside their consumer. Preserve comments explaining constraints or rationale.
 - Replace nested ternaries/repeated branches with maps or small helpers/components.
+- **Cyclomatic complexity.** Review branching paths and the repo's lint threshold; simplify decisions, not just function length.
 - Create generic utilities only when operations are genuinely the same shape.
 
 ### 3. Tests as confidence
 
-Require evidence proportional to the changed contract and failure cost. First inspect what existing tests actually prove.
+Tests are required when the hunk has logic, risk, or future extension pressure. Existing tests may supply that proof.
 
-- Test through the public interface used by the real consumer, including the built/installed entry point when packaging changes. Keep application layers real where practical and replace external dependencies at their boundaries. Focused unit tests suit independent business rules; integration tests should carry most cross-layer permutations. Use browser or native-UI tests for essential journeys and behavior specific to that environment.
-- When correctness depends on database authorization, constraints, transactions, or concurrency, require evidence using the real database behavior. Include legitimate success cases alongside rejection cases.
-- For critical rules, require a regression test that fails when the rule is broken, using a focused mutation check when needed. Assertions should use independent expected outcomes, not recompute them through the implementation.
+- Complex function or transformed data? Ask for focused unit tests.
+- User flow? Prefer behavior/user-experience tests over implementation-heavy tests.
+- Risky production path? Require multiple scenarios, not only happy-path manual QA.
 - Choose scenarios from the conditions that change execution: feature enabled/disabled, fresh/persisted state, and slow/failed dependencies. For asynchronous UI, verify eventual recovery and the next user action. Assert relevant external-call counts and blocking behavior, alongside returned values.
-- State what was exercised, simulated, and left unverified, and whether the relevant suite runs in CI. Test counts, a changed test file, source-text assertions, or isolated helper tests do not by themselves prove the journey.
+- **Regression tests.** For critical rules, prove the test fails when the rule breaks; use focused mutation testing where needed.
+- **Test fidelity.** For cross-layer, database, or packaging changes, read [test confidence](references/conditional-checks.md#test-confidence).
+- Repeatable issue? Ask whether a test or lint rule should prevent it next time.
 
 ### 4. Server, database, and security boundary
 
-Trace actual entry points and trust boundaries before judging exposure.
+Treat server/data boundaries as public attack surfaces until proven otherwise. Classify exports by caller and effect.
 
-- For protected data, trace authentication and ownership/tenant scope along every reachable path. Prove where middleware, service, query, or database enforcement supplies each guarantee. Authentication alone does not prove resource authorization. Flag an absent/bypassable guarantee at a reachable operation, or state the evidence still needed; public access must match the intended contract.
-- Validate untrusted input and provider replies at the boundary; trace casts and non-null assertions to the guarantees they rely on. Follow the repository's contract for expected failures; make broken internal invariants visible and stop unsafe effects. Check for fallbacks that disguise failure as empty data, zero amounts, or success.
-- For React or Next.js changes, read the framework section of [conditional checks](references/conditional-checks.md#react-and-nextjs).
+- Every DB access needs proof of auth, ownership/tenant scope, null handling, failure behavior, and IDOR resistance. Trace the enforcement path; proven middleware/service/query/database guarantees count. Authentication alone does not prove ownership.
+- **Defensive programming: distrust the boundary.** Bad input and external failures are expected. Validate runtime inputs/provider replies and return controlled errors; preserve recoverable state. Trace casts and non-null assertions to their guarantees.
+- **Offensive programming: fail fast on broken invariants.** A broken internal guarantee is our bug to diagnose. Use assertions and exhaustive state handling; fail visibly before unsafe effects. State why the condition must hold; avoid success-shaped defaults that conceal a broken guarantee.
+- Choose by fault ownership: an invalid guest request needs defensive handling; an impossible internal transition needs offensive detection. For examples, read [offensive and defensive programming](references/conditional-checks.md#offensive-and-defensive-programming).
+- For React or Next.js changes, read [framework boundaries](references/conditional-checks.md#react-and-nextjs), including actions versus routes and internal helpers.
 - Do not leak attacker-helpful detail in client-visible errors (`tenant not found for id X`). Log detail server-side.
 
 ### 5. Whole-flow correctness and scalability
@@ -62,8 +71,8 @@ Trace actual entry points and trust boundaries before judging exposure.
 Look across hunks, not just inside one line. Grouped hunks can create N+1 or repeated work even when each hunk looks locally reasonable; trace request, query, and API-call counts across the full flow.
 
 - Loops with DB/API calls: check N+1 and batching risks.
-- Check actual failure semantics: thrown/rejected errors versus returned error values, partial success, and the caller or job runner's retry behavior. Decide whether one failure should fail the whole operation.
-- For multi-step writes, payments, bookings, or jobs with side effects, read the recovery section of [conditional checks](references/conditional-checks.md#stateful-workflows).
+- `Promise.all`: decide whether one failure should fail everything. Distinguish rejected promises from returned error values; check partial success and retry semantics.
+- For multi-step writes, payments, bookings, or jobs with side effects, read [stateful workflows](references/conditional-checks.md#stateful-workflows).
 - Check caching, ISR/SSG, background jobs, and data type mismatches under production data.
 - Ask how the change behaves with more users, tenants, records, feature flags, and retries.
 - For shared hooks, middleware, and workflows, enumerate the user actions that trigger them. Trace awaited DB/API calls through completion. Does each action need that work before returning? Check timeouts, retries, and queued writes. Distinguish immediate optimistic UI feedback from actual request completion.
@@ -80,32 +89,39 @@ Ask whether a new engineer can safely extend this next month.
 
 ### 7. Automation feedback loop
 
-For recurring findings, first check whether the intended rule already exists and why it failed to prevent this instance.
+**Prevention.** Every repeatable finding needs a durable control: tests, lint/types, a shared helper, documentation/domain language, an `AGENTS.md` pathway, or a skill update.
 
-- Prefer the smallest effective control: a shared policy boundary, behavioral test, compiler/lint rule, or clearer agent guidance. Check whether it also covers the next caller or job without another manual guard.
-- For enforcement changed here or used to dismiss a finding, use existing evidence or a focused check of a violating and a legitimate case through its actual entry point. Distinguish documented, locally runnable, running in CI, and required before merge/deploy. State what remains unverified.
-- Group repeated symptoms by cause. Keep unrelated cleanup as a follow-up; add guidance only when missing guidance caused the failure.
+- Existing rule missed it? Check discovery, configuration, coverage, and whether it runs before adding another rule.
+- Protect the next caller/job at the shared boundary. Group symptoms by cause; keep unrelated rollout cleanup as a follow-up.
+- For changed enforcement, or enforcement used to dismiss a finding, verify a violating and a legitimate case. Distinguish documented, locally runnable, running in CI, and required before merge/deploy.
 
 ## Output contract
 
-Default to a standalone HTML findings file using `/readable-html-dossier` when available. An explicit user format request takes precedence. Keep it readable without conversation context and include the reviewed scope/revision, evidence links, verification limits, and prioritized findings.
+Always produce a standalone HTML findings file, readable without conversation context. Markdown requests get Markdown in addition. Use `/readable-html-dossier` when available; otherwise use self-contained HTML with inline CSS. Include scope/revision, evidence/source links, uncertainties, severity-tagged findings, automation follow-ups, and the output path.
 
-Use concise comments that give the consequence and direction:
+Use concise severity-tagged comments:
 
 ```md
-[P1 correctness] `path:line` When [action/state], [observable failure] because [cause]. Smallest fix. Evidence that would prove it.
-[P2 standards] `path:line` Existing rule/pattern. Concrete maintenance or consistency cost. Smallest alignment.
-[P2 confidence] Critical behavior not yet proved. Missing scenario and the evidence needed.
+[P1 security] `path:line` Problem. Why it matters. Smallest fix.
+[P1 correctness] `path:line` Action/state. Observable failure. Cause. Smallest fix.
+[P2 maintainability] `path:line` Problem. Existing pattern to use. Smallest fix.
+[P3 confidence] Missing scenario. What test/manual QA would prove it.
 ```
 
-Assign severity by the consequence under the stated conditions. State confidence separately; an uncertain premise is a risk or question, not a confirmed defect. Separate merge blockers, should-fix items, and optional follow-ups. A confidence gap blocks only when the unproved behavior carries material risk. Report a clean review when warranted, and call out specific good patterns worth repeating.
+Separate **Blockers** (security/correctness/data loss/material confidence gaps), **Should fix** (readability/duplication/constants/local pattern drift), **Teach-back** (good patterns/automation/why it matters), and **Follow-ups** (deferred work).
 
-For a handoff, explain the user outcome, reason for the change, constraints, and acceptance evidence. Leave implementation and slice planning to the engineer unless the user asks for that plan.
+Severity follows impact; confidence states how well the premise is proved. Category labels do not fix the priority. A confidence gap blocks when the unproved behavior carries material risk. Report a clean review when warranted.
 
-Publish inline PR comments only when the current user request explicitly directs publication. Then use `/posting-pr-review-comments`, which revalidates fresh PR state and posts one batched review. A request to review or preview findings stays read-only.
+For handoffs, give the user outcome, rationale, constraints, and acceptance evidence. Leave implementation/slice planning to the engineer unless asked.
+
+Publish inline PR comments only when the current user request explicitly directs publication. Then use `/posting-pr-review-comments`, which revalidates fresh PR state and posts one batched review. Requests to review a PR/branch or preview hypothetical findings stay read-only.
 
 ## Review discipline
 
-- Separate what the diff proves from production hypotheses. When attributing a regression, distinguish code introduction, deployment, feature activation, and symptom onset. Support latency claims with measurements or label them unmeasured; compare the same workload, path, and completion metric.
-- Before suggesting simplification, preserve the identified behavior, edge cases, and contracts. For extraction, verify every affected consumer still receives its specialized behavior.
-- Anchor standards feedback in an established convention or a concrete maintenance cost. Keep speculative redesign separate from defects in the requested change.
+- **Classify every export by caller and effect.** A `use server` export that client code calls is an action with auth and ownership requirements, not a helper.
+- **Search existing patterns before judging each hunk.** Find the established conventions first.
+- **Require evidence proportional to risk.** Happy-path manual QA is insufficient for data/server/payment logic; demand multi-scenario tests.
+- Separate diff proof from production hypotheses. Distinguish code introduction, deployment, feature activation, and symptom onset. Measure latency or label it unmeasured; compare the same workload, path, and completion metric.
+- **Name behavior, edge cases, and contracts before simplification.** Silent behavior removal is not simplification; preserve every consumer's specialized behavior.
+- **Pair every style flag with a maintainability or extension risk.** Style without consequence is noise.
+- **Prevention closes the review.** For every recurring finding, name the smallest durable control from lens 7 and what would prove it works.
