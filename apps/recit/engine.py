@@ -18,14 +18,92 @@ import ctypes as C
 import json
 import math
 import os
+import re
+import subprocess
 from pathlib import Path
 import tempfile
 import threading
 import time
+from audio_telemetry import LevelsCallback, MicrophoneTelemetry
+from audio_debug import AudioTrace, emit, traced
+from audio_devices import AudioDevices, AudioStreamPending
+
+
+def camera_settings(device, width, height, fps=30):
+    """Choose advertised MJPEG capture rather than a driver's inherited format."""
+    settings = {"device_id": device, "buffering": False}
+    try:
+        probe = subprocess.run(['v4l2-ctl', '-d', device, '--list-formats-ext'],
+                               capture_output=True, text=True, timeout=2)
+    except (OSError, subprocess.TimeoutExpired):
+        return settings
+    if probe.returncode:
+        return settings
+    candidates = set()
+    fmt, size = None, None
+    for line in probe.stdout.splitlines():
+        format_match = re.search(r"\[\d+\]: '(.{4})'", line)
+        size_match = re.search(r'Size: Discrete (\d+)x(\d+)', line)
+        rate_match = re.search(r'\(([\d.]+) fps\)', line)
+        if format_match:
+            fmt, size = format_match[1], None
+        elif size_match:
+            size = tuple(map(int, size_match.groups()))
+        elif fmt == 'MJPG' and size and rate_match and math.isclose(float(rate_match[1]), fps, abs_tol=.01):
+            candidates.add(size)
+    if candidates:
+        fitting = [s for s in candidates if s[0] <= width and s[1] <= height]
+        chosen = max(fitting, key=lambda s: s[0]*s[1]) if fitting else min(candidates, key=lambda s: s[0]*s[1])
+        settings.update(pixelformat=int.from_bytes(b'MJPG', 'little'),
+                        resolution=(chosen[0] << 16) | chosen[1], framerate=(1 << 16) | fps)
+    return settings
 
 
 class EngineError(RuntimeError):
     """A recoverable setup, capture, or recording failure."""
+
+
+def recording_audio_warning(path, trace=None):
+    """Decode a finalized local file, without playback or changing its bytes.
+
+    Track presence and AAC bitrate do not establish that samples contain sound.
+    Only exact digital silence is flagged; quiet speech is not a failure.
+    """
+    trace = trace if isinstance(trace, AudioTrace) else AudioTrace('validation')
+    started = trace.clock()
+    phase = 'saved_probe'
+    trace.event('saved_validation.start')
+    try:
+        probe = subprocess.run(['ffprobe', '-v', 'error', '-select_streams', 'a:0',
+            '-show_entries', 'stream=index', '-of', 'json', str(path)],
+            capture_output=True, text=True, timeout=5)
+        if probe.returncode:
+            raise ValueError('probe failed')
+        if not json.loads(probe.stdout).get('streams'):
+            trace.event('saved_validation.result', level='warning', outcome='no_audio_track',
+                        duration_ms=round((trace.clock() - started) * 1000))
+            return 'The saved recording has no audio track. Check your microphone before recording again.'
+        phase = 'saved_decode'
+        decoded = subprocess.run(['ffmpeg', '-hide_banner', '-nostdin', '-i', str(path),
+            '-map', '0:a:0', '-vn', '-af', 'astats=metadata=0:reset=0', '-f', 'null', '-'],
+            capture_output=True, text=True, timeout=30)
+        peaks = re.findall(r'Peak level dB: (\S+)', decoded.stderr)
+        samples = re.findall(r'Number of samples: (\d+)', decoded.stderr)
+        if decoded.returncode or not peaks or not samples or not int(samples[-1]):
+            raise ValueError('decode failed')
+        if all(float(peak) == -math.inf for peak in peaks):
+            trace.event('saved_validation.result', level='warning', outcome='digital_silence',
+                        duration_ms=round((trace.clock() - started) * 1000))
+            return ('The saved audio track is silent. No voice can be recovered from this file. '
+                    'Check the selected microphone and Clean microphone setting before recording again.')
+        trace.event('saved_validation.result', outcome='nonzero_audio',
+                    duration_ms=round((trace.clock() - started) * 1000))
+        return ''
+    except (OSError, subprocess.TimeoutExpired, ValueError, TypeError) as exc:
+        trace.event('saved_validation.failed', level='warning', phase=phase,
+                    exception_type=type(exc).__name__,
+                    duration_ms=round((trace.clock() - started) * 1000))
+        return 'Saved audio could not be verified. Review the recording before sharing.'
 
 
 def screen_transform(canvasw, canvash, sourcew, sourceh, factor, cx, cy):
@@ -113,11 +191,23 @@ def _load_obs():
         "obs_enum_encoder_types": (B, C.c_size_t, C.POINTER(S)),
         "obs_enum_source_types": (B, C.c_size_t, C.POINTER(S)),
         "obs_data_create_from_json": (P, S), "obs_data_release": (None, P),
+        "obs_data_get_string": (S, P, S),
+        "obs_get_source_defaults": (P, S), "obs_get_source_properties": (P, S),
+        "obs_properties_get": (P, P, S), "obs_properties_destroy": (None, P),
+        "obs_property_list_item_count": (C.c_size_t, P),
+        "obs_property_list_item_string": (S, P, C.c_size_t),
+        "obs_property_list_item_disabled": (B, P, C.c_size_t),
         "obs_source_create": (P, S, S, P, P), "obs_source_release": (None, P),
         "obs_source_get_width": (U, P), "obs_source_get_height": (U, P),
         "obs_source_inc_showing": (None, P), "obs_source_dec_showing": (None, P),
         "obs_source_video_render": (None, P),
         "obs_source_filter_add": (None, P, P),
+        "obs_volmeter_create": (P, I), "obs_volmeter_destroy": (None, P),
+        "obs_volmeter_attach_source": (B, P, P),
+        "obs_volmeter_detach_source": (None, P),
+        "obs_volmeter_set_peak_meter_type": (None, P, I),
+        "obs_volmeter_add_callback": (None, P, LevelsCallback, P),
+        "obs_volmeter_remove_callback": (None, P, LevelsCallback, P),
         "obs_scene_create": (P, S), "obs_scene_release": (None, P),
         "obs_wait_for_destroy_queue": (B,),
         "obs_scene_get_source": (P, P), "obs_scene_add": (P, P, P),
@@ -212,6 +302,7 @@ class Engine:
         self._output = None
         self._video_encoder = None
         self._audio_encoder = None
+        self._microphone_meter = None
         self._stop_event = threading.Event()
         self._started_at = None
         self._paused_at = None
@@ -312,6 +403,10 @@ class Engine:
             self._obs.obs_data_release(data)
         if not source:
             raise EngineError(f"OBS could not create {name} ({kind}).")
+        if kind in ('pulse_input_capture', 'pulse_output_capture'):
+            if not hasattr(self, '_audio_sources'):
+                self._audio_sources = []
+            self._audio_sources.append(source)
         return source
 
     def _filter(self, source, kind, name, settings):
@@ -320,6 +415,71 @@ class Engine:
             self._obs.obs_source_filter_add(source, filt)
         finally:
             self._obs.obs_source_release(filt)
+
+    def _microphone_noise_backend(self):
+        """Inspect compiled backends, including OBS 27's single-backend builds."""
+        o = self._obs
+        fallback = None
+        for kind in ("noise_suppress_filter_v2", "noise_suppress_filter"):
+            if kind not in self.source_types:
+                continue
+            props = o.obs_get_source_properties(kind.encode())
+            if not props:
+                continue
+            try:
+                method = o.obs_properties_get(props, b"method")
+                if method:
+                    methods = {o.obs_property_list_item_string(method, index)
+                               for index in range(o.obs_property_list_item_count(method))
+                               if not o.obs_property_list_item_disabled(method, index)}
+                else:
+                    # OBS omits the method list unless both backends are built.
+                    defaults = o.obs_get_source_defaults(kind.encode())
+                    if not defaults:
+                        continue
+                    try:
+                        methods = {o.obs_data_get_string(defaults, b"method")}
+                    finally:
+                        o.obs_data_release(defaults)
+                    if b"speex" in methods and not o.obs_properties_get(props, b"suppress_level"):
+                        methods.clear()
+                if b"rnnoise" in methods:
+                    return kind, "rnnoise"
+                if b"speex" in methods and fallback is None:
+                    fallback = kind, "speex"
+            finally:
+                o.obs_properties_destroy(props)
+        return fallback
+
+    def _microphone_filters(self, source, enabled=True):
+        """Denoise once, then limit peaks. Never filter desktop audio."""
+        emit(self, 'filters.selected', processing=enabled)
+        if not enabled:
+            return
+        filters = []
+        backend = self._microphone_noise_backend()
+        emit(self, 'filters.backend', backend=backend[0] if backend else 'none',
+             method=backend[1] if backend else 'none')
+        if backend:
+            kind, method = backend
+            settings = {"method": method}
+            if method == "speex":
+                settings["suppress_level"] = -15
+                self.warnings.append("Microphone processing: RNNoise is unavailable; using gentle Speex suppression (-15 dB).")
+            filters.append((kind, "RecIt microphone noise suppression", settings))
+        else:
+            self.warnings.append("Microphone processing: no supported noise suppression backend is available; microphone noise is unchanged.")
+        # OBS 27 inserts at the front but processes audio in reverse list order,
+        # so adding the limiter last makes it run after noise suppression.
+        filters.append(("limiter_filter", "RecIt microphone peak limiter", {
+            "threshold": -3.0, "release_time": 60}))
+        for kind, name, settings in filters:
+            try:
+                self._filter(source, kind, name, settings)
+                emit(self, 'filter.applied', filter=kind, **settings)
+            except EngineError as exc:
+                emit(self, 'filter.failed', level='warning', filter=kind, exception_type=type(exc).__name__)
+                self.warnings.append(f"Microphone processing: {name} is unavailable; continuing without it. {exc}")
 
     def _dimensions(self, source, label, timeout=3.0):
         deadline = time.monotonic() + timeout
@@ -365,10 +525,11 @@ class Engine:
                 raise EngineError("Could not save the camera mask image.")
         return str(path)
 
+    @traced('configure')
     def configure(self, mode="screen", camera="/dev/video0", microphone="default",
                   desktop_audio=False, shape="circle", mask_path=None, size=.22,
                   position="bottom-right", screen=0, mirror=True, floating_camera=False,
-                  window_id: int | None = None):
+                  window_id: int | None = None, *, microphone_processing=True):
         """Replace the scene and detach any camera display. Reattach afterward.
 
         In screen mode floating_camera omits the camera scene item: XShm captures
@@ -377,10 +538,15 @@ class Engine:
         always composited. Its mask is mirrored with the image; a custom Qt
         preview silhouette must match that orientation. The caller owns window
         lifetime checks and should stop capture when the selected window closes.
+        Microphone processing defaults to verified RNNoise, or gentle Speex,
+        followed by a peak limiter. Set microphone_processing=False to bypass.
+        Missing optional filters are reported in warnings and never mute audio.
         """
         self._check_open()
         if self._output:
             raise EngineError("Stop the recording before changing the scene.")
+        if not isinstance(microphone_processing, bool):
+            raise EngineError("Microphone processing must be enabled or disabled.")
         if mode not in ("screen", "camera") or shape not in ("circle", "square", "rounded", "custom"):
             raise EngineError("Unknown recording mode or camera shape.")
         if position not in ("top-left", "top-right", "bottom-left", "bottom-right", "center"):
@@ -398,7 +564,13 @@ class Engine:
         if camera and not os.access(camera, os.R_OK | os.W_OK):
             raise EngineError(f"Camera {camera} is missing or inaccessible.")
         # Release old camera before reopening it: V4L2 streaming is exclusive.
-        self._clear_scene()
+        route = getattr(self, '_microphone_route', None)
+        keep_audio = bool(microphone and route and route[0] == microphone
+                          and getattr(self, '_microphone_processing', None) == microphone_processing
+                          and getattr(self, '_microphone_meter', None))
+        self._clear_scene(preserve_audio=keep_audio)
+        self.warnings = [warning for warning in getattr(self, "warnings", [])
+                         if keep_audio or not warning.startswith("Microphone processing:")]
         o = self._obs
         try:
             self._scene = o.obs_scene_create(b"RecIt scene")
@@ -425,7 +597,7 @@ class Engine:
                 self._screen_dimensions = (sw, sh)
                 self.restore_screen_zoom()
             if camera:
-                source = self._source("v4l2_input", "RecIt camera", {"device_id": camera, "buffering": False})
+                source = self._source("v4l2_input", "RecIt camera", camera_settings(camera, self.width, self.height, self.fps))
                 self._sources.append(source)
                 self._camera_source = source
                 self._camera_mirror = bool(mirror)
@@ -436,15 +608,17 @@ class Engine:
                     if not item:
                         raise EngineError("OBS could not add the camera to the scene.")
                 cw, ch = self._dimensions(source, f"Camera {camera}")
-                # In camera-only mode fill the canvas. Masks apply to overlays.
-                ratio = self.width / self.height if mode == "camera" else 1.0
-                crop_w, crop_h = min(cw, round(ch*ratio)), min(ch, round(cw/ratio))
-                self._filter(source, "crop_filter", "RecIt camera crop", {
-                    "relative": False, "left": (cw-crop_w)//2, "top": (ch-crop_h)//2,
-                    "cx": crop_w, "cy": crop_h})
                 if mode == "camera":
-                    dw, dh, x, y = self.width, self.height, 0, 0
+                    # Preserve the full camera image, including non-16:9 sources.
+                    crop_w, crop_h = cw, ch
+                    scale = min(self.width / cw, self.height / ch)
+                    dw, dh = cw * scale, ch * scale
+                    x, y = (self.width - dw) / 2, (self.height - dh) / 2
                 else:
+                    crop_w = crop_h = min(cw, ch)
+                    self._filter(source, "crop_filter", "RecIt camera crop", {
+                        "relative": False, "left": (cw-crop_w)//2, "top": (ch-crop_h)//2,
+                        "cx": crop_w, "cy": crop_h})
                     dw = dh = round(min(self.width, self.height) * size)
                     margin = round(min(self.width, self.height) * .025)
                     x = margin if "left" in position else self.width-dw-margin
@@ -464,20 +638,158 @@ class Engine:
                         self._camera_item = item
                         self._camera_display_size = (dw, dh)
             if microphone:
+                emit(self, 'obs.source', source=microphone, backend='pulse_input_capture',
+                     obs_rate=48000, processing=microphone_processing, desktop_audio=desktop_audio,
+                     outcome='retained' if keep_audio else 'requested')
+            if microphone and not keep_audio:
+                self._microphone_processing = microphone_processing
+                self._microphone_route = (microphone, 'RecIt microphone', None)
                 source = self._source("pulse_input_capture", "RecIt microphone", {"device_id": microphone})
+                emit(self, 'obs.source', source=microphone, backend='pulse_input_capture',
+                     obs_rate=48000, processing=microphone_processing, outcome='created')
                 self._sources.append(source)
+                self._microphone_capture = source
+                self._microphone_filters(source, microphone_processing)
+                self._microphone_meter = MicrophoneTelemetry(o, source, microphone)
                 o.obs_set_output_source(1, source)
             if desktop_audio:
                 source = self._source("pulse_output_capture", "RecIt desktop audio", {"device_id": "default"})
                 self._sources.append(source)
                 o.obs_set_output_source(2, source)
             self._configured = True
+            self.audio_expected = bool(microphone or desktop_audio)
         except Exception as exc:
             self._clear_scene()
             self.errors.append(str(exc))
             raise
 
-    def _clear_scene(self):
+    @traced('monitor')
+    def begin_audio_monitor(self, microphone, processing=True):
+        """Open the recording microphone chain without touching camera preview."""
+        self._check_open()
+        self.release_audio()
+        try:
+            emit(self, 'obs.source', source=microphone, backend='pulse_input_capture',
+                 obs_rate=48000, processing=processing, outcome='requested')
+            source = self._source('pulse_input_capture', 'RecIt microphone', {'device_id': microphone})
+            emit(self, 'obs.source', source=microphone, backend='pulse_input_capture',
+                 obs_rate=48000, processing=processing, outcome='created')
+            self._sources.append(source)
+            self._microphone_capture = source
+            self._microphone_processing = processing
+            self._microphone_filters(source, processing)
+            self._microphone_meter = MicrophoneTelemetry(self._obs, source, microphone)
+            self._microphone_route = (microphone, 'RecIt microphone', None)
+            self._obs.obs_set_output_source(1, source)
+        except Exception:
+            self.release_audio()
+            raise
+
+    def audio_status(self):
+        """Thread-safe selected microphone telemetry; never starts capture.
+
+        source is the configured Pulse source ID, or None while monitoring is off.
+        packets counts OBS level callbacks; nonzero_packets counts packets
+        whose post-filter/pre-fader sample peak contains nonzero signal.
+        These are packet counts, NOT exact nonzero sample counts. peak_db is
+        post-filter/post-fader dBFS, input_peak_db is post-filter/pre-fader.
+        signal is current nonzero signal, packet_age is monotonic seconds
+        since receipt. Freshness expires after 1.5 seconds. Readiness can use
+        packets > 0 and nonzero_packets > 0, but must also check packet_age.
+        States: off, no_packets, silent, quiet (< -50 dBFS), signal, clipping.
+        Source filters and encoded output cannot be verified by this meter.
+        """
+        meter = getattr(self, '_microphone_meter', None)
+        if meter:
+            return meter.status()
+        return dict(source=None, packets=0, nonzero_packets=0,
+                    peak_db=-math.inf, input_peak_db=-math.inf,
+                    packet_age=None, state='off', signal=False, clipping=False)
+
+    def _release_microphone_meter(self):
+        meter = getattr(self, '_microphone_meter', None)
+        if meter:
+            meter.close()
+            self._microphone_meter = None
+
+    @traced('route', every=5)
+    def verify_audio_route(self, timeout=0):
+        route = getattr(self, '_microphone_route', None)
+        if not route:
+            return None
+        source, media_name, index = route
+        deadline = time.monotonic() + timeout
+        while True:
+            try:
+                devices = AudioDevices()
+                devices.audio_trace = getattr(self, 'audio_trace', None)
+                index = devices.verify_stream(source, media_name, index)
+                # Retained idle-to-recording audio keeps this same tuple object.
+                # Reopening even the same device creates a new session object.
+                if getattr(self, '_microphone_route', None) is not route:
+                    raise EngineError('Microphone session changed during verification. Retry recording.')
+                self._microphone_route = (source, media_name, index)
+                return source
+            except AudioStreamPending:
+                if time.monotonic() >= deadline:
+                    raise
+                time.sleep(.1)
+
+    @traced('check_capture')
+    def begin_audio_check(self, microphone, processing=True):
+        """Open only the recording microphone chain; never create video sources."""
+        from audio_check import AudioSample
+        self._check_open()
+        if self._output or getattr(self, '_check_sample', None):
+            raise EngineError('Stop the current capture before checking the microphone.')
+        self.release_audio()
+        try:
+            emit(self, 'obs.source', source=microphone, backend='pulse_input_capture',
+                 obs_rate=48000, processing=processing, outcome='requested')
+            source = self._source('pulse_input_capture', 'RecIt microphone check', {'device_id': microphone})
+            emit(self, 'obs.source', source=microphone, backend='pulse_input_capture',
+                 obs_rate=48000, processing=processing, outcome='created')
+            self._sources.append(source)
+            self._microphone_filters(source, processing)
+            self._obs.obs_set_output_source(1, source)
+            self._microphone_route = (microphone, 'RecIt microphone check', None)
+            self.verify_audio_route(timeout=2)
+            self._microphone_meter = MicrophoneTelemetry(self._obs, source, microphone)
+            self._check_sample = AudioSample(self._obs, source)
+            return self._check_sample
+        except Exception:
+            self.end_audio_check()
+            raise
+
+    @traced('check_release')
+    def end_audio_check(self):
+        sample = getattr(self, '_check_sample', None)
+        if sample:
+            sample.detach()
+            self._check_sample = None
+        self.release_audio()
+
+    @traced('audio_release')
+    def release_audio(self):
+        """Release capture only after the recording output has stopped."""
+        if self.recording:
+            raise EngineError('Cannot release audio while recording.')
+        self._release_microphone_meter()
+        self._microphone_route = None
+        for channel in (1, 2):
+            self._obs.obs_set_output_source(channel, None)
+        for source in getattr(self, '_audio_sources', []):
+            if source in self._sources:
+                self._sources.remove(source)
+                self._obs.obs_source_release(source)
+        self._audio_sources = []
+        self._obs.obs_wait_for_destroy_queue()
+
+    def _clear_scene(self, preserve_audio=False):
+        retained = [self._microphone_capture] if preserve_audio else []
+        if not preserve_audio:
+            self._release_microphone_meter()
+            self._microphone_route = None
         self.detach_camera_preview()
         self._camera_source = None
         self._camera_item = None
@@ -491,13 +803,16 @@ class Engine:
             return
         self._configured = False
         for channel in range(3):
-            self._obs.obs_set_output_source(channel, None)
+            if not preserve_audio or channel != 1:
+                self._obs.obs_set_output_source(channel, None)
         if self._scene:
             self._obs.obs_scene_release(self._scene)
             self._scene = None
         for source in self._sources:
-            self._obs.obs_source_release(source)
-        self._sources.clear()
+            if source not in retained:
+                self._obs.obs_source_release(source)
+        self._sources[:] = retained
+        self._audio_sources = retained
         # Source destruction is deferred in libobs. Drain it before reopening
         # V4L2, otherwise the previous source can still own its streaming buffers.
         self._obs.obs_wait_for_destroy_queue()
@@ -517,6 +832,29 @@ class Engine:
         finally:
             o.gs_projection_pop()
             o.gs_viewport_pop()
+
+    def detach_preview(self):
+        """Destroy the GLX child before Qt hides or reparents its native parent."""
+        if self._display:
+            o = self._obs
+            o.obs_display_set_enabled(self._display, False)
+            o.obs_display_remove_draw_callback(self._display, self._draw_callback, None)
+            o.obs_display_destroy(self._display)
+            self._display = None
+
+    def attach_preview(self, wid, width, height):
+        """Recreate the main display only after the native parent is laid out."""
+        self._check_open()
+        self.detach_preview()
+        info = _DisplayInfo(_Window(int(wid), self._xdisplay), width, height, 2, 3, 0, 0)
+        o = self._obs
+        self._display = o.obs_display_create(C.byref(info), 0xFF181818)
+        if not self._display:
+            raise EngineError("OBS cannot attach its OpenGL preview to this X11 window.")
+        o.obs_display_set_enabled(self._display, False)
+        o.obs_display_resize(self._display, width, height)
+        o.obs_display_add_draw_callback(self._display, self._draw_callback, None)
+        o.obs_display_set_enabled(self._display, True)
 
     def resize_preview(self, w, h):
         self._check_open()
@@ -544,6 +882,9 @@ class Engine:
         if not self._camera_display:
             raise EngineError("OBS cannot attach the camera preview. Use a visible native X11 widget and keep it alive until detach.")
         o.obs_display_set_enabled(self._camera_display, False)
+        # GLX creates its child from the X11 parent's current geometry, which
+        # can lag Qt's resize. Force the swapchain to our physical pixel size.
+        o.obs_display_resize(self._camera_display, width, height)
         o.obs_display_add_draw_callback(self._camera_display, self._camera_draw_callback, None)
         self.set_camera_preview_enabled(True)
 
@@ -707,12 +1048,19 @@ class Engine:
                               (detail.decode(errors="replace") if detail else "check encoder/device permissions and the OBS terminal log."))
         self.encoder = encoder_id
 
+    @traced('record_start')
     def start(self, path: Path) -> None:
         self._check_open()
         if self._output:
             raise EngineError("A recording already exists; stop it before starting another.")
         if not self._configured:
             raise EngineError("Configure a scene before recording.")
+        if getattr(self, '_microphone_meter', None):
+            self.verify_audio_route()
+            status = self.audio_status()
+            if (not status['packets'] or not status['nonzero_packets'] or
+                    status['packet_age'] is None or status['packet_age'] >= 1.5):
+                raise EngineError('Microphone has no verified audio samples. Say a few words and check the microphone before recording.')
         path = Path(path).expanduser().absolute()
         if path.suffix.lower() != ".mkv":
             raise EngineError("Record to an .mkv path; remux to MP4 after stop().")
@@ -803,6 +1151,7 @@ class Engine:
             result.setdefault(key, 0)
         return result
 
+    @traced('record_stop')
     def stop(self) -> None:
         if not self._output:
             return
