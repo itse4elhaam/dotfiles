@@ -88,7 +88,7 @@ class CameraPreviewTests(unittest.TestCase):
         e._window_id = None
         e._screen_dimensions = None
         e._xdisplay = 10
-        e.width, e.height = 1920, 1080
+        e.width, e.height, e.fps = 1920, 1080, 30
         e.errors = []
         e._camera_draw_callback = _Draw(e._draw_camera)
         e._obs.obs_display_create.side_effect = [101, 102]
@@ -104,6 +104,56 @@ class CameraPreviewTests(unittest.TestCase):
     def configure(self, **kwargs):
         with patch("engine.os.access", return_value=True):
             self.engine.configure(camera="/dev/fake-camera", microphone=None, **kwargs)
+
+    def test_brio_explicitly_opens_advertised_4k_mjpeg_at_30fps(self):
+        formats = """[0]: 'YUYV'
+            Size: Discrete 640x480
+                Interval: Discrete 0.033s (30.000 fps)
+        [1]: 'MJPG'
+            Size: Discrete 1920x1080
+                Interval: Discrete 0.033s (30.000 fps)
+            Size: Discrete 3840x2160
+                Interval: Discrete 0.033s (30.000 fps)
+        """
+        self.engine.width, self.engine.height = 3840, 2160
+        with patch("engine.subprocess.run", return_value=Mock(stdout=formats, returncode=0)):
+            self.configure(mode="camera")
+        settings = self.engine._source.call_args_list[0].args[2]
+        self.assertEqual(settings['pixelformat'], int.from_bytes(b'MJPG', 'little'))
+        self.assertEqual(settings['resolution'], (3840 << 16) | 2160)
+        self.assertEqual(settings['framerate'], (1 << 16) | 30)
+
+    def test_camera_format_fallback_and_output_limit(self):
+        from engine import camera_settings
+        formats = """[0]: 'MJPG'
+            Size: Discrete 1920x1080
+                Interval: Discrete 0.033s (30.000 fps)
+            Size: Discrete 3840x2160
+                Interval: Discrete 0.033s (30.000 fps)
+        [1]: 'YUYV'
+            Size: Discrete 4096x2160
+                Interval: Discrete 0.033s (30.000 fps)
+        """
+        with patch('engine.subprocess.run', return_value=Mock(stdout=formats, returncode=0)):
+            self.assertEqual(camera_settings('/dev/test', 1920, 1080)['resolution'], (1920 << 16) | 1080)
+            self.assertEqual(camera_settings('/dev/test', 640, 480)['resolution'], (1920 << 16) | 1080)
+        for output in ('', formats.replace('MJPG', 'YUYV'), formats.replace('30.000', '5.000')):
+            with patch('engine.subprocess.run', return_value=Mock(stdout=output, returncode=0)):
+                self.assertEqual(camera_settings('/dev/test', 1920, 1080), {'device_id': '/dev/test', 'buffering': False})
+        with patch('engine.subprocess.run', side_effect=OSError):
+            self.assertEqual(camera_settings('/dev/test', 1920, 1080), {'device_id': '/dev/test', 'buffering': False})
+        import subprocess
+        with patch('engine.subprocess.run', side_effect=subprocess.TimeoutExpired('v4l2-ctl', 2)):
+            self.assertEqual(camera_settings('/dev/test', 1920, 1080), {'device_id': '/dev/test', 'buffering': False})
+        with patch('engine.subprocess.run', return_value=Mock(stdout=formats, returncode=1)):
+            self.assertEqual(camera_settings('/dev/test', 1920, 1080), {'device_id': '/dev/test', 'buffering': False})
+
+    def test_full_camera_preserves_entire_four_by_three_image(self):
+        self.engine._dimensions.return_value = (640, 480)
+        self.engine._place = Mock()
+        self.configure(mode="camera", mirror=True)
+        self.engine._filter.assert_not_called()
+        self.engine._place.assert_called_once_with(201, 240, 0, 2.25, True, 1440)
 
     def test_floating_camera_is_filtered_but_not_composited(self):
         self.configure(floating_camera=True)
@@ -224,6 +274,17 @@ class CameraPreviewTests(unittest.TestCase):
         self.assertEqual(e._obs.obs_display_destroy.call_args_list, [call(101), call(102)])
         self.assertFalse(e._camera_preview_enabled)
         self.assertIsNone(e._camera_display)
+
+    def test_camera_swapchain_resizes_before_first_frame(self):
+        # GLX initially copies the X11 parent's geometry, which can still be
+        # the previous bubble size while Qt's resize request is in flight.
+        e = self.engine
+        e._camera_source = 302
+        e.attach_camera_preview(20, 650, 650)
+        e._obs.obs_display_resize.assert_called_once_with(101, 650, 650)
+        calls = e._obs.mock_calls
+        self.assertLess(calls.index(call.obs_display_resize(101, 650, 650)),
+                        calls.index(call.obs_display_set_enabled(101, True)))
 
     def test_clear_detaches_before_releasing_camera(self):
         self.configure(floating_camera=True)

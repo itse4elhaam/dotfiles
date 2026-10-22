@@ -1,2 +1,5 @@
-PySide6-Essentials==6.12.0
+# Qt 6.12.0 corrupts None refcounts on Python 3.10 during widget updates.
+# Keep Qt and its Shiboken bindings on the tested matching release.
+PySide6-Essentials==6.11.1
+PySide6-Addons==6.11.1
 python-xlib==0.33

@@ -1,0 +1,239 @@
+{
+  "cards": [
+    {
+      "index": 6816,
+      "name": "bluez_card.AA_BB_CC_DD_EE_FF",
+      "driver": "module-bluez5-device.c",
+      "owner_module": null,
+      "properties": {
+        "api.bluez5.address": "AA:BB:CC:DD:EE:FF",
+        "api.bluez5.class": "0x240404",
+        "api.bluez5.connection": "disconnected",
+        "api.bluez5.device": "",
+        "api.bluez5.icon": "audio-headset",
+        "api.bluez5.id": "1",
+        "api.bluez5.path": "/org/bluez/hci0/dev_AA_BB_CC_DD_EE_FF",
+        "bluez5.profile": "off",
+        "device.alias": "OnePlus Buds 4",
+        "device.api": "bluez5",
+        "device.bus": "bluetooth",
+        "device.description": "OnePlus Buds 4",
+        "device.form_factor": "headset",
+        "device.icon_name": "audio-headset-bluetooth",
+        "device.name": "bluez_card.AA_BB_CC_DD_EE_FF",
+        "device.string": "AA:BB:CC:DD:EE:FF",
+        "media.class": "Audio/Device",
+        "factory.id": "14",
+        "client.id": "35",
+        "object.id": "125",
+        "object.serial": "6816"
+      },
+      "profiles": {
+        "off": {
+          "description": "Off",
+          "sinks": 0,
+          "sources": 0,
+          "priority": 0,
+          "available": true
+        },
+        "headset-head-unit": {
+          "description": "Headset Head Unit (HSP/HFP)",
+          "sinks": 1,
+          "sources": 1,
+          "priority": 1,
+          "available": true
+        },
+        "a2dp-sink-sbc": {
+          "description": "High Fidelity Playback (A2DP Sink, codec SBC)",
+          "sinks": 1,
+          "sources": 0,
+          "priority": 18,
+          "available": true
+        },
+        "a2dp-sink-sbc_xq": {
+          "description": "High Fidelity Playback (A2DP Sink, codec SBC-XQ)",
+          "sinks": 1,
+          "sources": 0,
+          "priority": 17,
+          "available": true
+        },
+        "a2dp-sink": {
+          "description": "High Fidelity Playback (A2DP Sink, codec AAC)",
+          "sinks": 1,
+          "sources": 0,
+          "priority": 19,
+          "available": true
+        },
+        "headset-head-unit-cvsd": {
+          "description": "Headset Head Unit (HSP/HFP, codec CVSD)",
+          "sinks": 1,
+          "sources": 1,
+          "priority": 2,
+          "available": true
+        },
+        "headset-head-unit-msbc": {
+          "description": "Headset Head Unit (HSP/HFP, codec mSBC)",
+          "sinks": 1,
+          "sources": 1,
+          "priority": 3,
+          "available": true
+        }
+      },
+      "active_profile": "a2dp-sink",
+      "ports": {
+        "headset-output": {
+          "description": "Headset",
+          "type": "Headset",
+          "priority": 0,
+          "latency_offset": "0 usec",
+          "availability_group": "",
+          "availability": "available",
+          "properties": {
+            "port.type": "headset"
+          },
+          "profiles": [
+            "a2dp-sink-sbc",
+            "a2dp-sink-sbc_xq",
+            "a2dp-sink"
+          ]
+        },
+        "headset-hf-input": {
+          "description": "Handsfree",
+          "type": "Headset",
+          "priority": 0,
+          "latency_offset": "0 usec",
+          "availability_group": "",
+          "availability": "available",
+          "properties": {
+            "port.type": "headset"
+          },
+          "profiles": [
+            "headset-head-unit",
+            "headset-head-unit-cvsd",
+            "headset-head-unit-msbc"
+          ]
+        },
+        "headset-hf-output": {
+          "description": "Handsfree",
+          "type": "Headset",
+          "priority": 0,
+          "latency_offset": "0 usec",
+          "availability_group": "",
+          "availability": "available",
+          "properties": {
+            "port.type": "headset"
+          },
+          "profiles": [
+            "headset-head-unit",
+            "headset-head-unit-cvsd",
+            "headset-head-unit-msbc"
+          ]
+        }
+      }
+    }
+  ],
+  "sinks": [
+    {
+      "index": 6817,
+      "state": "SUSPENDED",
+      "name": "bluez_output.AA_BB_CC_DD_EE_FF.1",
+      "description": "OnePlus Buds 4",
+      "driver": "PipeWire",
+      "sample_specification": "s16le 2ch 48000Hz",
+      "channel_map": "front-left,front-right",
+      "owner_module": 4294967295,
+      "mute": false,
+      "volume": {
+        "front-left": {
+          "value": 41675,
+          "value_percent": "64%",
+          "db": "-11.80 dB"
+        },
+        "front-right": {
+          "value": 41675,
+          "value_percent": "64%",
+          "db": "-11.80 dB"
+        }
+      },
+      "balance": 0.0,
+      "base_volume": {
+        "value": 65536,
+        "value_percent": "100%",
+        "db": "0.00 dB"
+      },
+      "monitor_source": "bluez_output.AA_BB_CC_DD_EE_FF.1.monitor",
+      "latency": {
+        "actual": 0.0,
+        "configured": 0.0
+      },
+      "flags": [
+        "HARDWARE",
+        "HW_VOLUME_CTRL",
+        "DECIBEL_VOLUME",
+        "LATENCY"
+      ],
+      "properties": {
+        "api.bluez5.address": "AA:BB:CC:DD:EE:FF",
+        "api.bluez5.codec": "aac",
+        "api.bluez5.profile": "a2dp-sink",
+        "api.bluez5.transport": "",
+        "card.profile.device": "1",
+        "device.id": "125",
+        "device.routes": "1",
+        "factory.name": "api.bluez5.a2dp.sink",
+        "device.description": "OnePlus Buds 4",
+        "node.name": "bluez_output.AA_BB_CC_DD_EE_FF.1",
+        "node.pause-on-idle": "false",
+        "priority.driver": "1010",
+        "priority.session": "1010",
+        "factory.id": "8",
+        "clock.quantum-limit": "8192",
+        "device.api": "bluez5",
+        "media.class": "Audio/Sink",
+        "media.name": "OnePlus Buds 4",
+        "node.driver": "true",
+        "factory.mode": "merge",
+        "audio.adapt.follower": "",
+        "library.name": "audioconvert/libspa-audioconvert",
+        "object.id": "39",
+        "object.serial": "6817",
+        "client.id": "35",
+        "api.bluez5.class": "0x240404",
+        "api.bluez5.connection": "disconnected",
+        "api.bluez5.device": "",
+        "api.bluez5.icon": "audio-headset",
+        "api.bluez5.id": "1",
+        "api.bluez5.path": "/org/bluez/hci0/dev_AA_BB_CC_DD_EE_FF",
+        "bluez5.profile": "off",
+        "device.alias": "OnePlus Buds 4",
+        "device.bus": "bluetooth",
+        "device.form_factor": "headset",
+        "device.icon_name": "audio-headset-bluetooth",
+        "device.name": "bluez_card.AA_BB_CC_DD_EE_FF",
+        "device.string": "AA:BB:CC:DD:EE:FF"
+      },
+      "ports": [
+        {
+          "name": "headset-output",
+          "description": "Headset",
+          "type": "Headset",
+          "priority": 0,
+          "availability_group": "",
+          "availability": "available"
+        }
+      ],
+      "active_port": "headset-output",
+      "formats": [
+        "pcm"
+      ]
+    }
+  ],
+  "sources": [],
+  "info": {
+    "default_sink_name": "bluez_output.AA_BB_CC_DD_EE_FF.1",
+    "default_source_name": "brio"
+  },
+  "source-outputs": [],
+  "sink-inputs": [],
+  "bluez_connected": "b true\n"
+}
