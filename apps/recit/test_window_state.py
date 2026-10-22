@@ -25,9 +25,13 @@ class WindowStateTests(unittest.TestCase):
         for name, value in [('VIDEOS', root), ('STATE', root),
                             ('QSettings', lambda *args: QSettings(str(root / 'prefs.ini'), QSettings.IniFormat))]:
             self.stack.enter_context(patch.object(app, name, value))
+        self.stack.enter_context(patch('PySide6.QtGui.QScreen.name', return_value='Test-monitor'))
         self.window = app.Window()
         self.addCleanup(self.cleanup_window)
         self.window.engine = MagicMock()
+        screen = qt.primaryScreen()
+        geo, ratio = screen.geometry(), screen.devicePixelRatio()
+        self.window.engine.screen_options.return_value = [(f'Screen Test-monitor ({round(geo.width()*ratio)}x{round(geo.height()*ratio)} @ 0,0)', 0)]
         self.window.engine.errors = []
         self.window.engine.recording = False
         self.window.configuration_valid = True

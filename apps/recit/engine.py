@@ -196,6 +196,9 @@ def _load_obs():
         "obs_properties_get": (P, P, S), "obs_properties_destroy": (None, P),
         "obs_property_list_item_count": (C.c_size_t, P),
         "obs_property_list_item_string": (S, P, C.c_size_t),
+        "obs_property_list_item_name": (S, P, C.c_size_t),
+        "obs_property_list_item_int": (C.c_longlong, P, C.c_size_t),
+        "obs_source_properties": (P, P),
         "obs_property_list_item_disabled": (B, P, C.c_size_t),
         "obs_source_create": (P, S, S, P, P), "obs_source_release": (None, P),
         "obs_source_get_width": (U, P), "obs_source_get_height": (U, P),
@@ -525,11 +528,40 @@ class Engine:
                 raise EngineError("Could not save the camera mask image.")
         return str(path)
 
+    def screen_options(self):
+        """Read OBS's own XShm index/connector/physical-rectangle list.
+
+        Reuse the selected XShm source when available. OBS 27's property
+        callback requires an instance, so camera/window modes use an invalid
+        index probe that stops before SHM/texture allocation and is never shown.
+        """
+        self._check_open()
+        o = self._obs
+        source = self._screen_source if self._window_id is None else None
+        borrowed = bool(source)
+        if not borrowed:
+            source = self._source('xshm_input', 'RecIt monitor catalogue', {'screen': -1})
+        props = None
+        try:
+            props = o.obs_source_properties(source)
+            prop = o.obs_properties_get(props, b'screen') if props else None
+            if not prop:
+                raise EngineError('OBS monitor list is unavailable.')
+            return [(o.obs_property_list_item_name(prop, i).decode('utf-8', errors='replace'),
+                     o.obs_property_list_item_int(prop, i))
+                    for i in range(o.obs_property_list_item_count(prop))
+                    if not o.obs_property_list_item_disabled(prop, i)]
+        finally:
+            if props:
+                o.obs_properties_destroy(props)
+            if not borrowed:
+                o.obs_source_release(source)
+
     @traced('configure')
     def configure(self, mode="screen", camera="/dev/video0", microphone="default",
                   desktop_audio=False, shape="circle", mask_path=None, size=.22,
                   position="bottom-right", screen=0, mirror=True, floating_camera=False,
-                  window_id: int | None = None, *, microphone_processing=True):
+                  window_id: int | None = None, *, microphone_processing=True, region=None, monitor_bounds=None):
         """Replace the scene and detach any camera display. Reattach afterward.
 
         In screen mode floating_camera omits the camera scene item: XShm captures
@@ -563,6 +595,11 @@ class Engine:
                               "Entire-screen capture remains available.")
         if camera and not os.access(camera, os.R_OK | os.W_OK):
             raise EngineError(f"Camera {camera} is missing or inaccessible.")
+        if region is not None:
+            from capture_picker import validate_region
+            if mode != 'screen' or window_id is not None or monitor_bounds is None or len(monitor_bounds) != 4:
+                raise EngineError('Region capture requires one monitor and no window target.')
+            validate_region(region, monitor_bounds[2:])
         # Release old camera before reopening it: V4L2 streaming is exclusive.
         route = getattr(self, '_microphone_route', None)
         keep_audio = bool(microphone and route and route[0] == microphone
@@ -589,10 +626,17 @@ class Engine:
                     source = self._source("xshm_input", "RecIt screen", {"screen": screen, "show_cursor": True})
                 self._sources.append(source)
                 self._screen_source = source
+                if region is not None:
+                    sw, sh = self._dimensions(source, "Screen capture")
+                    if (sw, sh) != tuple(monitor_bounds[2:]):
+                        raise EngineError('Monitor dimensions changed. Select the region again.')
+                    x, y, rw, rh = region
+                    self._filter(source, 'crop_filter', 'RecIt region', {
+                        'relative': False, 'left': x, 'top': y, 'cx': rw, 'cy': rh})
                 item = o.obs_scene_add(self._scene, source)
                 if not item:
                     raise EngineError("OBS could not add the screen to the scene.")
-                sw, sh = self._dimensions(source, "Screen capture")
+                sw, sh = region[2:] if region is not None else self._dimensions(source, "Screen capture")
                 self._screen_item = item
                 self._screen_dimensions = (sw, sh)
                 self.restore_screen_zoom()
@@ -602,7 +646,7 @@ class Engine:
                 self._camera_source = source
                 self._camera_mirror = bool(mirror)
                 item = None
-                compose_camera = mode != "screen" or not floating_camera or window_id is not None
+                compose_camera = mode != "screen" or not floating_camera or window_id is not None or region is not None
                 if compose_camera:
                     item = o.obs_scene_add(self._scene, source)
                     if not item:
@@ -784,6 +828,13 @@ class Engine:
                 self._obs.obs_source_release(source)
         self._audio_sources = []
         self._obs.obs_wait_for_destroy_queue()
+
+    def clear_capture(self):
+        """Release the idle native preview when the browser owns recording."""
+        self._check_open()
+        if self._output:
+            raise EngineError('Stop recording before releasing native capture.')
+        self._clear_scene()
 
     def _clear_scene(self, preserve_audio=False):
         retained = [self._microphone_capture] if preserve_audio else []

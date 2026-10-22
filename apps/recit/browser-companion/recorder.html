@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="en"><meta charset="utf-8"><title>RecIt tab recorder</title>
+<link rel="stylesheet" href="style.css">
+<main><h1>Record a browser tab</h1>
+<p>Choose one tab in Chrome's picker. Other tabs, windows and system sound are excluded.</p>
+<p><label><input id="audio" type="checkbox"> Include tab audio, if shared in the picker</label></p>
+<p><label><input id="mic" type="checkbox"> Include microphone, with separate browser permission</label></p>
+<p><label><input id="camera" type="checkbox"> Include camera in the corner, with separate browser permission</label></p>
+<button id="start">Choose tab and record</button> <button id="stop" disabled>Stop and save / cancel</button>
+<p id="status" role="status">Ready. Nothing is captured until you choose a tab.</p>
+<a id="download" hidden>Download recording as WebM</a>
+<p>Keep this recorder page open until you download. On stop, Chrome releases the selected tab and devices.
+Then use RecIt → Recordings → Import video. Imports stay local until you choose Upload to Loom.</p>
+<p>Native RecIt zoom, noise filters, camera settings and hotkeys do not apply here.
+Long recordings use browser memory. Download before closing this page.</p>
+</main><script src="recorder.js"></script><script src="page.js"></script></html>
