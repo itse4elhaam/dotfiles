@@ -19,7 +19,8 @@ class IdleAudio:
 
     def wanted(self):
         w = self.window
-        return (w.engine is not None and w.isVisible() and not w.isMinimized()
+        return (not (w.mode == 'screen' and w.capture_kind.currentData() == 'tab')
+                and w.engine is not None and w.isVisible() and not w.isMinimized()
                 and not w._closing and not w.in_library() and not w.recording
                 and not w.busy and not w.counting and w.live_microphone.isChecked()
                 and w.microphone.currentData() is not None)

@@ -16,6 +16,7 @@ from PySide6.QtCore import Qt, QTimer, Signal, QThread, QProcess, QUrl, QSetting
 from PySide6.QtGui import QColor, QDesktopServices, QIcon, QPainter, QPixmap, QShortcut, QKeySequence, QCursor
 from floating import CameraBubble, ZoomMotion
 from windows import WindowCatalog
+from capture_picker import CapturePicker, CaptureTarget, monitor_targets
 from recordings import Recordings
 from naming import next_recording_path, recording_files
 from audio_devices import AudioDevices, AudioDeviceError
@@ -228,6 +229,16 @@ class Window(QMainWindow):
         self.recording_error = ''
         self.recording_error_baseline = 0
         self.zoom_motion = ZoomMotion()
+        self.capture_target = None
+        self._target_generation = 0
+        self._target_invalid = False
+        self._start_target_generation = None
+        self._applying_target = False
+        self._monitor_check_at = 0
+        QApplication.instance().screenRemoved.connect(self.monitor_changed)
+        QApplication.instance().screenAdded.connect(self.watch_monitor)
+        for monitor in QApplication.screens():
+            self.watch_monitor(monitor)
         self.window_catalog = WindowCatalog()
         self.bubble = CameraBubble()
         self.bubble.stop_requested.connect(self.stop)
@@ -328,7 +339,16 @@ class Window(QMainWindow):
         self.capture_kind = QComboBox()
         self.capture_kind.addItem('Entire screen', 'screen')
         self.capture_kind.addItem('A specific window', 'window')
+        self.capture_kind.addItem('A region', 'region')
+        self.capture_kind.addItem('Browser tab companion', 'tab')
         controls.addWidget(self.capture_kind)
+        self.choose_capture = QPushButton('Choose what to record…')
+        self.choose_capture.clicked.connect(self.pick_capture)
+        controls.addWidget(self.choose_capture)
+        self.companion_button = QPushButton('Browser companion instructions ↗')
+        self.companion_button.clicked.connect(self.companion_instructions)
+        self.companion_button.hide()
+        controls.addWidget(self.companion_button)
         self.screen = QComboBox()
         for index, screen in enumerate(QApplication.screens()):
             geo = screen.geometry()
@@ -499,9 +519,11 @@ class Window(QMainWindow):
             navigation.addWidget(button, 1)
         content.addWidget(self.navigation_footer, 1, 0, Qt.AlignLeft | Qt.AlignBottom)
         layout.addLayout(content, 1)
-        self.config_controls = [self.screen_button, self.camera_button, self.capture_kind, self.capture_window, self.refresh_button, self.screen, self.camera, self.microphone, self.clean_microphone, self.desktop_audio, self.shape, self.size, self.position, self.mask_button, self.mirror, self.quality]
+        self.config_controls = [self.choose_capture, self.companion_button, self.screen_button, self.camera_button, self.capture_kind, self.capture_window, self.refresh_button, self.screen, self.camera, self.microphone, self.clean_microphone, self.desktop_audio, self.shape, self.size, self.position, self.mask_button, self.mirror, self.quality]
         for combo in (self.screen, self.capture_window, self.camera, self.microphone, self.position):
             combo.currentIndexChanged.connect(self.schedule_configure)
+        self.screen.currentIndexChanged.connect(self.target_changed)
+        self.capture_window.currentIndexChanged.connect(self.target_changed)
         self.capture_kind.currentIndexChanged.connect(self.capture_changed)
         self.shape.currentIndexChanged.connect(self.shape_changed)
         self.size.valueChanged.connect(self.schedule_configure)
@@ -607,6 +629,8 @@ class Window(QMainWindow):
         self.preview_title.setText('FULL CAMERA VIEW' if camera_mode else 'LIVE PREVIEW')
         self.capture_label.setVisible(not camera_mode)
         self.capture_kind.setVisible(not camera_mode)
+        self.choose_capture.setVisible(not camera_mode)
+        self.companion_button.setVisible(not camera_mode and self.capture_kind.currentData() == 'tab')
         self.screen.setVisible(not camera_mode and self.capture_kind.currentData() == 'screen')
         self.window_row.setVisible(not camera_mode and self.capture_kind.currentData() == 'window')
         self.zoom_button.setVisible(not camera_mode)
@@ -629,9 +653,132 @@ class Window(QMainWindow):
             self.recorder_content.addLayout(self.preview_column, 0, 1, 2, 1)
         self.focus_button.setText('Show controls' if expanded else 'Expand camera')
 
+    def watch_monitor(self, monitor):
+        monitor.geometryChanged.connect(self.monitor_changed)
+        monitor.physicalDotsPerInchChanged.connect(self.monitor_changed)
+
+    def monitor_changed(self, *_):
+        target = self.capture_target
+        if self._closing or not target or target.kind not in ('screen', 'region'):
+            return
+        self.invalidate_monitor()
+
+    def invalidate_monitor(self):
+        self._target_invalid = True
+        self._target_generation += 1
+        self.configuration_valid = False
+        self.configure_timer.stop()
+        if self.recording:
+            self.recording_error = 'Monitor layout changed. Recording stopped and saved; select the target again.'
+            self.stop()
+        elif self.preparing_audio:
+            self.audio_start_failed('Monitor layout changed. Select the capture target again.')
+        elif self.counting:
+            self.cancel_countdown()
+        self.record_button.setEnabled(False)
+        self.notice('Monitor layout changed. Choose what to record again.')
+
+    def target_changed(self, *_):
+        if self._applying_target:
+            return
+        self._target_generation += 1
+        self._target_invalid = False
+        self.capture_target = None
+        self.configuration_valid = False
+        if hasattr(self, 'start_timer'):
+            self.start_timer.stop()
+        if self.preparing_audio:
+            self.audio_start_failed('Capture target changed. Choose the target and start again.')
+        elif self.counting:
+            self.cancel_countdown()
+        elif self.recording:
+            self.recording_error = 'Capture target changed. Recording stopped and saved.'
+            self.stop()
+        self.schedule_configure()
+
+    def companion_instructions(self):
+        dialog = QDialog(self)
+        dialog.setWindowTitle('Record a browser tab')
+        dialog.resize(540, 340)
+        layout = QVBoxLayout(dialog)
+        text = QLabel('1. Open chrome://extensions in Chrome or Chromium. Enable Developer mode.\n'
+            '2. Choose Load unpacked and select the extension folder below.\n'
+            '3. Click the RecIt extension action to open its recorder page.\n'
+            '4. Click Choose tab and record, then consent to a tab in the browser picker.\n'
+            '5. Stop and download WebM. In RecIt, open Recordings → Import video.\n\n'
+            'The browser owns recording and device permission. Native Record, zoom, filters and hotkeys do not apply. '
+            'Keep the recorder page open until you download. Imports never upload automatically.\n\n'
+            + str(ROOT / 'browser-companion'))
+        text.setWordWrap(True)
+        text.setTextFormat(Qt.PlainText)
+        text.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        layout.addWidget(text)
+        folder = QPushButton('Open extension folder')
+        folder.clicked.connect(lambda: QDesktopServices.openUrl(QUrl.fromLocalFile(str(ROOT / 'browser-companion'))))
+        layout.addWidget(folder)
+        done = QPushButton('Done')
+        done.clicked.connect(dialog.accept)
+        layout.addWidget(done)
+        dialog.exec()
+
+    def pick_capture(self):
+        if not self.engine or self.recording or self.busy or self.counting:
+            return
+        self.configure_timer.stop()
+        try:
+            dialog = CapturePicker(self.engine, self.window_catalog,
+                self.capture_target or CaptureTarget(self.capture_kind.currentData()), self)
+            if dialog.exec() != QDialog.Accepted:
+                return
+            target = dialog.target
+            self.target_changed()
+            self._applying_target = True
+            try:
+                self.capture_kind.setCurrentIndex(self.capture_kind.findData(target.kind))
+                if target.kind == 'window':
+                    index = self.capture_window.findData(target.window_id)
+                    if index < 0:
+                        self.capture_window.addItem(f'Window {target.window_id}', target.window_id)
+                        index = self.capture_window.count()-1
+                    self.capture_window.setCurrentIndex(index)
+                elif target.monitor:
+                    index = next(i for i, screen in enumerate(QApplication.screens()) if screen.name() == target.monitor)
+                    self.screen.setCurrentIndex(index)
+                self.capture_target = target
+            finally:
+                self._applying_target = False
+            self.configure()
+        except Exception as exc:
+            self.notice(f'Could not choose capture target: {exc}')
+
+    def resolve_target(self):
+        if self._target_invalid:
+            raise ValueError('Monitor layout changed. Choose what to record again.')
+        kind = self.capture_kind.currentData()
+        if kind == 'tab':
+            raise ValueError('Record this tab in the Chrome companion, then import the download in Recordings.')
+        if kind == 'window':
+            target = CaptureTarget('window', window_id=self.capture_window.currentData()).validate()
+            if not self.window_catalog.geometry(target.window_id):
+                raise ValueError('The selected window closed or was minimized. Select an open window.')
+            return target
+        monitors = monitor_targets(self.engine.screen_options(), QApplication.screens())
+        target = self.capture_target
+        if target is None:
+            if kind == 'region':
+                raise ValueError('Use Choose what to record to drag a region on one monitor.')
+            screen = self.screen.currentText().split(' · ')[0]
+            target = next((t for t, _ in monitors if t.monitor == screen), None)
+        if target is None or not any(t.monitor == target.monitor and t.bounds == target.bounds
+                and t.obs_index == target.obs_index for t, _ in monitors):
+            raise ValueError('The selected monitor is missing or changed. Choose the capture target again.')
+        return target.validate()
+
     def capture_changed(self):
+        self.target_changed()
         window_mode = self.capture_kind.currentData() == 'window'
-        self.screen.setVisible(self.mode == 'screen' and not window_mode)
+        self.screen.setVisible(self.mode == 'screen' and self.capture_kind.currentData() == 'screen')
+        self.companion_button.setVisible(self.mode == 'screen' and self.capture_kind.currentData() == 'tab')
         self.window_row.setVisible(self.mode == 'screen' and window_mode)
         if window_mode:
             self.refresh_windows()
@@ -641,6 +788,7 @@ class Window(QMainWindow):
         previous = self.capture_window.currentData()
         self.capture_window.blockSignals(True)
         self.capture_window.clear()
+        self.capture_window.addItem('Select a window…', None)
         try:
             windows = self.window_catalog.list()
             for title, wid in windows:
@@ -656,6 +804,8 @@ class Window(QMainWindow):
                 self.notice(f'Could not list windows: {exc}')
         finally:
             self.capture_window.blockSignals(False)
+        if not self._applying_target:
+            self.target_changed()
         self.schedule_configure()
 
     def shape_changed(self):
@@ -682,6 +832,20 @@ class Window(QMainWindow):
             self.configure_timer.start(180)
 
     def configure(self, microphone=None, recording_setup=False):
+        if (self.engine and self.mode == 'screen' and self.capture_kind.currentData() == 'tab'
+                and not (self.recording or self.busy)):
+            self.configuration_valid = False
+            self.record_button.setEnabled(False)
+            self.idle_audio.stop()
+            self.hide_bubble()
+            try:
+                self.engine.clear_capture()
+            except Exception as exc:
+                self.notice(f'Could not release native capture: {exc}')
+                return
+            self.source_note.setText('Browser companion records the tab. Native Record is unavailable. Download, then import in Recordings.')
+            self.notice('Use Browser companion instructions to install and open the optional Chrome extension.')
+            return
         if not recording_setup:
             key = (self.microphone.currentData(), self.clean_microphone.isChecked())
             if self.idle_audio.source and self.idle_audio.key != key:
@@ -695,24 +859,25 @@ class Window(QMainWindow):
             self.hide_bubble()
             camera = self.camera.currentData()
             window_id = self.capture_window.currentData() if self.capture_kind.currentData() == 'window' and self.mode == 'screen' else None
-            if self.mode == 'screen' and self.capture_kind.currentData() == 'window':
-                if not window_id or not self.window_catalog.geometry(window_id):
-                    raise ValueError('Select an open window. Refresh the list if needed.')
+            target = self.resolve_target() if self.mode == 'screen' else None
             if self.mode == 'camera' and not camera:
                 raise ValueError('Choose a camera to use Camera mode.')
             self.engine.configure(mode=self.mode, camera=camera, microphone=microphone,
                 microphone_processing=self.clean_microphone.isChecked(),
                 desktop_audio=recording_setup and self.desktop_audio.isChecked(), shape=self.shape.currentData(),
                 mask_path=self.mask_path or None, size=self.size.value() / 100,
-                position=self.position.currentData(), screen=self.screen.currentData() or 0,
-                mirror=self.mirror.isChecked(), floating_camera=self.mode == 'screen' and bool(camera) and not window_id, window_id=window_id)
-            if self.mode == 'screen' and camera:
+                position=self.position.currentData(), screen=target.obs_index if target and target.obs_index >= 0 else 0,
+                mirror=self.mirror.isChecked(), floating_camera=self.mode == 'screen' and bool(camera) and not window_id and target.kind != 'region', window_id=window_id,
+                region=target.region if target else None, monitor_bounds=target.bounds if target else None)
+            if target:
+                self.capture_target = target
+            if self.mode == 'screen' and camera and target.kind != 'region':
                 self.show_bubble()
             self.record_button.setEnabled(True)
             self.configuration_valid = True
             self.engine_notice('Ready when you are. Your recording stays on this computer until you upload it.')
             self.encoder_label.setText('OBS engine · Intel hardware available')
-            screen = QApplication.screens()[self.screen.currentIndex()]
+            screen = self.capture_screen()
             geo = screen.geometry()
             ratio = screen.devicePixelRatio()
             self.source_note.setText(f'{self.quality.currentText()} output · Display source {round(geo.width() * ratio)} × {round(geo.height() * ratio)}. '
@@ -721,10 +886,16 @@ class Window(QMainWindow):
                 self.source_note.setText(f'{self.camera.currentText()} · {self.quality.currentText()} output · Full image, no crop.')
             if window_id:
                 self.source_note.setText(f'{self.quality.currentText()} · Recording only the selected window. Keep it open and unminimized.')
+            if target and target.kind == 'region':
+                self.source_note.setText(f'Region {target.region[2]} × {target.region[3]} pixels · {target.monitor} · Camera composed inside the video.')
             self.save_preferences()
         except Exception as exc:
             self.record_button.setEnabled(False)
             self.notice(f'Check your setup: {exc}')
+
+    def capture_screen(self):
+        name = self.capture_target.monitor if self.capture_target and self.capture_target.monitor else self.screen.currentText().split(' · ')[0]
+        return next((screen for screen in QApplication.screens() if screen.name() == name), QApplication.primaryScreen())
 
     def resize_preview(self, width, height):
         if self.engine:
@@ -732,7 +903,9 @@ class Window(QMainWindow):
             self.engine.resize_preview(round(width * ratio), round(height * ratio))
 
     def show_bubble(self):
-        screen = QApplication.screens()[self.screen.currentIndex()]
+        if self.capture_kind.currentData() in ('region', 'tab'):
+            return
+        screen = self.capture_screen()
         self.bubble.arrange(screen, self.size.value() / 100, self.position.currentData(), self.shape.currentData(), self.mask_path,
             mirror_mask=self.capture_kind.currentData() == 'window' and self.mirror.isChecked())
         self.bubble.recording = self.recording
@@ -751,7 +924,7 @@ class Window(QMainWindow):
 
     def move_camera_overlay(self):
         if self.engine and self.mode == 'screen' and self.capture_kind.currentData() == 'window':
-            bounds = QApplication.screens()[self.screen.currentIndex()].availableGeometry()
+            bounds = self.capture_screen().availableGeometry()
             dx = max(1, bounds.width() - self.bubble.width())
             dy = max(1, bounds.height() - self.bubble.height())
             self.engine.set_camera_position((self.bubble.x() - bounds.left()) / dx, (self.bubble.y() - bounds.top()) / dy)
@@ -775,13 +948,15 @@ class Window(QMainWindow):
         if self.paused:
             self.zoom_motion.last_time = time.monotonic()
             return
-        screen = QApplication.screens()[self.screen.currentIndex()]
+        screen = self.capture_screen()
         bounds = screen.geometry()
         pointer = QCursor.pos()
         x, y = self.zoom_motion.x, self.zoom_motion.y
         if bounds.contains(pointer):
             x = (pointer.x() - bounds.left()) / bounds.width()
             y = (pointer.y() - bounds.top()) / bounds.height()
+        if self.capture_target and self.capture_target.kind == 'region':
+            x, y = self.capture_target.pointer(*self.window_catalog.pointer())
         if self.capture_kind.currentData() == 'window':
             geometry = self.window_catalog.geometry(self.capture_window.currentData())
             if not geometry:
@@ -814,13 +989,14 @@ class Window(QMainWindow):
             self.engine.set_screen_zoom(1.0, .5, .5)
 
     def toggle_record(self):
-        if self.in_library():
+        if self.in_library() or (self.mode == 'screen' and self.capture_kind.currentData() == 'tab'):
             return
         if self.recording:
             self.stop()
         elif self.counting:
             self.cancel_countdown()
         elif self.engine and not self.busy and self.record_button.isEnabled():
+            self._start_target_generation = self._target_generation
             self.counting = True
             self.countdown = 3
             self.lock_controls(True)
@@ -864,6 +1040,9 @@ class Window(QMainWindow):
         if self.audio_worker and self.audio_worker.isRunning():
             self.start_timer.start(100)  # Serialize preparation with deferred restoration.
             return
+        if self._start_target_generation is not None and self._start_target_generation != self._target_generation:
+            self.cancel_countdown()
+            return
         self.counting = False
         self.busy = self.preparing_audio = True
         self.record_button.setEnabled(False)
@@ -906,6 +1085,9 @@ class Window(QMainWindow):
             return  # closeEvent releases capture and restores after the worker exits.
         if error:
             self.audio_start_failed(error)
+            return
+        if self._start_target_generation is not None and self._start_target_generation != self._target_generation:
+            self.audio_start_failed('Capture target changed during preparation.')
             return
         self.selected_source = source
         self.configure(microphone=source, recording_setup=True)
@@ -993,8 +1175,10 @@ class Window(QMainWindow):
         try:
             if not self.configuration_valid:
                 raise RuntimeError(self.status.text())
-            if self.mode == 'screen' and self.capture_kind.currentData() == 'window' and not self.window_catalog.geometry(self.capture_window.currentData()):
-                raise RuntimeError('The selected window is no longer available. Choose an open window and try again.')
+            if self._start_target_generation is not None and self._start_target_generation != self._target_generation:
+                raise RuntimeError('Capture target changed during preparation.')
+            if self.mode == 'screen':
+                self.resolve_target()
             if shutil.disk_usage(VIDEOS).free < 1024 ** 3:
                 raise RuntimeError('Less than 1 GB free. Make some room before recording.')
             window_title = self.capture_window.currentText() if self.mode == 'screen' and self.capture_kind.currentData() == 'window' else ''
@@ -1261,6 +1445,16 @@ class Window(QMainWindow):
         elif not self.recording and audio_idle and time.monotonic() >= self._audio_retry_at:
             self.retry_audio_restore()
         if self.recording and not self.busy:
+            if self.mode == 'screen' and self.capture_kind.currentData() in ('screen', 'region') and time.monotonic() >= self._monitor_check_at:
+                self._monitor_check_at = time.monotonic() + 1
+                try:
+                    self.resolve_target()
+                except Exception:
+                    self.recording_error = 'The selected monitor was removed or changed. Recording stopped and saved; review before sharing.'
+                    self._target_invalid = True
+                    self.configuration_valid = False
+                    self.stop()
+                    return
             if self.mode == 'screen' and self.capture_kind.currentData() == 'window' and not self.window_catalog.geometry(self.capture_window.currentData()):
                 self.recording_error = self.recording_error or 'The selected window closed or was minimized. The recording was saved; review it before sharing.'
                 self.stop()
@@ -1347,6 +1541,7 @@ class Window(QMainWindow):
             self.recordings.recording_deleted.connect(self.recording_deleted)
             self.recordings.recording_renamed.connect(self.recording_renamed)
             self.recordings.upload_requested.connect(self.upload_recording)
+            self.recordings.import_requested.connect(self.import_video)
             self.recordings.back_requested.connect(self.back_to_recorder)
             self.pages.addWidget(self.recordings)
         self.configure_timer.stop()
@@ -1361,6 +1556,34 @@ class Window(QMainWindow):
         self.tray_record.setEnabled(False)
         self.recordings.search.clear()
         self.recordings.refresh(path)
+
+    def import_video(self):
+        if self.busy or self.recording or self.counting or self._closing:
+            return
+        path, _ = QFileDialog.getOpenFileName(self, 'Import a browser recording',
+            str(Path.home() / 'Downloads'), 'Videos (*.webm *.mp4 *.mkv)')
+        if not path or self.busy or self.recording or self.counting or self._closing:
+            return
+        from video_import import ImportWorker
+        self.busy = True
+        self.recordings.release()
+        self.recordings.back.setEnabled(False)
+        self.recordings.import_button.setEnabled(False)
+        self.recordings.update_actions()
+        self.recordings.message.setText('Importing video locally. Keep RecIt open; the original stays unchanged.')
+        worker = self.import_worker = ImportWorker(Path(path), VIDEOS, self)
+        def done(result, error):
+            self.busy = False
+            self.recordings.back.setEnabled(True)
+            self.recordings.import_button.setEnabled(True)
+            if result:
+                self.set_last(result)
+                self.recordings.refresh(result)
+            self.recordings.message.setText(error or 'Imported locally. Review the video before choosing Upload to Loom.')
+            self.recordings.update_actions()
+        worker.result.connect(done)
+        worker.finished.connect(worker.deleteLater)
+        worker.start()
 
     def recording_renamed(self, old_path, new_path):
         if self.last_file is not None and Path(old_path) == self.last_file:

@@ -21,7 +21,7 @@ class AppChecks(unittest.TestCase):
         devices = MagicMock()
         devices.lease = None
         devices.prepare.return_value = 'test-microphone'
-        self.patches = [patch.object(glint, 'AudioDevices', return_value=devices),
+        self.patches = [patch('PySide6.QtGui.QScreen.name', return_value='Test-monitor'), patch.object(glint, 'AudioDevices', return_value=devices),
             patch.object(glint.Window, 'initialize'), patch.object(glint.Hotkeys, 'start'),
             patch.object(glint, 'cameras', return_value=[('Test camera', '/dev/video-test')]),
             patch.object(glint, 'microphones', return_value=[]), patch.object(glint, 'VIDEOS', self.root),
@@ -30,6 +30,9 @@ class AppChecks(unittest.TestCase):
             p.start()
         self.window = glint.Window()
         self.window.engine = MagicMock()
+        screen = qt.primaryScreen()
+        geo, ratio = screen.geometry(), screen.devicePixelRatio()
+        self.window.engine.screen_options.return_value = [(f'Screen Test-monitor ({round(geo.width()*ratio)}x{round(geo.height()*ratio)} @ 0,0)', 0)]
         self.window.engine.verify_audio_route.side_effect = lambda **_: self.window.audio_devices.resolve(self.window.selected_source)
         self.window.engine.recording = False
         self.window.engine.errors = []
@@ -400,6 +403,7 @@ class AppChecks(unittest.TestCase):
         self.window.window_catalog.list.return_value = [('Test browser', 123)]
         self.window.window_catalog.geometry.return_value = (100, 200, 500, 400)
         self.window.capture_kind.setCurrentIndex(1)
+        self.window.capture_window.setCurrentIndex(self.window.capture_window.findData(123))
         self.window.configure_timer.stop()
         self.window.configure()
 

@@ -40,6 +40,7 @@ class Recordings(QWidget):
     recording_deleted = Signal(str)
     recording_renamed = Signal(str, str)
     upload_requested = Signal(str)
+    import_requested = Signal()
 
     def __init__(self, directory, parent=None, deletion_blocked=None):
         super().__init__(parent)
@@ -67,6 +68,9 @@ class Recordings(QWidget):
         self.back = QPushButton('←  Back to recorder')
         self.back.clicked.connect(self.reject)
         header.addWidget(self.back)
+        self.import_button = QPushButton('Import video…')
+        self.import_button.clicked.connect(self.import_requested.emit)
+        header.addWidget(self.import_button)
         header.addStretch()
         privacy = QLabel('LOCAL LIBRARY  ·  Only on this computer')
         privacy.setObjectName('eyebrow')

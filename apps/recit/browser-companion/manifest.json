@@ -1,0 +1,9 @@
+{
+  "manifest_version": 3,
+  "name": "RecIt tab recorder",
+  "version": "0.1.0",
+  "description": "Record only a browser tab, then explicitly import the download into RecIt.",
+  "permissions": ["desktopCapture"],
+  "action": {"default_title": "Open RecIt tab recorder"},
+  "background": {"service_worker": "background.js"}
+}

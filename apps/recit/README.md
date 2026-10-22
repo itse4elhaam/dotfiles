@@ -1,13 +1,13 @@
 # RecIt
 
-A native Linux recorder with two modes: screen with a camera widget, or a camera that fills the frame. Uses Qt for the interface, libobs for capture/composition/encoding, and FFmpeg to prepare MP4 files without re-encoding.
+A native Linux recorder for a screen, window, region or full-frame camera, with an optional Chrome companion for real browser tab recording. Uses Qt for the interface, libobs for capture/composition/encoding, and FFmpeg to prepare MP4 files without re-encoding.
 
 ## Use
 
 Open **RecIt** from the application launcher, or run `recit`.
 
 1. Choose Camera or Loom. New preferences default to Camera; existing preferences keep your last mode.
-2. In Loom mode, choose **Entire screen** or **A specific window**. For a window, select it from the list; use the refresh button after opening another window. Choose your camera and microphone, then a camera shape, size, and corner.
+2. In Loom mode, use **Choose what to record** for Screen, Window, Region or Browser tab. Screen and Region list monitors by connector and physical dimensions. Window lists titles; refreshing preserves only the exact selected window ID and never selects another window automatically. Choose your camera and microphone, then a camera shape, size, and corner.
 3. Start recording. A three-second countdown gives you time to get ready.
 4. Press **Ctrl + Shift + F9** to stop and save. **Ctrl + Shift + F10** pauses or resumes. **Ctrl + Shift + F8** toggles pointer-follow zoom. These also work while the main window is hidden. The tray menu has the same controls.
 
@@ -18,6 +18,51 @@ Videos save to `~/Videos/RecIt`. Recordings opens a dedicated library page with 
 Window capture records the selected window's content, including when another window covers it. Keep the selected window open and unminimized. Closing or minimizing it stops and saves the recording with a warning. Resizing the selected window refits it to the video frame. Computer sound, if enabled, still records the computer's audio rather than audio isolated to that window.
 
 In Camera mode, **Expand camera** hides the settings panel while keeping recording controls visible. **Show controls** brings the settings back. The complete camera image fits inside the video frame without cropping; sources with a different aspect ratio have black borders.
+
+## Capture targets
+
+The native picker uses labeled lists without live thumbnails. A screen target keeps
+the monitor connector, OBS index and physical rectangle together; it does not assume
+Qt and OBS enumerate monitors in the same order. Unmatched or ambiguous monitors
+are unavailable. A missing monitor, index change or geometry change invalidates
+selection and stops/saves an active recording with a warning. Choose the target
+again after changing display layout. Window capture records the exact X11 window,
+including browser chrome and its visible tab; it does not isolate a browser tab.
+
+For **Region**, select one monitor and drag either direction. The overlay shows
+physical pixel dimensions; Escape cancels. The region must fit wholly inside that
+monitor. OBS crops the source before fitting or pointer zoom, so zoom cannot expose
+pixels outside the region. The camera is composed separately using the selected
+shape, mask, mirror, size and corner, and the floating desktop bubble is hidden to
+avoid capturing the camera twice. Computer sound remains system-wide for native
+screen, window and region recording. Entire-screen capture retains the floating
+camera limitation described under Pointer zoom.
+
+For **Browser tab**, native Record is unavailable. Open **Browser companion
+instructions**, manually load the bundled [Chrome extension](browser-companion/README.md),
+and open its visible recorder page. Its browser-owned picker offers tabs only;
+capture starts only after clicking and consenting. Optional tab audio follows the
+picker's audio consent. Optional microphone/camera require separate browser
+permission. No system Pulse audio or native recording settings apply to this path.
+Cancel, permission denial or source loss never selects another target. Stop or
+revoking sharing finalizes available video and releases sources. Download WebM
+before closing the recorder page, then use **Recordings → Import video**.
+
+Import inspects local WebM/MP4/MKV with ffprobe and converts incompatible video and
+audio to H.264/AAC MP4. H.264 yuv420p and AAC streams may be copied. The selected
+original remains unchanged even if conversion fails. Output names are sanitized
+and collisions produce separate files, without overwriting files or symlinks.
+Imports never trigger automatic upload, even when automatic uploads are enabled.
+Review the result and explicitly choose Upload to Loom.
+
+Live multi-monitor X11 capture, region rendering and Chrome permission/capture UI
+remain unverified. Automated checks use synthetic screens, mocked OBS/browser
+APIs and generated media only. This branch does not include the separate Qt
+runtime crash fix and does not change the installed application.
+
+Implementation references: [OBS 27.2.4 XShm monitor labels and integer values](https://github.com/obsproject/obs-studio/blob/27.2.4/plugins/linux-capture/xshm-input.c),
+[OBS crop filter](https://github.com/obsproject/obs-studio/blob/27.2.4/plugins/obs-filters/crop-filter.c),
+and [Chrome desktopCapture consent](https://developer.chrome.com/docs/extensions/reference/api/desktopCapture).
 
 ## Microphones and Bluetooth headsets
 
@@ -150,3 +195,13 @@ The MX Brio format selection and full-image layout have automated regression cov
 Playback regression checks generate silent H.264 MP4/MKV clips with FFmpeg and assert decoded frames through Qt QVideoSink offscreen, without an audio output device. They cover pause, seek, switching files, missing/corrupt files, and cleanup. Desktop video rendering and audible volume output have not been tested by these checks.
 
 Navigation checks use a mocked OBS engine and synthetic silent video to exercise repeated Recordings/back transitions. The recorder destroys its native OBS preview before hiding it and recreates it after Qt lays out the recorder again; playback stops and clears its source on return. Tests check teardown order and cancel stale queued restoration, but offscreen Qt cannot establish X11/GLX stacking correctness. No live desktop or device capture was used to verify this fix.
+
+Target/import regressions can run without a desktop or devices:
+
+```bash
+env -u DISPLAY QT_QPA_PLATFORM=offscreen /path/to/isolated/python -m unittest discover -s apps/recit
+node --test apps/recit/browser-companion/test_recorder.cjs
+```
+
+The target-picker PR used `/tmp/recit-qt-crash-check/bin/python` with Qt 6.11.1,
+without changing the installed runtime. Hardware-only tests remain skipped.
