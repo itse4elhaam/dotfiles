@@ -25,6 +25,7 @@ AI agent skills for code review, Git workflows, documentation, and structured da
 | **doc-map** | Maintain a branch-aware DOC_MAP.html registry with document summaries, reading metadata, and persistent read status. |
 | **github-graphql-first** | Fetch structured GitHub data — PRs, reviews, review threads, comments, project items, timelines — using `gh api graphql`. |
 | **linear-issue-recon** | Pull full context from a Linear issue (description, comments, linked issues and PRs), explore the codebase, and produce an HTML dossier with a way-ahead recommendation. |
+| **load-bearing** | Longevity audit of a whole codebase — map every data flow, pick the load-bearing ones, trace each in a subagent against eight architectural smells (slow-by-schema, unguarded boundary, open door, fragile write, silent failure, split truth, unpinned, no guardrail), and mine git history for recurring bugs with a durable control per cluster. User-invoked. |
 | **subagent-retry** | Recover stuck or incomplete subagent work — extract output, assess completeness, then finish the remainder or fire a follow-up agent. User-invoked. |
 
 ## Installing from this repo
