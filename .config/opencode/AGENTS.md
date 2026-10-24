@@ -1,6 +1,6 @@
 ## NOTES
 
-when asked to create a skill, create in this repo and then and then symlink to ~/.agents/skills
+when asked to create a skill, create it in ~/workspace/coding/skills (github.com/itse4elhaam/skills) and then symlink it to ~/.agents/skills
 
 ## Agent skills
 
