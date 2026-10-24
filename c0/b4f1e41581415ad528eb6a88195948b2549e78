@@ -1,0 +1,23 @@
+.config/opencode/AGENTS.md
+  s_ffdbc37c76d093::t_12bbac9ea0abdb 3
+dev-setup/runs/skills.sh
+  s_ffdbc37c76d093::t_12bbac9ea0abdb 15-24,26-27
+scripts/skill-links.lua
+  s_ffdbc37c76d093::t_12bbac9ea0abdb 3-4
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "c0b4f1e41581415ad528eb6a88195948b2549e78",
+  "prompts": {},
+  "sessions": {
+    "s_ffdbc37c76d093": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "625ebdaf-6b90-4cc2-b760-958d30fca2b5",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Elhaam Basheer Chaudhry <e4elhaam@gmail.com>"
+    }
+  }
+}
