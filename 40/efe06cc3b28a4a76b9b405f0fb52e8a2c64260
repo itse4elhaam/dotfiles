@@ -1,0 +1,25 @@
+.agents/skills/load-bearing/agents/recurrence-miner.md
+  s_27c3aa0809363f::t_abb7e860ed09af 1-25
+.agents/skills/load-bearing/SKILL.md
+  s_27c3aa0809363f::t_ecac1daec86ce0 1-42
+.agents/skills/load-bearing/agents/flow-tracer.md
+  s_27c3aa0809363f::t_1de50e46b585a1 1-22
+.agents/skills/README.md
+  s_27c3aa0809363f::t_f15ac5e3c4e7a9 28
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "40efe06cc3b28a4a76b9b405f0fb52e8a2c64260",
+  "prompts": {},
+  "sessions": {
+    "s_27c3aa0809363f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e04fa611-3bbb-4b6a-bb38-c4657d48767e",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Elhaam Basheer Chaudhry <e4elhaam@gmail.com>"
+    }
+  }
+}
