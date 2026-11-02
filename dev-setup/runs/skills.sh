@@ -12,12 +12,17 @@ npx skills add mattpocock/skills --global --all --yes
 npx skills add charon-fan/agent-playbook --global --all --yes
 npx skills add obra/superpowers --global --all --yes
 
-# Symlink dotfiles' own skills (instead of npx skills add, which would
-# produce non-fatal "does not support global skill installation" warnings
-# for project-only agents like Eve and PromptScript)
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-for skill in "$SCRIPT_DIR"/.agents/skills/*/; do
+# Symlink personal skills from itse4elhaam/skills (instead of npx skills add,
+# which would produce non-fatal "does not support global skill installation"
+# warnings for project-only agents like Eve and PromptScript)
+SKILLS_DIR="$HOME/workspace/coding/skills"
+if [ ! -d "$SKILLS_DIR/.git" ]; then
+  mkdir -p "$(dirname "$SKILLS_DIR")"
+  git clone git@github.com:itse4elhaam/skills.git "$SKILLS_DIR"
+fi
+mkdir -p "$HOME/.agents/skills"
+for skill in "$SKILLS_DIR"/*/; do
   skill_name="$(basename "$skill")"
-  [ "$skill_name" = "README.md" ] && continue  # skip the README
-  ln -sfn "$skill" "$HOME/.agents/skills/$skill_name"
+  [ -f "$skill/SKILL.md" ] || continue  # skip non-skill dirs like assets/
+  ln -sfn "${skill%/}" "$HOME/.agents/skills/$skill_name"
 done

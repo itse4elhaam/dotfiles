@@ -1,6 +1,7 @@
 local uv = vim.uv or vim.loop
 local repo = vim.fn.resolve(vim.fn.expand("~/dotfiles"))
-local roots = { repo .. "/.agents/skills", repo .. "/.pi/agent/skills" }
+local skills_repo = vim.fn.resolve(vim.fn.expand("~/workspace/coding/skills"))
+local roots = { skills_repo, repo .. "/.pi/agent/skills" }
 
 vim.api.nvim_create_autocmd("BufWritePost", {
   group = vim.api.nvim_create_augroup("DotfilesSkillLinks", { clear = true }),

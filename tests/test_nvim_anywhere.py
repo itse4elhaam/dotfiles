@@ -47,6 +47,18 @@ class EditorProtocol(unittest.TestCase):
     def test_actual_user_config(self):
         self.assertTrue(self.editor(["call setline(1, 'configured editor')", 'wq'], True)[0])
 
+    def test_zoom_save_and_quit(self):
+        self.assertEqual(self.editor([
+            'lua Snacks.zen.zoom()', "call setline(1, 'edited in zoom')",
+            'wq', 'lua vim.wait(100)',
+        ], True), (True, 'edited in zoom\n'))
+
+    def test_zoom_force_quit_cancels(self):
+        self.assertEqual(self.editor([
+            'lua Snacks.zen.zoom()', "call setline(1, 'discard')",
+            r'call feedkeys(":q!\<CR>", "xt")', 'lua vim.wait(100)',
+        ], True), (False, 'original\n'))
+
 
 class DesktopHandoff(unittest.TestCase):
     def test_blank_commit_and_failure_recovery(self):
@@ -59,6 +71,8 @@ class DesktopHandoff(unittest.TestCase):
                     if args[0] == 'ghostty':
                         self.assertIn('--font-size=17', args)
                         env = kwargs['env']
+                        self.assertEqual(env['NVIM_SMEAR_CURSOR'], 'true')
+                        self.assertEqual(env['NVIM_DEFAULT_FULL_SCREEN'], 'true')
                         editor = shlex.split(args[-1])
                         self.assertEqual(editor, ['/bin/tool', '--cmd', 'lua dofile(vim.env.NVIM_ANYWHERE_LUA)', env['NVIM_ANYWHERE_DRAFT']])
                         self.assertEqual(env['NVIM_ANYWHERE_LUA'], str(ROOT / 'scripts/nvim-anywhere/editor.lua'))
@@ -75,7 +89,8 @@ class DesktopHandoff(unittest.TestCase):
                     if args[-1] == 'ctrl+v':
                         pasted.append(True)
                     return subprocess.CompletedProcess(args, 0)
-                with patch.dict(os.environ, XDG_SESSION_TYPE='x11', XDG_STATE_HOME=folder), \
+                with patch.dict(os.environ, XDG_SESSION_TYPE='x11', XDG_STATE_HOME=folder, NVIM_DEFAULT_FULL_SCREEN='false'), \
+                     patch.dict(os.environ, {key: value for key, value in os.environ.items() if key != 'NVIM_SMEAR_CURSOR'}, clear=True), \
                      patch('sys.argv', ['nvim-anywhere-edit'] + ([mode] if mode else [])), \
                      patch.object(helper.shutil, 'which', return_value='/bin/tool'), \
                      patch.object(helper, 'output', return_value='123'), \

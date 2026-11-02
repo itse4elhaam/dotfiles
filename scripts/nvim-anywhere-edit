@@ -108,7 +108,10 @@ def main():
         draft = session / 'draft.md'
         draft.write_bytes(captured)
         marker = session / 'commit'
-        env = dict(os.environ, NVIM_ANYWHERE_DRAFT=str(draft), NVIM_ANYWHERE_COMMIT=str(marker))
+        env = dict(os.environ, NVIM_ANYWHERE_DRAFT=str(draft), NVIM_ANYWHERE_COMMIT=str(marker),
+                   NVIM_DEFAULT_FULL_SCREEN='true')
+        # Desktop shortcuts bypass the shell that normally enables cursor effects.
+        env.setdefault('NVIM_SMEAR_CURSOR', 'true')
         lua = Path(__file__).resolve().parent / 'nvim-anywhere/editor.lua'
         command = ['ghostty', '--gtk-single-instance=false', '--class=com.elhaam.NvimAnywhere',
                    '--title=Neovim anywhere', '--font-size=17', f'--fullscreen={str(not args.windowed).lower()}',
