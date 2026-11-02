@@ -122,6 +122,8 @@ The installer includes matching pinned PySide6 Essentials and Addons packages fo
 
 ## Checks
 
+Qt is pinned to PySide6 6.11.1. On the tested Python 3.10 runtime, 6.12.0 loses references to Python's `None` during ordinary widget updates and eventually aborts with `none_dealloc: deallocating None`. The offscreen `test_qt_runtime.py` subprocess exercises 10,000 microphone-meter updates and interpreter shutdown without opening capture devices. Keep Essentials and Addons on the same version when changing the pin. This dependency fix does not establish Bluetooth microphone reliability.
+
 An audio-only hardware comparison requires explicit recording authorization and a closed RecIt process, with no other capture stream active:
 
 ```bash
