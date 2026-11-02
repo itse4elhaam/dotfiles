@@ -7,6 +7,16 @@ vim.opt.backup = false
 vim.opt.writebackup = false
 local wrote = false
 local cancelled = false
+vim.api.nvim_create_autocmd('QuitPre', {
+  callback = function()
+    if _G.Snacks and Snacks.zen.win and Snacks.zen.win:valid()
+        and Snacks.zen.win.win == vim.api.nvim_get_current_win()
+        and (not vim.bo.modified or cancelled) then
+      -- Zoom adds a window for the same draft; quitting it must end the edit.
+      vim.schedule(function() vim.cmd(cancelled and 'qa!' or 'qa') end)
+    end
+  end,
+})
 vim.api.nvim_create_autocmd('CmdlineLeave', {
   callback = function()
     local command = vim.fn.getcmdline():match('^%s*(%S+)') or ''

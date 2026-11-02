@@ -47,6 +47,18 @@ class EditorProtocol(unittest.TestCase):
     def test_actual_user_config(self):
         self.assertTrue(self.editor(["call setline(1, 'configured editor')", 'wq'], True)[0])
 
+    def test_zoom_save_and_quit(self):
+        self.assertEqual(self.editor([
+            'lua Snacks.zen.zoom()', "call setline(1, 'edited in zoom')",
+            'wq', 'lua vim.wait(100)',
+        ], True), (True, 'edited in zoom\n'))
+
+    def test_zoom_force_quit_cancels(self):
+        self.assertEqual(self.editor([
+            'lua Snacks.zen.zoom()', "call setline(1, 'discard')",
+            r'call feedkeys(":q!\<CR>", "xt")', 'lua vim.wait(100)',
+        ], True), (False, 'original\n'))
+
 
 class DesktopHandoff(unittest.TestCase):
     def test_blank_commit_and_failure_recovery(self):
