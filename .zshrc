@@ -11,6 +11,7 @@ fi
 if [ -f ~/.zshenv_local ]; then
   source ~/.zshenv_local
 fi
+export NVIM_DEFAULT_FULL_SCREEN="${NVIM_DEFAULT_FULL_SCREEN:-false}"
 # assuming you cloned zff to ~/zff
 if [[ -f ~/zff/zff.sh ]]; then
   source ~/zff/zff.sh

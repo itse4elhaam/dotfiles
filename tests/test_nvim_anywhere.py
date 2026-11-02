@@ -59,6 +59,8 @@ class DesktopHandoff(unittest.TestCase):
                     if args[0] == 'ghostty':
                         self.assertIn('--font-size=17', args)
                         env = kwargs['env']
+                        self.assertEqual(env['NVIM_SMEAR_CURSOR'], 'true')
+                        self.assertEqual(env['NVIM_DEFAULT_FULL_SCREEN'], 'true')
                         editor = shlex.split(args[-1])
                         self.assertEqual(editor, ['/bin/tool', '--cmd', 'lua dofile(vim.env.NVIM_ANYWHERE_LUA)', env['NVIM_ANYWHERE_DRAFT']])
                         self.assertEqual(env['NVIM_ANYWHERE_LUA'], str(ROOT / 'scripts/nvim-anywhere/editor.lua'))
@@ -75,7 +77,8 @@ class DesktopHandoff(unittest.TestCase):
                     if args[-1] == 'ctrl+v':
                         pasted.append(True)
                     return subprocess.CompletedProcess(args, 0)
-                with patch.dict(os.environ, XDG_SESSION_TYPE='x11', XDG_STATE_HOME=folder), \
+                with patch.dict(os.environ, XDG_SESSION_TYPE='x11', XDG_STATE_HOME=folder, NVIM_DEFAULT_FULL_SCREEN='false'), \
+                     patch.dict(os.environ, {key: value for key, value in os.environ.items() if key != 'NVIM_SMEAR_CURSOR'}, clear=True), \
                      patch('sys.argv', ['nvim-anywhere-edit'] + ([mode] if mode else [])), \
                      patch.object(helper.shutil, 'which', return_value='/bin/tool'), \
                      patch.object(helper, 'output', return_value='123'), \
