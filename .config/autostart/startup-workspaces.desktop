@@ -1,7 +1,9 @@
 [Desktop Entry]
 Type=Application
-Name=Startup Workspaces
-Comment=Open Ghostty, Edge, and Upwork Tracker on login
-Exec=/home/elhaam/dotfiles/scripts/startup-setup.sh
+Name=Desktop Recovery
+Comment=Tray menu to recover Edge tabs and restore the desktop layout on demand
+Exec="/home/elhaam/dotfiles/scripts/desktop-recovery" tray
+Icon=view-refresh
 Terminal=false
 X-GNOME-Autostart-enabled=true
+X-GNOME-Autostart-Delay=5

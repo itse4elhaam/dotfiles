@@ -1,0 +1,47 @@
+#!/bin/bash
+set -euo pipefail
+
+script_dir="$(cd -- "$(dirname -- "$(readlink -f -- "$0")")" && pwd)"
+for command in wmctrl xrandr microsoft-edge ghostty tmux discord gtk-launch systemd-run; do
+  command -v "$command" >/dev/null
+done
+/usr/bin/python3 -c "import gi; gi.require_version('Gtk', '3.0'); gi.require_version('AyatanaAppIndicator3', '0.1')"
+mkdir -p "$HOME/.local/bin" "$HOME/.local/share/applications" "$HOME/.config/autostart"
+ln -sfn "$script_dir/desktop-recovery" "$HOME/.local/bin/desktop-recovery"
+cat > "$HOME/.local/share/applications/desktop-recovery.desktop" <<EOF
+[Desktop Entry]
+Type=Application
+Name=Recover Desktop
+Comment=Restore Edge tabs and place Ghostty, Zoho Mail, Discord and WhatsApp
+Exec="$script_dir/desktop-recovery" recover
+Icon=view-refresh
+Terminal=false
+Categories=Utility;
+EOF
+# Replace the legacy startup entry so it cannot launch a second recovery.
+cat > "$HOME/.config/autostart/startup-workspaces.desktop" <<EOF
+[Desktop Entry]
+Type=Application
+Name=Desktop Recovery
+Comment=Tray menu to recover Edge tabs and restore the desktop layout on demand
+Exec="$script_dir/desktop-recovery" tray
+Icon=view-refresh
+Terminal=false
+X-GNOME-Autostart-enabled=true
+X-GNOME-Autostart-Delay=5
+EOF
+/usr/bin/python3 - "$script_dir/desktop-recovery" <<'PY'
+import sys
+from gi.repository import Gio
+root = Gio.Settings.new('org.gnome.settings-daemon.plugins.media-keys')
+path = '/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/desktop-recovery/'
+paths = root.get_strv('custom-keybindings')
+if path not in paths:
+    root.set_strv('custom-keybindings', paths + [path])
+shortcut = Gio.Settings.new_with_path('org.gnome.settings-daemon.plugins.media-keys.custom-keybinding', path)
+shortcut.set_string('name', 'Recover desktop')
+shortcut.set_string('command', '"' + sys.argv[1] + '" recover')
+shortcut.set_string('binding', '<Super><Alt>r')
+Gio.Settings.sync()
+PY
+systemd-run --user --collect --quiet --unit="desktop-recovery-tray-$(date +%s)" "$script_dir/desktop-recovery" tray

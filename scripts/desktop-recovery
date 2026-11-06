@@ -1,0 +1,316 @@
+#!/usr/bin/python3
+"""Recover the personal GNOME/X11 desktop, or keep a Recover menu in the tray."""
+import fcntl
+import os
+from pathlib import Path
+import re
+import shutil
+import subprocess
+import sys
+import struct
+from urllib.parse import urlparse
+import time
+
+STATE = Path.home() / '.local/state/desktop-recovery'
+EDGE = 'microsoft-edge.Microsoft-edge'
+ZOHO = 'crx__ilnnabaccafamopchccjobpmmpmdnope.Microsoft-edge'
+WHATSAPP = 'crx__hnpfjngllnobngcgfapefoaidbinmjnm.Microsoft-edge'
+
+
+def run(*args):
+    return subprocess.check_output(args, text=True).strip()
+
+
+def windows():
+    return parse_windows(run('wmctrl', '-lxG'))
+
+
+def parse_windows(output):
+    result = []
+    for line in output.splitlines():
+        fields = line.split(None, 8)
+        if len(fields) == 9:
+            result.append(dict(id=fields[0], workspace=int(fields[1]),
+                               cls=fields[6], title=fields[8]))
+    return result
+
+
+def monitors(output):
+    result = []
+    for line in output.splitlines()[1:]:
+        match = re.search(r'(\d+)/\d+x(\d+)/\d+([+-]\d+)([+-]\d+)', line)
+        if match:
+            width, height, x, y = map(int, match.groups())
+            result.append(dict(primary='*' in line.split()[1],
+                               width=width, height=height, x=x, y=y))
+    return sorted(result, key=lambda m: not m['primary'])
+
+
+def edge_sessions(data):
+    """Read Chromium SNSS commands, counting current URLs rather than history entries.
+
+    Format: chromium/components/sessions/core/{session_service_commands,
+    serialized_navigation_entry}.cc. Edge-only command IDs are ignored.
+    """
+    if len(data) < 8 or data[:4] != b'SNSS' or struct.unpack_from('<I', data, 4)[0] not in (1, 3):
+        raise ValueError('Unsupported Edge session format')
+    tabs, sessions = {}, {}
+    offset = 8
+    def tab(tid):
+        return tabs.setdefault(tid, dict(window=None, index=-1, selected=0, nav={}))
+    def window(wid):
+        return sessions.setdefault(wid, dict(selected=0, workspace=None, kind=0))
+    while offset + 2 <= len(data):
+        size = struct.unpack_from('<H', data, offset)[0]
+        offset += 2
+        if size < 1 or offset + size > len(data):
+            break  # The running browser can be halfway through appending a command.
+        command, payload = data[offset], data[offset + 1:offset + size]
+        offset += size
+        if command in (0, 2, 7, 8, 9) and len(payload) >= 8:
+            first, second = struct.unpack_from('<ii', payload)
+            if command == 0:
+                tab(second)['window'] = first
+                window(first)
+            elif command == 2:
+                tab(first)['index'] = second
+            elif command == 7:
+                tab(first)['selected'] = second
+            elif command == 8:
+                window(first)['selected'] = second
+            elif command == 9:
+                window(first)['kind'] = second
+        elif command == 6 and len(payload) >= 16:
+            tid, index, length = struct.unpack_from('<iii', payload, 4)
+            if length < 0 or 16 + length > len(payload):
+                raise ValueError('Invalid Edge navigation record')
+            url = payload[16:16 + length].decode('utf-8', errors='replace')
+            pos = (16 + length + 3) & ~3
+            title = ''
+            if pos + 4 <= len(payload):
+                characters = struct.unpack_from('<i', payload, pos)[0]
+                if 0 <= characters <= (len(payload) - pos - 4) // 2:
+                    title = payload[pos + 4:pos + 4 + characters * 2].decode('utf-16-le', errors='replace')
+            tab(tid)['nav'][index] = (url, title)
+        elif command in (16, 17) and len(payload) >= 4:
+            identifier = struct.unpack_from('<i', payload)[0]
+            if command == 16:
+                tabs.pop(identifier, None)
+            else:
+                sessions.pop(identifier, None)
+                tabs = {tid: t for tid, t in tabs.items() if t['window'] != identifier}
+        elif command == 23 and len(payload) >= 12:
+            wid, length = struct.unpack_from('<ii', payload, 4)
+            value = payload[12:12 + max(length, 0)].decode('ascii', errors='replace')
+            if value.isdigit():
+                window(wid)['workspace'] = int(value)
+        elif command in (5, 11, 24) and len(payload) >= (12 if command == 24 else 8):
+            tid, index = struct.unpack_from('<ii', payload)
+            nav = tab(tid)['nav']
+            if command == 5:
+                tab(tid)['nav'] = {i: n for i, n in nav.items() if i < index}
+            else:
+                start, count = (0, index) if command == 11 else (index, struct.unpack_from('<i', payload, 8)[0])
+                tab(tid)['nav'] = {i if i < start else i - count: n
+                                   for i, n in nav.items() if i < start or i >= start + count}
+    result = []
+    for wid, session in sessions.items():
+        if session['kind'] != 0:
+            continue
+        members = [t for t in tabs.values() if t['window'] == wid and t['nav']]
+        if not members:
+            continue
+        entries = [(t, t['nav'][min(t['nav'], key=lambda i: abs(i - t['selected']))]) for t in members]
+        selected = next((entry for t, entry in entries if t['index'] == session['selected']), ('', ''))
+        result.append(dict(workspace=session['workspace'], selected_title=selected[1],
+                           titles=[entry[1] for _, entry in entries], tabs=len(entries),
+                           upwork=sum((urlparse(entry[0]).hostname or '').lower().rstrip('.') in ('upwork.com', 'www.upwork.com')
+                                      or (urlparse(entry[0]).hostname or '').lower().rstrip('.').endswith('.upwork.com')
+                                      for _, entry in entries)))
+    return result
+
+
+def browser_workspaces(browser_windows, saved):
+    available = list(saved)
+    matches = []
+    for window in browser_windows:
+        def score(session):
+            active = session['selected_title']
+            return (int(bool(active) and active in window['title']) * 100
+                    + int(any(title and title in window['title'] for title in session['titles'])) * 10
+                    + int(session['workspace'] == window['workspace']))
+        if not available or max(map(score, available)) == 0:
+            raise RuntimeError('Cannot match Edge windows to saved tabs yet; try Recover again in a few seconds')
+        match = max(available, key=score)
+        available.remove(match)
+        matches.append((window, match))
+    # Ties preserve the reference workspace instead of swapping windows arbitrarily.
+    main, _ = max(matches, key=lambda pair: (pair[1]['upwork'], pair[0]['workspace'] == 1))
+    return {w['id']: 1 if w == main else 0 for w in browser_windows}
+
+
+def saved_edge_sessions():
+    directory = Path.home() / '.config/microsoft-edge/Default/Sessions'
+    latest = max(directory.glob('Session_*'), default=None)
+    if latest is None:
+        raise RuntimeError('No Edge session to count tabs from')
+    return edge_sessions(latest.read_bytes())
+
+
+def launch(*command):
+    # User services survive the shortcut process and keep application logs out of the terminal.
+    subprocess.run(['systemd-run', '--user', '--collect', '--quiet',
+                    '--unit=desktop-recovery-' + str(time.time_ns()), *command], check=True)
+
+
+def ensure_app(match, command):
+    if any(match(w) for w in windows()):
+        return
+    launch(*command)
+    deadline = time.monotonic() + 45
+    while time.monotonic() < deadline:
+        if any(match(w) for w in windows()):
+            return
+        time.sleep(0.5)
+    raise RuntimeError('No window appeared for ' + command[0])
+
+
+def backup_edge():
+    source = Path.home() / '.config/microsoft-edge/Default/Sessions'
+    if not source.exists():
+        raise RuntimeError('Edge session directory is missing; refusing a blank recovery')
+    destination = STATE / ('edge-session-' + time.strftime('%Y%m%d-%H%M%S'))
+    shutil.copytree(source, destination)
+    for old in sorted(STATE.glob('edge-session-*'))[:-5]:
+        shutil.rmtree(old)
+
+
+def place(window, workspace, monitor):
+    wid = window['id']
+    if workspace is not None:
+        subprocess.run(['wmctrl', '-ir', wid, '-t', str(workspace)], check=True)
+    subprocess.run(['wmctrl', '-ir', wid, '-b', 'remove,maximized_vert,maximized_horz'], check=True)
+    geometry = f"0,{monitor['x'] + 40},{monitor['y'] + 70},{monitor['width'] - 80},{monitor['height'] - 140}"
+    subprocess.run(['wmctrl', '-ir', wid, '-e', geometry], check=True)
+    subprocess.run(['wmctrl', '-ir', wid, '-b', 'add,maximized_vert,maximized_horz'], check=True)
+
+
+def notify(message):
+    subprocess.run(['notify-send', 'Desktop recovery', message], check=False)
+
+
+def recover():
+    STATE.mkdir(parents=True, exist_ok=True, mode=0o700)
+    with (STATE / 'recover.lock').open('w') as lock:
+        try:
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            notify('Recovery is already running.')
+            return
+        if os.environ.get('XDG_SESSION_TYPE') != 'x11':
+            raise RuntimeError('This layout requires the GNOME X11 session.')
+        screens = monitors(run('xrandr', '--listmonitors'))
+        if not screens:
+            raise RuntimeError('No connected monitor found')
+        if len(screens) > 1:
+            # Both displays must participate in workspace switching for Ghostty/WhatsApp.
+            subprocess.run(['gsettings', 'set', 'org.gnome.mutter',
+                            'workspaces-only-on-primary', 'false'], check=True)
+        subprocess.run(['gsettings', 'set', 'org.gnome.mutter', 'dynamic-workspaces', 'false'], check=True)
+        count = len(run('wmctrl', '-d').splitlines())
+        if count < 6:
+            subprocess.run(['wmctrl', '-n', '6'], check=True)
+        errors = []
+        if not any(w['cls'] == EDGE for w in windows()):
+            backup_edge()
+            ensure_app(lambda w: w['cls'] == EDGE,
+                       ['microsoft-edge', '--profile-directory=Default', '--restore-last-session'])
+            # Restored windows arrive separately. Wait for the set to settle before placing them.
+            previous, stable = None, 0
+            for _ in range(30):
+                current = [w['id'] for w in windows() if w['cls'] == EDGE]
+                stable = stable + 1 if current == previous else 0
+                if stable >= 5:
+                    break
+                previous = current
+                time.sleep(1)
+        apps = [
+            (lambda w: 'ghostty' in w['cls'].lower(),
+             ['ghostty', '-e', 'tmux', 'new-session', '-A', '-s', 'main']),
+            (lambda w: w['cls'] == ZOHO,
+             ['gtk-launch', 'msedge-ilnnabaccafamopchccjobpmmpmdnope-Default']),
+            (lambda w: w['cls'].lower() == 'discord.discord', ['discord']),
+            (lambda w: w['cls'] == WHATSAPP,
+             ['gtk-launch', 'msedge-hnpfjngllnobngcgfapefoaidbinmjnm-Default']),
+        ]
+        for match, command in apps:
+            try:
+                ensure_app(match, command)
+            except (RuntimeError, subprocess.SubprocessError) as error:
+                errors.append(str(error))
+        current = windows()
+        browsers = [w for w in current if w['cls'] == EDGE]
+        assignments = browser_workspaces(browsers, saved_edge_sessions()) if browsers else {}
+        for window in current:
+            if window['workspace'] < 0:
+                continue
+            cls = window['cls']
+            secondary = cls == WHATSAPP or 'ghostty' in cls.lower()
+            workspace = assignments.get(window['id'])
+            if 'ghostty' in cls.lower():
+                workspace = 0
+            elif cls == ZOHO:
+                workspace = 2
+            elif cls.lower() == 'discord.discord':
+                workspace = 3
+            elif cls == WHATSAPP:
+                workspace = 5
+            try:
+                place(window, workspace, screens[-1] if secondary else screens[0])
+            except subprocess.SubprocessError as error:
+                errors.append(str(error))
+        main = next((wid for wid, workspace in assignments.items() if workspace == 1), None)
+        if main:
+            subprocess.run(['wmctrl', '-ia', main], check=True)
+        if errors:
+            raise RuntimeError('; '.join(errors))
+        notify('Recovered Edge and placed your apps. Main Edge is on workspace 2.')
+
+
+def tray():
+    import gi
+    gi.require_version('Gtk', '3.0')
+    gi.require_version('AyatanaAppIndicator3', '0.1')
+    from gi.repository import Gtk, AyatanaAppIndicator3
+    STATE.mkdir(parents=True, exist_ok=True, mode=0o700)
+    lock = (STATE / 'tray.lock').open('w')
+    try:
+        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError:
+        return
+    indicator = AyatanaAppIndicator3.Indicator.new(
+        'desktop-recovery', 'view-refresh', AyatanaAppIndicator3.IndicatorCategory.APPLICATION_STATUS)
+    indicator.set_status(AyatanaAppIndicator3.IndicatorStatus.ACTIVE)
+    indicator.set_title('Desktop recovery')
+    menu = Gtk.Menu()
+    recover_item = Gtk.MenuItem(label='Recover')
+    recover_item.connect('activate', lambda _: launch('/usr/bin/python3', str(Path(__file__).resolve()), 'recover'))
+    menu.append(recover_item)
+    quit_item = Gtk.MenuItem(label='Quit')
+    quit_item.connect('activate', lambda _: Gtk.main_quit())
+    menu.append(quit_item)
+    menu.show_all()
+    indicator.set_menu(menu)
+    Gtk.main()
+
+
+if __name__ == '__main__':
+    try:
+        if sys.argv[1:] == ['tray']:
+            tray()
+        else:
+            recover()
+    except Exception as error:
+        print(f'Desktop recovery failed: {error}', file=sys.stderr)
+        notify(f'Recovery incomplete: {error}. See journalctl --user -g desktop-recovery')
+        sys.exit(1)
