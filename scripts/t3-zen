@@ -118,7 +118,7 @@ def main():
             state_path.write_text(json.dumps(restore) + "\n")
             with tempfile.TemporaryDirectory(prefix="t3-zen-") as directory:
                 target = Path(directory) / "zen-mode.json"
-                target.write_text(json.dumps(theme))
+                target.write_text(json.dumps(theme, indent=2) + "\n")
                 subprocess.run([str(cli), "theme", "set", "--base-dir", str(home), "--id", ZEN_ID, str(target)], check=True)
         else:
             if not state_path.is_file():
