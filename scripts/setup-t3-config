@@ -1,0 +1,109 @@
+#!/usr/bin/env python3
+"""Link T3's portable configuration to this dotfiles checkout, with backups."""
+
+import argparse
+from datetime import datetime
+import json
+import os
+from pathlib import Path
+import shutil
+import subprocess
+import sys
+
+
+def config_links(repo, home, t3_home):
+    config = repo / ".config/t3code"
+    userdata = t3_home / "userdata"
+    return [
+        (config / "themes", userdata / "themes"),
+        (config / "keybindings.json", userdata / "keybindings.json"),
+        (config / "client-settings.json", userdata / "client-settings.json"),
+        (repo / "scripts/t3-zen", home / ".local/bin/t3-zen"),
+        (repo / "scripts/t3-wallpaper-layout", home / ".local/bin/t3-wallpaper-layout"),
+    ]
+
+
+def linked(source, destination):
+    return source.exists() and destination.is_symlink() and destination.resolve() == source.resolve()
+
+
+def install_links(links, backup, dry_run=False):
+    # Validate every source before moving any existing configuration.
+    for source, _ in links:
+        if not source.exists():
+            raise SystemExit(f"Missing dotfiles source: {source}")
+    for source, destination in links:
+        if linked(source, destination):
+            print(f"Linked: {destination}")
+            continue
+        print(f"Link: {destination} -> {source}")
+        if dry_run:
+            continue
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        if destination.exists() or destination.is_symlink():
+            backup.mkdir(parents=True, exist_ok=True)
+            saved = backup / destination.name
+            shutil.move(str(destination), str(saved))
+            print(f"Backup: {saved}")
+        destination.symlink_to(source, target_is_directory=source.is_dir())
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--repo", type=Path, default=Path.home() / "dotfiles",
+                        help="Permanent dotfiles checkout, default ~/dotfiles")
+    parser.add_argument("--home", type=Path, default=Path.home())
+    parser.add_argument("--t3-home", type=Path, help="Defaults to T3CODE_HOME or HOME/.t3")
+    parser.add_argument("--check", action="store_true", help="Verify links without changing anything")
+    parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument("--skip-shortcut", action="store_true")
+    parser.add_argument("--skip-theme", action="store_true")
+    args = parser.parse_args()
+    repo, home = args.repo.expanduser().resolve(), args.home.expanduser().resolve()
+    t3_home = (args.t3_home or Path(os.environ.get("T3CODE_HOME", str(home / ".t3")))).expanduser().resolve()
+    links = config_links(repo, home, t3_home)
+    if args.check:
+        missing = [(source, destination) for source, destination in links if not linked(source, destination)]
+        for source, destination in missing:
+            print(f"Not linked: {destination} -> {source}")
+        if missing:
+            raise SystemExit(1)
+        print(f"All {len(links)} links point into {repo}")
+        return
+    config = repo / ".config/t3code"
+    defaults = json.loads((config / "defaults.json").read_text())
+    for name in ("keybindings.json", "client-settings.json"):
+        json.loads((config / name).read_text())
+    for theme in (config / "themes").glob("*.json"):
+        data = json.loads(theme.read_text())
+        if len(data.get("css", "")) > 50_000:
+            raise SystemExit(f"Theme exceeds T3's CSS limit: {theme}")
+    for key in ("themeId", "restoreThemeId"):
+        if defaults[key] not in {theme.stem for theme in (config / "themes").glob("*.json")}:
+            raise SystemExit(f"Unknown {key} in defaults.json")
+    stamp = datetime.now().strftime("%Y%m%d-%H%M%S-%f")
+    state_root = Path(os.environ.get("XDG_STATE_HOME", str(home / ".local/state")))
+    backup = state_root / "t3-config/backups" / stamp
+    install_links(links, backup, args.dry_run)
+    if args.dry_run:
+        return
+    # This is transient toggle state, not a copy of the configuration.
+    restore = state_root / "t3-zen/restore.json"
+    if not restore.exists():
+        restore.parent.mkdir(parents=True, exist_ok=True)
+        restore.write_text(json.dumps({"themeId": defaults["restoreThemeId"], "home": str(t3_home)}) + "\n")
+    if not args.skip_shortcut:
+        if home == Path.home() and os.environ.get("XDG_SESSION_TYPE") == "x11" and shutil.which("gsettings"):
+            subprocess.run([sys.executable, str(repo / "scripts/t3-zen"), "install"], check=True)
+        else:
+            print("Run t3-zen install from the GNOME X11 desktop to register Ctrl+Alt+Z.")
+    if not args.skip_theme:
+        cli = home / ".t3/bin/t3"
+        if cli.is_file():
+            subprocess.run([str(cli), "theme", "set", "--base-dir", str(t3_home), defaults["themeId"]], check=True)
+        else:
+            print(f"Open T3 once, then run its CLI: t3 theme set {defaults['themeId']}")
+
+
+if __name__ == "__main__":
+    main()

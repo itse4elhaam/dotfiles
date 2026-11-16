@@ -1,0 +1,134 @@
+#!/usr/bin/env python3
+"""Toggle a local T3 Zen theme, preserving the previous theme and panel state."""
+
+import argparse
+import ast
+import fcntl
+import json
+import os
+from pathlib import Path
+import re
+import runpy
+import subprocess
+import tempfile
+
+
+ROOT = Path(__file__).resolve().parent.parent
+ZEN_ID = "zen-mode"
+
+
+def build_theme(theme):
+    compact = runpy.run_path(str(ROOT / "scripts/t3-wallpaper-layout"))["compact_css"]
+    css = compact(theme.get("css", ""))
+    # Share hover opacity through a custom property instead of repeating the
+    # long action selector. Preserve keyboard focus and the original buttons.
+    pattern = (
+        r'\[data-message-role\] (button:is\([^{}]+\))\{opacity:0\s*!important;?\}'
+        r'\[data-message-role\]:is\(:hover,:focus-within\) \1\{opacity:1\s*!important;?\}'
+    )
+    css = re.sub(pattern, lambda m: (
+        '[data-message-role]{--td-action-opacity:0}'
+        '[data-message-role]:is(:hover,:focus-within){--td-action-opacity:1}'
+        f'[data-message-role] {m[1]}{{opacity:var(--td-action-opacity)!important}}'
+    ), css)
+    # Quotes are optional around identifier-valued attributes, not labels.
+    css = re.sub(r'([~|^$*]?=)"([a-zA-Z_][a-zA-Z0-9_-]*)"\]', r'\1\2]', css)
+    css += compact((ROOT / ".config/t3code/zen.css").read_text())
+    css = re.sub(r'\s+!important', '!important', css)
+    if len(css) > 50_000:
+        # The largest wallpaper leaves almost no CSS budget. Let the app use
+        # its default corner radii in Zen, keeping the image and glass paint.
+        css = re.sub(r'(?:^|(?<=}))[^{]+\{border-radius:[^{}]+\}', '', css)
+    if len(css) > 50_000:
+        raise SystemExit("This wallpaper is too large to add Zen CSS. The current theme was kept.")
+    result = dict(theme)
+    result["name"] = f"Zen mode: {theme['name']}"
+    result["css"] = css
+    return result
+
+
+def install_shortcut():
+    launcher = Path.home() / ".local/bin/t3-zen"
+    launcher.parent.mkdir(parents=True, exist_ok=True)
+    source = Path(__file__).resolve()
+    if launcher.exists() or launcher.is_symlink():
+        if launcher.resolve() != source:
+            raise SystemExit(f"Refusing to replace another launcher: {launcher}")
+    else:
+        launcher.symlink_to(source)
+    schema = "org.gnome.settings-daemon.plugins.media-keys"
+    key = "custom-keybindings"
+    path = "/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/t3-zen/"
+    paths = ast.literal_eval(subprocess.check_output(["gsettings", "get", schema, key], text=True).removeprefix("@as "))
+    binding = "<Control><Alt>z"
+    for existing in paths:
+        if existing == path:
+            continue
+        other = f"{schema}.custom-keybinding:{existing}"
+        bound = subprocess.check_output(["gsettings", "get", other, "binding"], text=True).strip()
+        if bound.strip("'").replace("<Primary>", "<Control>") == binding:
+            raise SystemExit("Ctrl+Alt+Z is already assigned to another custom shortcut.")
+    target = f"{schema}.custom-keybinding:{path}"
+    for name, value in [("name", "T3 Zen mode"), ("command", f'"{launcher}" --only-t3'), ("binding", binding)]:
+        subprocess.run(["gsettings", "set", target, name, repr(value)], check=True)
+    if path not in paths:
+        subprocess.run(["gsettings", "set", schema, key, repr(paths + [path])], check=True)
+    print("Installed Ctrl+Alt+Z for Zen mode while T3 is focused.")
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("action", nargs="?", choices=["toggle", "on", "off", "status", "install"], default="toggle")
+    parser.add_argument("--only-t3", action="store_true", help="Ignore the desktop shortcut outside T3")
+    args = parser.parse_args()
+    if args.action == "install":
+        install_shortcut()
+        return
+    if args.only_t3:
+        window = subprocess.check_output(["xdotool", "getactivewindow"], text=True).strip()
+        window_class = subprocess.check_output(["xprop", "-id", window, "WM_CLASS"], text=True)
+        if "t3code" not in window_class.lower() and "t3 code" not in window_class.lower():
+            return
+    home = Path(os.environ.get("T3CODE_HOME", str(Path.home() / ".t3")))
+    userdata = home / "userdata"
+    state_dir = Path(os.environ.get("XDG_STATE_HOME", str(Path.home() / ".local/state"))) / "t3-zen"
+    state_dir.mkdir(parents=True, exist_ok=True)
+    # Serialize repeated shortcut presses so they cannot overwrite the restore id.
+    with (state_dir / "lock").open("w") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        settings = json.loads((userdata / "settings.json").read_text())
+        current = settings.get("defaultTheme")
+        active = current == ZEN_ID
+        if args.action == "status":
+            print("on" if active else "off")
+            return
+        enable = not active if args.action == "toggle" else args.action == "on"
+        if enable == active:
+            return
+        cli = Path.home() / ".t3/bin/t3"
+        state_path = state_dir / "restore.json"
+        if enable:
+            if not current or not re.fullmatch(r"[a-zA-Z0-9_-]+", current):
+                raise SystemExit("Select a published wallpaper theme before entering Zen mode.")
+            source = userdata / "themes" / f"{current}.json"
+            if not source.is_file():
+                raise SystemExit("Select a published wallpaper theme before entering Zen mode.")
+            theme = build_theme(json.loads(source.read_text()))
+            restore = {"themeId": current, "home": str(home.resolve())}
+            state_path.write_text(json.dumps(restore) + "\n")
+            with tempfile.TemporaryDirectory(prefix="t3-zen-") as directory:
+                target = Path(directory) / "zen-mode.json"
+                target.write_text(json.dumps(theme))
+                subprocess.run([str(cli), "theme", "set", "--base-dir", str(home), "--id", ZEN_ID, str(target)], check=True)
+        else:
+            if not state_path.is_file():
+                raise SystemExit("Restore record missing. Choose your wallpaper from T3's theme picker.")
+            restore = json.loads(state_path.read_text())
+            if restore["home"] != str(home.resolve()):
+                raise SystemExit("The restore record belongs to another T3 data directory.")
+            subprocess.run([str(cli), "theme", "set", "--base-dir", str(home), restore["themeId"]], check=True)
+        print("Zen mode on" if enable else "Zen mode off")
+
+
+if __name__ == "__main__":
+    main()
