@@ -1,0 +1,12 @@
+/* Show wallpaper behind the empty-thread composer as well as conversations.
+   Keep the composer card's glass background and all its contents intact. */
+.dark [data-workspace-area="conversation"] > [data-timeline-loading],
+.dark [data-slot="sidebar-inset"] :has([data-chat-composer-form]):not([data-slot="composer-host"]):not([data-slot="composer-host"] *) {
+  background: transparent !important;
+}
+
+/* Keep navigation available normally; Zen owns hiding the header. */
+.dark [data-chat-header] {
+  background: rgba(26,27,38,.57) !important;
+  backdrop-filter: blur(12px);
+}
