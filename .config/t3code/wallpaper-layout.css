@@ -23,10 +23,15 @@
   box-shadow: inset 0 1px #ffffff20,inset -1px 0 #ffffff08,0 8px 32px #0003;
   border-right: 1px solid #ffffff0a;
 }
+/* Quiet icon at rest; preserve its hit area and native keyboard focus ring. */
 .dark [data-sidebar="trigger"] {
-  background: linear-gradient(155deg,#ffffff38,#ffffff08 50%,#ffffff18),#16161e40 !important;
-  backdrop-filter: blur(20px) saturate(1.8);
-  box-shadow: inset 0 1px #ffffff40,0 4px 16px #0003;
-  border: 1px solid #ffffff12;
-  border-radius: 10px;
+  background: transparent !important;
+  backdrop-filter: none;
+  box-shadow: none;
+  border-color: transparent;
+  border-radius: 0 !important;
+  opacity: .5;
+}
+.dark [data-sidebar="trigger"]:is(:hover,:focus-visible) {
+  opacity: 1;
 }
