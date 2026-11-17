@@ -11,12 +11,33 @@ one of these actions before opening or moving applications.
 | Ghostty running tmux | 1 | Secondary |
 | Zoho Mail PWA | 3 | Primary |
 | Discord | 4 | Primary |
+| T3 Code | 5 | Primary |
 | WhatsApp PWA | 6 | Secondary |
 
-Other application windows move to the primary display and retain their workspace.
+Other application windows keep their current display and workspace.
 With one display, everything uses that display. Recovery enables workspaces on
 both displays so Ghostty and WhatsApp can occupy different workspaces there.
 It uses six or more fixed workspaces and maximizes the windows it places.
+
+## Quiet recovery
+
+Recovery places Edge on workspace 1 first, then the Upwork Edge on workspace 2,
+before launching the remaining apps. Existing windows are reused. New windows
+start on the secondary display on their intended workspace, settle, then move to
+their final display. With one display, they use that display instead.
+
+Recovery never activates another workspace. It temporarily uses GNOME's strict
+new-window focus policy and sets X11 launch properties to discourage focus
+stealing, then restores the previous policy even if an app fails. These are
+best-effort window-manager hints; an app that explicitly activates itself may
+still interrupt. Windows already on the correct display avoid the visible
+unmaximize/resize/maximize cycle. Sticky app windows are assigned to their
+intended workspace. Unrelated windows are left alone.
+
+After placement settles, recovery checks the paired **OnePlus Buds 4** and makes
+one bounded connection attempt if disconnected. It does not scan or pair devices.
+Unavailable earbuds are reported in the completion notification and do not fail
+desktop recovery. Bluetooth and the audio system retain control of audio routing.
 
 ## Edge recovery
 
@@ -52,8 +73,9 @@ registers the launcher, shortcut, and tray autostart, then starts the tray. It
 replaces the old startup entry so there is only one login action.
 `./scripts/startup-setup.sh` remains a compatible command for direct recovery.
 
-Requires GNOME on X11, `wmctrl`, `xrandr`, `systemd-run`, Python GI with GTK 3 and
-AyatanaAppIndicator3, and the installed applications. Zoho and WhatsApp use the
+Requires GNOME on X11, `wmctrl`, `xrandr`, `systemd-run`, `bluetoothctl`, Python Xlib,
+Python GI with GTK 3 and AyatanaAppIndicator3, and the installed applications.
+T3 Code uses the existing `t3code.desktop` launcher. Zoho and WhatsApp use the
 existing Edge Default-profile PWA IDs in `scripts/desktop-recovery`.
 
 Run `./scripts/test-desktop-recovery.py` for offline checks without touching the
@@ -61,6 +83,10 @@ desktop. Logs for recovery actions started from the tray are available through
 `journalctl --user -g desktop-recovery`. Application errors also produce a desktop
 notification. A failed recovery can leave some applications placed; another
 Recover click reuses those windows and retries.
+
+Use `./scripts/test-desktop-recovery.py --x11-staging` to additionally check real
+X11 staging with invisible, unmapped probe windows. It never launches apps or
+changes the visible desktop.
 
 Disable the tray on login in Startup Applications, or set
 `X-GNOME-Autostart-enabled=false` in

@@ -29,15 +29,27 @@ systemctl enable touchpad-watch.service
 systemctl restart touchpad-watch.service
 systemctl is-active --quiet touchpad-watch.service
 for attempt in {1..30}; do
-    if /usr/bin/python3 -I -c 'import json; from pathlib import Path; raise SystemExit(set(json.loads(Path("/run/touchpad-watch/status").read_text())["sources"]) != {"mouse", "touchpad"})' 2>/dev/null; then
-        echo 'Verified: recording both ELAN touchpad and mouse input nodes.'
+    if /usr/bin/python3 -I -c 'import json; from pathlib import Path; raise SystemExit(not {"mouse", "touchpad", "hid"} <= set(json.loads(Path("/run/touchpad-watch/status").read_text())["sources"]))' 2>/dev/null; then
+        echo 'Verified: recording the ELAN touchpad and mouse input nodes and raw HID reports.'
         break
     fi
     if [[ $attempt -eq 30 ]]; then
-        echo 'Service started but has not opened both input nodes. Check: sudo journalctl -u touchpad-watch -n 30' >&2
+        echo 'Service started but has not opened the touchpad, mouse and hidraw nodes. Check: sudo journalctl -u touchpad-watch -n 30' >&2
+        exit 1
+    fi
+    sleep 0.5
+done
+for attempt in {1..30}; do
+    if [[ -s /var/log/touchpad-watch/health.jsonl && $(stat -c %a /var/log/touchpad-watch/health.jsonl) == 644 ]]; then
+        echo 'Verified: health log /var/log/touchpad-watch/health.jsonl is being written (world-readable).'
+        break
+    fi
+    if [[ $attempt -eq 30 ]]; then
+        echo 'Service started but has not written its health log. Check: sudo journalctl -u touchpad-watch -n 30' >&2
         exit 1
     fi
     sleep 0.5
 done
 echo 'Recorder installed and started. Automatic driver resets remain off.'
-echo 'For the next fault: fixtouchpad --hardware (records first, then reconnects the driver).'
+echo 'For the next fault: lift your fingers, then fixtouchpad --hardware or Ctrl+Alt+Shift+F12'
+echo '(records first, waits until the pad is untouched, then recalibrates it).'

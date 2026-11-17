@@ -1,6 +1,7 @@
 #!/usr/bin/python3
 """Recover the personal GNOME/X11 desktop, or keep a Recover menu in the tray."""
 import fcntl
+from contextlib import contextmanager
 import os
 from pathlib import Path
 import re
@@ -8,6 +9,8 @@ import shutil
 import subprocess
 import sys
 import struct
+import select
+import threading
 from urllib.parse import urlparse
 import time
 
@@ -15,6 +18,10 @@ STATE = Path.home() / '.local/state/desktop-recovery'
 EDGE = 'microsoft-edge.Microsoft-edge'
 ZOHO = 'crx__ilnnabaccafamopchccjobpmmpmdnope.Microsoft-edge'
 WHATSAPP = 'crx__hnpfjngllnobngcgfapefoaidbinmjnm.Microsoft-edge'
+
+
+def is_t3(window):
+    return window['cls'].lower() in ('t3code.t3code', 'com.t3tools.t3code.com.t3tools.t3code')
 
 
 def run(*args):
@@ -31,6 +38,8 @@ def parse_windows(output):
         fields = line.split(None, 8)
         if len(fields) == 9:
             result.append(dict(id=fields[0], workspace=int(fields[1]),
+                               x=int(fields[2]), y=int(fields[3]),
+                               width=int(fields[4]), height=int(fields[5]),
                                cls=fields[6], title=fields[8]))
     return result
 
@@ -163,16 +172,83 @@ def launch(*command):
                     '--unit=desktop-recovery-' + str(time.time_ns()), *command], check=True)
 
 
-def ensure_app(match, command):
+@contextmanager
+def stage_windows(match, workspace, monitor):
+    """Give new app windows a quiet workspace/display before the WM maps them.
+
+    MapNotify is a fallback for apps that overwrite the initial X11 properties.
+    No workspace activation or keyboard/pointer manipulation is involved.
+    """
+    from Xlib import X, Xatom, display, error
+    connection = display.Display()
+    root = connection.screen().root
+    root.change_attributes(event_mask=X.SubstructureNotifyMask)
+    connection.sync()
+    stop = threading.Event()
+    failures = []
+    prepared, mapped = set(), set()
+    user_time = connection.intern_atom('_NET_WM_USER_TIME')
+    desktop = connection.intern_atom('_NET_WM_DESKTOP')
+
+    def watch():
+        try:
+            while not stop.is_set():
+                if not connection.pending_events():
+                    select.select([connection.fileno()], [], [], 0.05)
+                    continue
+                event = connection.next_event()
+                window = getattr(event, 'window', None)
+                if window is None:
+                    continue
+                try:
+                    if event.type == X.CreateNotify:
+                        window.change_attributes(event_mask=X.PropertyChangeMask | X.StructureNotifyMask)
+                    if event.type in (X.CreateNotify, X.PropertyNotify, X.MapNotify):
+                        cls = window.get_wm_class()
+                        if not cls or not match({'cls': '.'.join(cls)}):
+                            continue
+                        if window.id not in prepared:
+                            window.change_property(user_time, Xatom.CARDINAL, 32, [0])
+                            window.change_property(desktop, Xatom.CARDINAL, 32, [workspace])
+                            window.configure(x=monitor['x'] + 40, y=monitor['y'] + 70,
+                                             width=monitor['width'] - 80, height=monitor['height'] - 140)
+                            prepared.add(window.id)
+                        if event.type == X.MapNotify and window.id not in mapped:
+                            mapped.add(window.id)
+                            place({'id': hex(window.id)}, workspace, monitor)
+                    connection.flush()
+                except error.XError:
+                    pass  # Splash windows can disappear before their properties are read.
+        except Exception as failure:
+            failures.append(failure)
+
+    watcher = threading.Thread(target=watch, daemon=True)
+    watcher.start()
+    try:
+        yield
+    finally:
+        stop.set()
+        watcher.join()
+        connection.close()
+        if failures:
+            raise RuntimeError('Could not stage new windows: ' + str(failures[0]))
+
+
+def ensure_app(match, command, workspace, monitor, settle_seconds=2):
     if any(match(w) for w in windows()):
         return
-    launch(*command)
-    deadline = time.monotonic() + 45
-    while time.monotonic() < deadline:
-        if any(match(w) for w in windows()):
-            return
-        time.sleep(0.5)
-    raise RuntimeError('No window appeared for ' + command[0])
+    with stage_windows(match, workspace, monitor):
+        launch(*command)
+        deadline = time.monotonic() + 45
+        previous, stable_since = None, time.monotonic()
+        while time.monotonic() < deadline:
+            current = sorted(w['id'] for w in windows() if match(w))
+            if current != previous:
+                previous, stable_since = current, time.monotonic()
+            if current and time.monotonic() - stable_since >= settle_seconds:
+                return
+            time.sleep(0.1)
+        raise RuntimeError('No settled window appeared for ' + command[0])
 
 
 def backup_edge():
@@ -188,15 +264,56 @@ def backup_edge():
 def place(window, workspace, monitor):
     wid = window['id']
     if workspace is not None:
-        subprocess.run(['wmctrl', '-ir', wid, '-t', str(workspace)], check=True)
-    subprocess.run(['wmctrl', '-ir', wid, '-b', 'remove,maximized_vert,maximized_horz'], check=True)
-    geometry = f"0,{monitor['x'] + 40},{monitor['y'] + 70},{monitor['width'] - 80},{monitor['height'] - 140}"
-    subprocess.run(['wmctrl', '-ir', wid, '-e', geometry], check=True)
+        if window.get('workspace') == -1:
+            subprocess.run(['wmctrl', '-ir', wid, '-b', 'remove,sticky'], check=True)
+        if window.get('workspace') != workspace:
+            subprocess.run(['wmctrl', '-ir', wid, '-t', str(workspace)], check=True)
+    same_screen = ('x' in window
+                   and monitor['x'] <= window['x'] + window['width'] / 2 < monitor['x'] + monitor['width']
+                   and monitor['y'] <= window['y'] + window['height'] / 2 < monitor['y'] + monitor['height'])
+    if not same_screen:
+        subprocess.run(['wmctrl', '-ir', wid, '-b', 'remove,maximized_vert,maximized_horz'], check=True)
+        geometry = f"0,{monitor['x'] + 40},{monitor['y'] + 70},{monitor['width'] - 80},{monitor['height'] - 140}"
+        subprocess.run(['wmctrl', '-ir', wid, '-e', geometry], check=True)
     subprocess.run(['wmctrl', '-ir', wid, '-b', 'add,maximized_vert,maximized_horz'], check=True)
 
 
 def notify(message):
     subprocess.run(['notify-send', 'Desktop recovery', message], check=False)
+
+
+@contextmanager
+def quiet_launches():
+    schema = 'org.gnome.desktop.wm.preferences'
+    original = run('gsettings', 'get', schema, 'focus-new-windows')
+    subprocess.run(['gsettings', 'set', schema, 'focus-new-windows', 'strict'], check=True)
+    try:
+        yield
+    finally:
+        if run('gsettings', 'get', schema, 'focus-new-windows') == "'strict'":
+            subprocess.run(['gsettings', 'set', schema, 'focus-new-windows', original], check=True)
+
+
+def connect_earbuds():
+    """Best effort only: do not scan, pair, or change the user's audio routing."""
+    def bluetooth(*args):
+        return subprocess.check_output(['bluetoothctl', '--timeout', '12', *args],
+                                       text=True, timeout=15, stderr=subprocess.STDOUT)
+    try:
+        for line in bluetooth('paired-devices').splitlines():
+            match = re.fullmatch(r'Device ([0-9A-Fa-f:]{17}) (.+)', line.strip())
+            if match and match[2].casefold() == 'oneplus buds 4':
+                address = match[1]
+                if 'Connected: yes' in bluetooth('info', address):
+                    return 'OnePlus Buds 4 connected.'
+                bluetooth('connect', address)
+                if 'Connected: yes' in bluetooth('info', address):
+                    return 'OnePlus Buds 4 connected.'
+                return 'OnePlus Buds 4 unavailable; reconnect from Bluetooth when ready.'
+        return 'OnePlus Buds 4 are not paired.'
+    except (OSError, subprocess.SubprocessError) as error:
+        print(f'Earbuds connection skipped: {error}', file=sys.stderr)
+        return 'OnePlus Buds 4 unavailable; reconnect from Bluetooth when ready.'
 
 
 def recover():
@@ -221,60 +338,45 @@ def recover():
         if count < 6:
             subprocess.run(['wmctrl', '-n', '6'], check=True)
         errors = []
-        if not any(w['cls'] == EDGE for w in windows()):
-            backup_edge()
-            ensure_app(lambda w: w['cls'] == EDGE,
-                       ['microsoft-edge', '--profile-directory=Default', '--restore-last-session'])
-            # Restored windows arrive separately. Wait for the set to settle before placing them.
-            previous, stable = None, 0
-            for _ in range(30):
-                current = [w['id'] for w in windows() if w['cls'] == EDGE]
-                stable = stable + 1 if current == previous else 0
-                if stable >= 5:
-                    break
-                previous = current
-                time.sleep(1)
-        apps = [
-            (lambda w: 'ghostty' in w['cls'].lower(),
-             ['ghostty', '-e', 'tmux', 'new-session', '-A', '-s', 'main']),
-            (lambda w: w['cls'] == ZOHO,
-             ['gtk-launch', 'msedge-ilnnabaccafamopchccjobpmmpmdnope-Default']),
-            (lambda w: w['cls'].lower() == 'discord.discord', ['discord']),
-            (lambda w: w['cls'] == WHATSAPP,
-             ['gtk-launch', 'msedge-hnpfjngllnobngcgfapefoaidbinmjnm-Default']),
-        ]
-        for match, command in apps:
+        with quiet_launches():
             try:
-                ensure_app(match, command)
-            except (RuntimeError, subprocess.SubprocessError) as error:
+                if not any(w['cls'] == EDGE for w in windows()):
+                    backup_edge()
+                    ensure_app(lambda w: w['cls'] == EDGE,
+                               ['microsoft-edge', '--profile-directory=Default', '--restore-last-session'],
+                               0, screens[-1], settle_seconds=5)
+                browsers = [w for w in windows() if w['cls'] == EDGE]
+                assignments = browser_workspaces(browsers, saved_edge_sessions()) if browsers else {}
+                # Put workspace 1's Edge in place before opening any other application.
+                for window in sorted(browsers, key=lambda w: assignments[w['id']]):
+                    place(window, assignments[window['id']], screens[0])
+            except (OSError, RuntimeError, subprocess.SubprocessError) as error:
                 errors.append(str(error))
-        current = windows()
-        browsers = [w for w in current if w['cls'] == EDGE]
-        assignments = browser_workspaces(browsers, saved_edge_sessions()) if browsers else {}
-        for window in current:
-            if window['workspace'] < 0:
-                continue
-            cls = window['cls']
-            secondary = cls == WHATSAPP or 'ghostty' in cls.lower()
-            workspace = assignments.get(window['id'])
-            if 'ghostty' in cls.lower():
-                workspace = 0
-            elif cls == ZOHO:
-                workspace = 2
-            elif cls.lower() == 'discord.discord':
-                workspace = 3
-            elif cls == WHATSAPP:
-                workspace = 5
-            try:
-                place(window, workspace, screens[-1] if secondary else screens[0])
-            except subprocess.SubprocessError as error:
-                errors.append(str(error))
-        main = next((wid for wid, workspace in assignments.items() if workspace == 1), None)
-        if main:
-            subprocess.run(['wmctrl', '-ia', main], check=True)
+            apps = [
+                (lambda w: 'ghostty' in w['cls'].lower(),
+                 ['ghostty', '-e', 'tmux', 'new-session', '-A', '-s', 'main'], 0, screens[-1]),
+                (lambda w: w['cls'] == ZOHO,
+                 ['gtk-launch', 'msedge-ilnnabaccafamopchccjobpmmpmdnope-Default'], 2, screens[0]),
+                (lambda w: w['cls'].lower() == 'discord.discord', ['discord'], 3, screens[0]),
+                (is_t3, ['gtk-launch', 't3code'], 4, screens[0]),
+                (lambda w: w['cls'] == WHATSAPP,
+                 ['gtk-launch', 'msedge-hnpfjngllnobngcgfapefoaidbinmjnm-Default'], 5, screens[-1]),
+            ]
+            for match, command, workspace, monitor in apps:
+                try:
+                    ensure_app(match, command, workspace, screens[-1])
+                    for window in windows():
+                        if match(window):
+                            place(window, workspace, monitor)
+                except (OSError, RuntimeError, subprocess.SubprocessError) as error:
+                    errors.append(str(error))
+        # Let the last placement settle before asking Bluetooth to connect.
+        time.sleep(2)
+        earbuds = connect_earbuds()
         if errors:
-            raise RuntimeError('; '.join(errors))
-        notify('Recovered Edge and placed your apps. Main Edge is on workspace 2.')
+            raise RuntimeError('; '.join(errors) + '. ' + earbuds)
+        notify('Desktop ready. T3 Code is on workspace 5. ' + earbuds)
+
 
 
 def tray():

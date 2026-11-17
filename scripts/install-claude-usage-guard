@@ -1,0 +1,62 @@
+#!/bin/bash
+# Install the Claude usage guard for this user: a copy of the script, a systemd
+# user timer, and Claude Code hooks that block prompts and tools while it is tripped.
+# Safe to re-run after editing the script; it replaces the installed copy.
+set -euo pipefail
+[[ $EUID -ne 0 ]] || { echo 'Run as your normal user, not root.' >&2; exit 1; }
+script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+install_dir="$HOME/.local/share/claude-usage-guard"
+guard="$install_dir/claude-usage-guard"
+unit_dir="$HOME/.config/systemd/user"
+config="$HOME/.config/claude-usage-guard.ini"
+settings="$HOME/.claude/settings.json"
+
+python3 -I -m py_compile "$script_dir/claude-usage-guard"
+install -D -m 0755 "$script_dir/claude-usage-guard" "$guard"
+install -d "$HOME/.local/bin"
+ln -sfn "$guard" "$HOME/.local/bin/claude-usage-guard"
+install -D -m 0644 "$script_dir/claude-usage-guard.service" "$unit_dir/claude-usage-guard.service"
+install -D -m 0644 "$script_dir/claude-usage-guard.timer" "$unit_dir/claude-usage-guard.timer"
+
+if [[ ! -e $config ]]; then
+    cat > "$config" <<'INI'
+[guard]
+# Stop all Claude work when a limit reaches these percentages.
+session_percent = 98
+weekly_percent = 99
+# Poll every fast_poll_min once usage reaches these, otherwise every slow_poll_min.
+session_fast_from = 75
+weekly_fast_from = 90
+slow_poll_min = 5
+fast_poll_min = 1
+# Alert (or lock, if usage was near a limit) after usage is unreadable this long.
+failure_alert_min = 10
+INI
+fi
+
+hook_command="/usr/bin/python3 -I $guard hook"
+cp -- "$settings" "$settings.bak-usage-guard"
+python3 -I - "$settings" "$hook_command" <<'PY'
+import json, sys
+path, command = sys.argv[1], sys.argv[2]
+with open(path) as handle:
+    settings = json.load(handle)
+hooks = settings.setdefault("hooks", {})
+for event in ("UserPromptSubmit", "PreToolUse"):
+    groups = hooks.setdefault(event, [])
+    if any(h.get("command") == command for g in groups for h in g.get("hooks", [])):
+        continue
+    group = {"hooks": [{"type": "command", "command": command, "timeout": 10}]}
+    if event == "PreToolUse":
+        group = {"matcher": "*", **group}
+    groups.insert(0, group)
+with open(path + ".tmp", "w") as handle:
+    json.dump(settings, handle, indent=2)
+    handle.write("\n")
+PY
+mv -- "$settings.tmp" "$settings"
+
+systemctl --user daemon-reload
+systemctl --user enable --now claude-usage-guard.timer
+systemctl --user start claude-usage-guard.service
+"$guard" status

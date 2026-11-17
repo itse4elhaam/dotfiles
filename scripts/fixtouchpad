@@ -1,14 +1,25 @@
 #!/bin/bash
-# Manual X11 recovery, with incident capture before a hardware reset.
+# Manual X11 recovery, with incident capture before a hands-off hardware recalibration.
 set -euo pipefail
 
 touchpad_name='ELAN07AC:00 04F3:31EC Touchpad'
+# touchpad-filter's virtual twin; while the filter runs, libinput reads this one.
+filter_name='ELAN07AC:00 04F3:31EC Touchpad (filtered)'
+# Test seams only; the defaults are the live system paths.
+watch_dir=${FIXTOUCHPAD_WATCH_DIR:-/run/touchpad-watch}
+filter_status=${FIXTOUCHPAD_FILTER_STATUS:-/run/touchpad-filter/status.json}
+interrupts_file=${FIXTOUCHPAD_INTERRUPTS:-/proc/interrupts}
+quiet_seconds=${FIXTOUCHPAD_QUIET_SECONDS:-1}
+quiet_timeout=${FIXTOUCHPAD_QUIET_TIMEOUT:-20}
+verify_seconds=${FIXTOUCHPAD_VERIFY_SECONDS:-2}
 mode=${1:-}
 [[ $# -le 1 ]] || { echo 'Usage: fixtouchpad [--check|--mark|--hardware]' >&2; exit 2; }
 case "$mode" in
     -h|--help)
         echo 'Usage: fixtouchpad [--check|--mark|--hardware]'
-        echo 'Default: soft input reset. --hardware records then reconnects the driver; --mark only records.'
+        echo 'Default: soft input reset. --mark only records.'
+        echo '--hardware records, waits until nothing touches the pad, then reconnects the'
+        echo 'driver so the firmware recalibrates hands-off, and checks the pad stays quiet.'
         exit 0
         ;;
     ''|--check|--auto|--mark|--hardware) ;;
@@ -23,12 +34,14 @@ runtime_dir=${XDG_RUNTIME_DIR:?XDG_RUNTIME_DIR is required for the recovery lock
 exec 9>>"$runtime_dir/fixtouchpad.lock"
 flock -n 9 || { echo 'A touchpad reset is already running.'; exit 0; }
 mark_incident() {
-    /usr/bin/python3 -I - <<'PY'
+    /usr/bin/python3 -I - "$watch_dir" <<'PY'
 import json
 from pathlib import Path
+import sys
 import time
 import uuid
-marker = Path('/run/touchpad-watch/mark')
+watch_dir = Path(sys.argv[1])
+marker = watch_dir / 'mark'
 try:
     stamp = uuid.uuid4().hex
     marker.write_text(stamp)
@@ -37,7 +50,7 @@ except OSError as error:
 deadline = time.monotonic() + 3
 while time.monotonic() < deadline:
     try:
-        saved = json.loads(Path('/run/touchpad-watch/last-marker').read_text())
+        saved = json.loads((watch_dir / 'last-marker').read_text())
         if saved.get('marker') == stamp:
             print('Incident recorded: ' + saved['path'])
             break
@@ -48,13 +61,120 @@ else:
     raise SystemExit('Recorder did not acknowledge the incident within 3 seconds.')
 PY
 }
+notify() {
+    if [[ -n ${FIXTOUCHPAD_NOTIFY:-} ]]; then
+        notify-send -t 8000 "$1" "$2" 2>/dev/null || echo "$1. $2" >&2
+    else
+        echo "$1. $2" >&2
+    fi
+}
+# The ELAN interrupt counter in /proc/interrupts only moves while the firmware
+# reports contacts, so a flat counter means nothing is touching the pad.
+# Exit 0 quiet, 3 touched (wait: never quiet in time; verify: moved), 4 unknown.
+touch_state() {
+    /usr/bin/python3 -I - "$interrupts_file" "$@" <<'PY'
+import sys
+import time
+path, mode, quiet, limit = sys.argv[1], sys.argv[2], float(sys.argv[3]), float(sys.argv[4])
+
+def count():
+    try:
+        with open(path) as handle:
+            lines = handle.read().splitlines()
+    except OSError:
+        return None
+    if not lines:
+        return None
+    cpus = sum(token.startswith('CPU') for token in lines[0].split())
+    for line in lines[1:]:
+        fields = line.split()
+        if fields and fields[-1] == 'ELAN07AC:00' and len(fields) > cpus:
+            try:
+                return sum(int(value) for value in fields[1:1 + cpus])
+            except ValueError:
+                return None
+    return None
+
+start = time.monotonic()
+last = count()
+if last is None:
+    raise SystemExit(4)
+changed = start
+while True:
+    time.sleep(0.05)
+    now = time.monotonic()
+    current = count()
+    if current is None:
+        raise SystemExit(4)
+    if current != last:
+        if mode == 'verify':
+            raise SystemExit(3)
+        last, changed = current, now
+    if mode == 'wait' and now - changed >= quiet:
+        raise SystemExit(0)
+    if mode == 'verify' and now - start >= quiet:
+        raise SystemExit(0)
+    if now - start >= limit:
+        raise SystemExit(3)
+PY
+}
+# Prints "<state> <hid device>" from touchpad-filter's status file, or "none -".
+filter_info() {
+    /usr/bin/python3 -I - "$filter_status" <<'PY'
+import json
+import sys
+try:
+    with open(sys.argv[1]) as handle:
+        data = json.load(handle)
+    print(data.get("state") or "unknown", data.get("hid") or "-")
+except (OSError, ValueError):
+    print("none -")
+PY
+}
+# The filter follows a driver rebind to the new event node; say whether it did.
+report_filter() {
+    [[ $filter_before == active ]] || return 0
+    local state hid attempt
+    for attempt in {1..15}; do
+        read -r state hid <<< "$(filter_info)"
+        if [[ $state == active && $hid != "$filter_hid_before" ]]; then
+            echo 'The touchpad filter reattached to the recalibrated touchpad.'
+            return 0
+        fi
+        sleep 0.2
+    done
+    echo "The touchpad filter did not reattach (state: $state); the touchpad is unfiltered. Run: touchpad-filter on"
+}
+filter_listed() {
+    xinput list --name-only 2>/dev/null | grep -Fxq "$filter_name"
+}
 if [[ $mode == --mark ]]; then
     mark_incident
     exit 0
 fi
 if [[ $mode == --hardware ]]; then
     mark_incident || echo 'Continuing manual reset without a confirmed recording.' >&2
+    notify 'Lift your fingers off the touchpad' \
+        "Recalibration starts once nothing has touched the pad for ${quiet_seconds} s. Keep hands off until the result appears."
+    quiet_status=0
+    touch_state wait "$quiet_seconds" "$quiet_timeout" || quiet_status=$?
+    case $quiet_status in
+        0) ;;
+        4)
+            echo 'Cannot see the touchpad interrupt counter, so an untouched pad cannot be confirmed.' >&2
+            echo 'Keep your hands off the touchpad; resetting in 2 seconds.' >&2
+            sleep 2
+            ;;
+        3)
+            echo "The touchpad kept reporting touches for ${quiet_timeout} s, so recalibration was skipped." >&2
+            echo 'Lift every finger and palm (and anything resting on the pad), then try again.' >&2
+            exit 3
+            ;;
+        *) exit "$quiet_status" ;;
+    esac
+    read -r filter_before filter_hid_before <<< "$(filter_info)"
     sudo -n /usr/local/sbin/reset-touchpad-driver
+    enabled=false
     for attempt in {1..25}; do
         if xinput list-props "$touchpad_name" >/dev/null 2>&1; then
             xinput enable "$touchpad_name"
@@ -62,23 +182,43 @@ if [[ $mode == --hardware ]]; then
                 /Device Enabled \(/ { enabled = ($NF == 1) }
                 END { exit !enabled }
             '; then
-                echo 'Driver recreated; X11 lists an enabled touchpad. Check how movement feels.'
-                exit 0
+                enabled=true
+                break
             fi
         fi
         sleep 0.2
     done
-    echo 'Driver reset completed, but X11 does not list an enabled touchpad.' >&2
-    exit 1
+    $enabled || { echo 'Driver reset completed, but X11 does not list an enabled touchpad.' >&2; exit 1; }
+    sleep 0.3
+    verify_status=0
+    touch_state verify "$verify_seconds" "$verify_seconds" || verify_status=$?
+    case $verify_status in
+        0) echo 'Recalibrated hands-off and the touchpad stayed quiet afterwards. Check how movement feels.' ;;
+        3) echo 'Recalibrated, but the touchpad reported touches right afterwards. If nothing was touching it, run the reset again.' ;;
+        *) echo 'Recalibrated, but could not confirm the touchpad stayed quiet afterwards. Check how movement feels.' ;;
+    esac
+    report_filter
+    exit 0
 fi
 props=$(xinput list-props "$touchpad_name")
 if [[ $mode == --check ]]; then
     printf '%s\n' "$props" | awk '/Device Enabled \(/ || /Device Node \(/'
-    if [[ -r /run/touchpad-watch/status ]]; then
-        cat /run/touchpad-watch/status
+    if filter_listed; then
+        echo "$filter_name:"
+        xinput list-props "$filter_name" | awk '/Device Enabled \(/ || /Device Node \(/'
+    fi
+    read -r filter_state _ <<< "$(filter_info)"
+    echo "Touchpad filter: $filter_state"
+    if [[ -r $watch_dir/status ]]; then
+        cat "$watch_dir/status"
         echo
     else
         echo 'Raw-event recorder is not installed or running.'
+    fi
+    if [[ -r $watch_dir/alert ]]; then
+        echo 'Latest dead-strip alert:'
+        cat "$watch_dir/alert"
+        echo
     fi
     exit 0
 fi
@@ -94,19 +234,30 @@ if [[ $mode == --auto ]]; then
     [[ $screen_state == '(false,)' ]] || { echo 'Skipping reset: desktop locked.'; exit 0; }
 fi
 
+# While touchpad-filter runs, libinput reads its virtual twin; reset both.
+devices=("$touchpad_name")
+if filter_listed; then
+    devices+=("$filter_name")
+fi
 restore_touchpad() {
-    xinput enable "$touchpad_name"
+    for device in "${devices[@]}"; do
+        xinput enable "$device"
+    done
 }
 trap restore_touchpad EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
-xinput disable "$touchpad_name"
+for device in "${devices[@]}"; do
+    xinput disable "$device"
+done
 sleep 0.3
-xinput enable "$touchpad_name"
+restore_touchpad
 trap - EXIT INT TERM
-xinput list-props "$touchpad_name" | awk '
-    /Device Enabled \(/ { enabled = ($NF == 1) }
-    END { exit !enabled }
-' || { echo 'Touchpad did not re-enable after the reset.' >&2; exit 1; }
+for device in "${devices[@]}"; do
+    xinput list-props "$device" | awk '
+        /Device Enabled \(/ { enabled = ($NF == 1) }
+        END { exit !enabled }
+    ' || { echo "$device did not re-enable after the reset." >&2; exit 1; }
+done
 touch -- "$runtime_dir/fixtouchpad.last-reset"
 echo 'Touchpad input reset and verified enabled.'

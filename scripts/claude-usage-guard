@@ -1,0 +1,473 @@
+#!/usr/bin/python3
+"""Stop Claude Code on this machine before Bluum's extra usage starts billing.
+
+`check` runs every minute from a systemd user timer and polls the usage
+endpoint behind Claude Code's /usage screen, using the login Claude Code
+already stored. It polls every slow_poll_min, or every fast_poll_min once
+usage is near a limit. It trips when:
+  - any session limit reaches session_percent, or any weekly limit (including
+    per-model ones) reaches weekly_percent;
+  - billed extra usage rises above the accepted baseline;
+  - usage stays unreadable for failure_alert_min while the last reading was
+    near a limit.
+A trip kills every claude process this user runs, sends a critical desktop
+notification, and writes state that `hook` turns into a block on every prompt
+and tool call. Claude processes started during the lockout are killed on the
+next run. A limit trip lifts on the first reading under the thresholds after
+the limit resets. A spend trip lifts only after `claude-usage-guard ack`.
+
+The guard never refreshes the login: refresh tokens rotate, so a refresh here
+could sign out real sessions. When the stored login has expired, no session is
+using it, and the guard waits for Claude Code to renew it.
+
+Settings: ~/.config/claude-usage-guard.ini, section [guard], keys as in DEFAULTS.
+"""
+import argparse
+import configparser
+from datetime import datetime
+import fcntl
+import json
+import os
+from pathlib import Path
+import signal
+import subprocess
+import sys
+import time
+import urllib.error
+import urllib.request
+
+HOME = Path.home()
+CREDENTIALS = HOME / ".claude/.credentials.json"
+CONFIG = HOME / ".config/claude-usage-guard.ini"
+CLAUDE_VERSIONS = str(HOME / ".local/share/claude/versions") + "/"
+USAGE_URL = "https://api.anthropic.com/api/oauth/usage"
+DEFAULTS = {"session_percent": "98", "weekly_percent": "99",
+            "session_fast_from": "75", "weekly_fast_from": "90",
+            "slow_poll_min": "5", "fast_poll_min": "1", "failure_alert_min": "10"}
+SPEND_FIELDS = (("extra_usage", "used_credits"), ("spend", "used", "amount_minor"))
+REALERT_SECONDS = 1800
+MAX_BACKOFF_SECONDS = 600
+POLL_SLACK_SECONDS = 15
+
+
+def state_dir():
+    return Path(os.environ.get("CLAUDE_USAGE_GUARD_STATE_DIR")
+                or HOME / ".local/state/claude-usage-guard")
+
+
+class Settings:
+    def __init__(self, values=None):
+        merged = dict(DEFAULTS, **(values or {}))
+        self.session_percent = float(merged["session_percent"])
+        self.weekly_percent = float(merged["weekly_percent"])
+        self.session_fast_from = float(merged["session_fast_from"])
+        self.weekly_fast_from = float(merged["weekly_fast_from"])
+        self.slow_poll = float(merged["slow_poll_min"]) * 60
+        self.fast_poll = float(merged["fast_poll_min"]) * 60
+        self.failure_alert = float(merged["failure_alert_min"]) * 60
+
+    @classmethod
+    def load(cls, path=CONFIG):
+        parser = configparser.ConfigParser()
+        if path.exists():
+            parser.read(path)
+        return cls(dict(parser["guard"]) if parser.has_section("guard") else None)
+
+
+class ShapeError(Exception):
+    """The endpoint answered with something this guard cannot read safely."""
+
+
+class Failure(Exception):
+    def __init__(self, message, retry_after=None):
+        super().__init__(message)
+        self.retry_after = retry_after
+
+
+class Quiet(Exception):
+    """Nothing can be billed right now (offline, or no session holds a live login)."""
+
+
+def parse_time(text):
+    if not text:
+        return None
+    text = str(text).replace("Z", "+00:00")
+    try:
+        return datetime.fromisoformat(text).timestamp()
+    except ValueError:
+        head, _, tail = text.partition(".")
+        zone = tail[tail.find("+"):] if "+" in tail else ""
+        return datetime.fromisoformat(head + zone).timestamp()
+
+
+def dig(payload, path):
+    for key in path:
+        if not isinstance(payload, dict):
+            return None
+        payload = payload.get(key)
+    return payload
+
+
+def normalize(payload):
+    """Reduce the usage payload to limits and billed-spend counters."""
+    if not isinstance(payload, dict):
+        raise ShapeError("response is not a JSON object")
+    limits = []
+    for item in payload.get("limits") or []:
+        if not isinstance(item, dict) or not isinstance(item.get("percent"), (int, float)):
+            raise ShapeError("unreadable entry in limits")
+        scope = dig(item, ("scope", "model", "display_name")) or dig(item, ("scope", "surface"))
+        name = item.get("kind") or item.get("group") or "limit"
+        limits.append({"group": item.get("group") or "", "name": f"{name} ({scope})" if scope else name,
+                       "percent": float(item["percent"]), "resets_at": parse_time(item.get("resets_at"))})
+    if not limits:
+        for key, group in (("five_hour", "session"), ("seven_day", "weekly")):
+            window = payload.get(key)
+            if isinstance(window, dict) and isinstance(window.get("utilization"), (int, float)):
+                limits.append({"group": group, "name": key, "percent": float(window["utilization"]),
+                               "resets_at": parse_time(window.get("resets_at"))})
+    groups = {item["group"] for item in limits}
+    if not {"session", "weekly"} <= groups:
+        raise ShapeError("session or weekly limit missing from response")
+    spend = {}
+    for path in SPEND_FIELDS:
+        value = dig(payload, path)
+        if isinstance(value, (int, float)):
+            spend[".".join(path)] = float(value)
+    extra_off = dig(payload, ("extra_usage", "is_enabled")) is False
+    if not spend and not extra_off:
+        raise ShapeError("extra usage spend missing from response")
+    return {"limits": limits, "spend": spend, "extra_usage_off": extra_off}
+
+
+def threshold(settings, group):
+    strictest = min(settings.session_percent, settings.weekly_percent)
+    return {"session": settings.session_percent, "weekly": settings.weekly_percent}.get(group, strictest)
+
+
+def limit_reasons(reading, settings):
+    reasons, until = [], None
+    for item in reading["limits"]:
+        stop_at = threshold(settings, item["group"])
+        if item["percent"] >= stop_at:
+            reasons.append(f"{item['name']} at {item['percent']:g}% (stop at {stop_at:g}%)")
+            if item["resets_at"]:
+                until = max(until or 0, item["resets_at"])
+    return reasons, until
+
+
+def update_baseline(baseline, reading):
+    """First sight of a counter, or a lower value after the monthly reset, becomes the baseline."""
+    for field, value in reading["spend"].items():
+        if field not in baseline or value < baseline[field]:
+            baseline[field] = value
+
+
+def spend_increase(reading, baseline):
+    return {field: value - baseline[field] for field, value in reading["spend"].items()
+            if field in baseline and value > baseline[field]}
+
+
+def dollars(field, amount):
+    # Both counters are minor units (cents); monthly_limit 5000 is the $50 cap.
+    return f"${amount / 100:.2f}"
+
+
+def near_limit(reading, settings):
+    for item in (reading or {}).get("limits", []):
+        fast_from = settings.session_fast_from if item["group"] == "session" else settings.weekly_fast_from
+        if item["percent"] >= fast_from:
+            return True
+    return False
+
+
+def fetch():
+    try:
+        oauth = json.loads(CREDENTIALS.read_text())["claudeAiOauth"]
+        token = oauth["accessToken"]
+    except (OSError, ValueError, KeyError, TypeError) as error:
+        raise Failure(f"cannot read the Claude login: {error}")
+    expires_at = oauth.get("expiresAt")
+    if isinstance(expires_at, (int, float)) and expires_at / 1000 < time.time():
+        raise Quiet("stored login expired; Claude Code renews it on next use")
+    request = urllib.request.Request(USAGE_URL, headers={
+        "Authorization": f"Bearer {token}", "anthropic-beta": "oauth-2025-04-20",
+        "User-Agent": "claude-usage-guard"})
+    try:
+        with urllib.request.urlopen(request, timeout=20) as response:
+            body = response.read()
+    except urllib.error.HTTPError as error:
+        if error.code == 429:
+            retry = error.headers.get("retry-after")
+            raise Failure("usage endpoint rate limited", int(retry) if retry and retry.isdigit() else None)
+        raise Failure(f"usage endpoint returned HTTP {error.code}")
+    except (urllib.error.URLError, OSError) as error:
+        raise Quiet(f"offline: {error}")
+    try:
+        return json.loads(body)
+    except ValueError:
+        raise ShapeError("usage endpoint returned non-JSON")
+
+
+def claude_pids():
+    pids = []
+    for entry in Path("/proc").iterdir():
+        if not entry.name.isdigit() or int(entry.name) == os.getpid():
+            continue
+        try:
+            if entry.stat().st_uid != os.getuid():
+                continue
+            exe = os.readlink(entry / "exe").removesuffix(" (deleted)")
+        except OSError:
+            continue
+        if exe.startswith(CLAUDE_VERSIONS) or Path(exe).name == "claude":
+            pids.append(int(entry.name))
+    return pids
+
+
+def stop_claude(dry_run):
+    if dry_run:
+        print("KILL claude processes (dry run)")
+        return 0
+    pids = claude_pids()
+    for pid in pids:
+        try:
+            os.kill(pid, signal.SIGTERM)
+        except OSError:
+            pass
+    deadline = time.time() + 5
+    while time.time() < deadline and any(Path(f"/proc/{pid}").exists() for pid in pids):
+        time.sleep(0.2)
+    for pid in pids:
+        try:
+            os.kill(pid, signal.SIGKILL)
+        except OSError:
+            pass
+    if pids:
+        print(f"stopped claude processes: {pids}")
+    return len(pids)
+
+
+def notify(title, body, critical=True, dry_run=False):
+    print(f"NOTIFY {title}: {body}")
+    if dry_run:
+        return
+    try:
+        subprocess.run(["notify-send", "-a", "Claude usage guard", "-i",
+                        "dialog-warning" if critical else "dialog-information",
+                        "-u", "critical" if critical else "normal", title, body],
+                       timeout=10, check=False)
+    except (OSError, subprocess.SubprocessError) as error:
+        print(f"notify-send failed: {error}", file=sys.stderr)
+
+
+def clock(stamp):
+    return datetime.fromtimestamp(stamp).strftime("%a %I:%M %p").replace(" 0", " ")
+
+
+def load_state():
+    try:
+        return json.loads((state_dir() / "state.json").read_text())
+    except (OSError, ValueError):
+        return {}
+
+
+def save_state(state):
+    directory = state_dir()
+    directory.mkdir(parents=True, exist_ok=True)
+    temporary = directory / "state.json.tmp"
+    temporary.write_text(json.dumps(state, indent=2))
+    os.replace(temporary, directory / "state.json")
+
+
+def lock():
+    directory = state_dir()
+    directory.mkdir(parents=True, exist_ok=True)
+    handle = open(directory / "lock", "w")
+    fcntl.flock(handle, fcntl.LOCK_EX)
+    return handle
+
+
+def lapsed(trip, now):
+    """A limit trip whose limits have all reset; spend and unreadable-usage trips never lapse."""
+    return bool(trip and trip.get("until") and not trip.get("needs_ack") and now >= trip["until"])
+
+
+def describe_trip(trip):
+    until = f" until {clock(trip['until'])}" if trip.get("until") else ""
+    tail = " Run `claude-usage-guard ack` to accept the charge." if trip.get("needs_ack") else ""
+    return "; ".join(trip["reasons"]) + f". Claude is locked{until}.{tail}"
+
+
+def poll(state, settings, now, payload_path):
+    """Return a reading, or None after recording why there is none."""
+    try:
+        payload = json.loads(Path(payload_path).read_text()) if payload_path else fetch()
+        reading = normalize(payload)
+    except Quiet as reason:
+        print(f"skipped: {reason}")
+        state["next_poll"] = now + settings.fast_poll
+        return None
+    except (Failure, ShapeError) as error:
+        failure = state.get("failure") or {"since": now}
+        failure["error"] = str(error)
+        state["failure"] = failure
+        retry = getattr(error, "retry_after", None)
+        if "rate limited" in str(error):
+            state["backoff"] = min(max(state.get("backoff", 60) * 2, retry or 0), MAX_BACKOFF_SECONDS)
+            state["next_poll"] = now + state["backoff"]
+        else:
+            state["next_poll"] = now + settings.fast_poll
+        print(f"usage check failed: {error}", file=sys.stderr)
+        return None
+    state.pop("failure", None)
+    state.pop("backoff", None)
+    state["reading"] = reading
+    state["reading_at"] = now
+    return reading
+
+
+def check(args, settings, now=None):
+    now = now or time.time()
+    state = load_state()
+    trip_before = state.get("trip")
+    reading = None
+    # The timer fires about every 60 s, so allow some slack or a 1-minute poll slips to 2 minutes.
+    if args.payload or now >= state.get("next_poll", 0) - POLL_SLACK_SECONDS:
+        reading = poll(state, settings, now, args.payload)
+
+    if reading:
+        baseline = state.setdefault("spend_baseline", {})
+        update_baseline(baseline, reading)
+        reasons, until = limit_reasons(reading, settings)
+        increase = spend_increase(reading, baseline)
+        if increase:
+            field, amount = max(increase.items(), key=lambda item: item[1])
+            reasons.append(f"extra usage billed {dollars(field, amount)} past your limits")
+        state["trip"] = ({"reasons": reasons, "until": None if increase else until,
+                          "needs_ack": bool(increase),
+                          "since": (trip_before or {}).get("since", now)} if reasons else None)
+    elif lapsed(trip_before, now):
+        # Every tripped limit has reset since the trip, so it is back near 0%.
+        state["trip"] = None
+    failure = state.get("failure")
+    if failure and now - failure["since"] >= settings.failure_alert:
+        minutes = round((now - failure["since"]) / 60)
+        if near_limit(state.get("reading"), settings) and not state.get("trip"):
+            state["trip"] = {"reasons": [f"usage unreadable for {minutes} min while near a limit"
+                                         f" ({failure['error']})"],
+                             "until": None, "needs_ack": False, "since": now}
+        elif now - failure.get("alerted_at", 0) >= REALERT_SECONDS:
+            notify("Claude usage guard cannot read usage",
+                   f"{failure['error']} for {minutes} min. Limits are not being enforced.",
+                   critical=False, dry_run=args.dry_run)
+            failure["alerted_at"] = now
+
+    trip = state.get("trip")
+    if trip:
+        stopped = stop_claude(args.dry_run)
+        if not trip_before:
+            notify("Claude stopped: usage limit", describe_trip(trip) + f" Stopped {stopped} processes.",
+                   dry_run=args.dry_run)
+        elif stopped:
+            notify("Claude stopped again", f"Stopped {stopped} Claude processes started during the lockout. "
+                   + describe_trip(trip), dry_run=args.dry_run)
+        elif trip["reasons"] != trip_before["reasons"]:
+            notify("Claude still locked", describe_trip(trip), dry_run=args.dry_run)
+    elif trip_before:
+        notify("Claude unlocked", "Usage is back under your thresholds.", critical=False,
+               dry_run=args.dry_run)
+
+    if reading:
+        if trip and trip.get("until") and now < trip["until"]:
+            state["next_poll"] = min(now + settings.slow_poll, trip["until"] + 30)
+        elif trip or near_limit(reading, settings):
+            state["next_poll"] = now + settings.fast_poll
+        else:
+            state["next_poll"] = now + settings.slow_poll
+    save_state(state)
+
+
+def ack(args, settings):
+    state = load_state()
+    reading = state.get("reading")
+    if not reading:
+        print("No usage reading yet; nothing to accept.")
+        return 1
+    state["spend_baseline"] = dict(reading["spend"])
+    state["next_poll"] = 0
+    save_state(state)
+    print("Accepted the extra usage billed so far. Re-checking usage now.")
+    check(args, settings)
+    return status(args, settings)
+
+
+def status(args, settings):
+    state = load_state()
+    now = time.time()
+    reading = state.get("reading")
+    if reading:
+        print(f"Last reading {round((now - state['reading_at']) / 60)} min ago:")
+        for item in reading["limits"]:
+            reset = f", resets {clock(item['resets_at'])}" if item["resets_at"] else ""
+            print(f"  {item['name']}: {item['percent']:g}% (stop at {threshold(settings, item['group']):g}%){reset}")
+        baseline = state.get("spend_baseline", {})
+        for field, value in reading["spend"].items():
+            print(f"  {field}: {dollars(field, value)} (accepted {dollars(field, baseline.get(field, value))})")
+        if reading.get("extra_usage_off"):
+            print("  extra usage is turned off for this account")
+    else:
+        print("No usage reading yet.")
+    if state.get("failure"):
+        print(f"Failing since {clock(state['failure']['since'])}: {state['failure']['error']}")
+    trip = state.get("trip")
+    print(("LOCKED: " + describe_trip(trip)) if trip else "Not locked.")
+    if state.get("next_poll"):
+        print(f"Next poll in {max(0, round(state['next_poll'] - now))} s.")
+    seen = state_dir() / "hook-seen"
+    if seen.exists():
+        print(f"Claude Code hook last ran {round((now - seen.stat().st_mtime) / 60)} min ago.")
+    else:
+        print("Claude Code hook has not run yet.")
+    return 0
+
+
+def hook():
+    """Claude Code hook: exit 2 blocks the prompt or tool call while the guard is tripped."""
+    try:
+        (state_dir() / "hook-seen").touch()
+    except OSError:
+        pass
+    trip = load_state().get("trip")
+    if trip and not lapsed(trip, time.time()):
+        print("Claude usage guard: " + describe_trip(trip), file=sys.stderr)
+        return 2
+    return 0
+
+
+def main(argv=None):
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    sub = parser.add_subparsers(dest="command", required=True)
+    run = sub.add_parser("check", help="poll usage and enforce (systemd timer)")
+    run.add_argument("--payload", help="evaluate this saved response instead of calling the endpoint")
+    run.add_argument("--dry-run", action="store_true", help="print kills and notifications instead")
+    accept = sub.add_parser("ack", help="accept extra usage billed so far and lift the spend lock")
+    accept.add_argument("--payload", help=argparse.SUPPRESS)
+    accept.add_argument("--dry-run", action="store_true", help=argparse.SUPPRESS)
+    sub.add_parser("status", help="show the last reading and lock state")
+    sub.add_parser("hook", help="Claude Code UserPromptSubmit/PreToolUse hook")
+    args = parser.parse_args(argv)
+    if args.command == "hook":
+        return hook()
+    settings = Settings.load()
+    with lock():
+        if args.command == "check":
+            check(args, settings)
+            return 0
+        if args.command == "ack":
+            return ack(args, settings)
+    return status(args, settings)
+
+
+if __name__ == "__main__":
+    sys.exit(main())

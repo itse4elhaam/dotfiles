@@ -1,0 +1,7 @@
+[Unit]
+Description=Stop Claude Code before extra usage bills (one check)
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/python3 -I %h/.local/share/claude-usage-guard/claude-usage-guard check
+TimeoutStartSec=90

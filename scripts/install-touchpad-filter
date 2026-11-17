@@ -1,0 +1,39 @@
+#!/bin/bash
+# Install the opt-in touchpad filter. Copies it to a root-owned path, adds its
+# systemd unit and a sudoers rule for exactly start/stop. Never enables or starts it.
+set -euo pipefail
+[[ $EUID -eq 0 && $# -eq 0 ]] || {
+    echo 'Run: sudo /home/elhaam/dotfiles/scripts/install-touchpad-filter' >&2
+    exit 1
+}
+user_name=${SUDO_USER:-}
+[[ -n $user_name && $user_name != root && $user_name =~ ^[a-z_][a-z0-9_-]*$ ]] || {
+    echo 'Run this using sudo from your normal account.' >&2
+    exit 1
+}
+script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+systemctl_path=/usr/bin/systemctl
+[[ -x $systemctl_path ]] || { echo "Missing $systemctl_path" >&2; exit 1; }
+staging_dir=$(mktemp -d)
+trap 'rm -rf -- "$staging_dir"' EXIT
+printf '%s ALL=(root) NOPASSWD: %s start touchpad-filter.service, %s stop touchpad-filter.service\n' \
+    "$user_name" "$systemctl_path" "$systemctl_path" > "$staging_dir/sudoers"
+visudo -cf "$staging_dir/sudoers"
+/usr/bin/python3 -I -c 'import ast, sys; ast.parse(open(sys.argv[1]).read())' "$script_dir/touchpad-filter.py"
+cp -- "$script_dir/touchpad-filter.service" "$staging_dir/touchpad-filter.service"
+systemd-analyze verify "$staging_dir/touchpad-filter.service"
+if systemctl is-active --quiet touchpad-filter.service; then
+    echo 'The filter is running. Turn it off first: touchpad-filter off' >&2
+    exit 1
+fi
+install -d -o root -g root -m 0755 /usr/local/libexec
+install -o root -g root -m 0755 "$script_dir/touchpad-filter.py" /usr/local/libexec/touchpad-filter.py
+install -o root -g root -m 0644 "$staging_dir/touchpad-filter.service" /etc/systemd/system/touchpad-filter.service
+install -o root -g root -m 0440 "$staging_dir/sudoers" /etc/sudoers.d/touchpad-filter
+systemctl daemon-reload
+echo 'Installed /usr/local/libexec/touchpad-filter.py and touchpad-filter.service (not enabled, not started).'
+if ! grep -q 'def feed_hid' /usr/local/libexec/touchpad-watch.py 2>/dev/null; then
+    echo 'The installed touchpad-watch still measures health from evdev, which the filter hides.' >&2
+    echo 'Reinstall it first: sudo /home/elhaam/dotfiles/scripts/install-touchpad-watch' >&2
+fi
+echo 'Turn on: /home/elhaam/dotfiles/scripts/touchpad-filter on   (off: ... off)'

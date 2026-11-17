@@ -1,0 +1,245 @@
+#!/usr/bin/python3
+"""Outage-aware battery reminders and touchpad ghost alerts. Notify-only, user session.
+
+Charger state comes from UPower over D-Bus. /sys/class/power_supply is never
+read, because ACPI battery reads have hung this laptop. Ghost detection follows
+/var/log/touchpad-watch/health.jsonl, which the root touchpad-watch service writes.
+
+Rules. Times are local; override them in ~/.config/touchpad-notify.ini under
+[reminders].
+  outage guard  prep_start to outage_start, on battery: "plug in", repeated
+                every outage_repeat_min until the charger is connected.
+  low battery   On battery at or below plug_in_percent, outside prep_start to
+                outage_end (during the outage there is no power to plug into):
+                "plug in", repeated every low_repeat_min.
+  ghost         Two ghost-rated touched minutes within 3 minutes. Plugged in
+                outside prep_start to outage_end: advise unplugging. Otherwise,
+                advise Ctrl+Alt+Shift+F12. At most every ghost_cooldown_min.
+"""
+import argparse
+import configparser
+import datetime as dt
+import json
+import os
+from pathlib import Path
+import subprocess
+import time
+
+HEALTH_LOG = Path("/var/log/touchpad-watch/health.jsonl")
+CONFIG = Path.home() / ".config/touchpad-notify.ini"
+DEFAULTS = {"prep_start": "18:00", "outage_start": "19:00", "outage_end": "21:00",
+            "plug_in_percent": "50", "outage_repeat_min": "15", "low_repeat_min": "20",
+            "ghost_cooldown_min": "30"}
+POLL_SECONDS = 30
+GHOST_PAIR_SECONDS = 180
+UPOWER_STATES = {1: "charging", 2: "discharging", 4: "fully-charged", 5: "pending-charge"}
+POWER_COMMANDS = [
+    ["busctl", "--system", "--json=short", "--timeout=2", "get-property", "org.freedesktop.UPower",
+     "/org/freedesktop/UPower", "org.freedesktop.UPower", "OnBattery"],
+    ["busctl", "--system", "--json=short", "--timeout=2", "get-property", "org.freedesktop.UPower",
+     "/org/freedesktop/UPower/devices/DisplayDevice", "org.freedesktop.UPower.Device",
+     "State", "Percentage"],
+]
+NO_POWER = {"on_battery": None, "state": None, "percent": None}
+
+
+def clock(text):
+    hours, minutes = text.strip().split(":")
+    return dt.time(int(hours), int(minutes))
+
+
+class Settings:
+    def __init__(self, values=None):
+        merged = dict(DEFAULTS, **(values or {}))
+        self.prep_start = clock(merged["prep_start"])
+        self.outage_start = clock(merged["outage_start"])
+        self.outage_end = clock(merged["outage_end"])
+        self.plug_in_percent = float(merged["plug_in_percent"])
+        self.outage_repeat = float(merged["outage_repeat_min"]) * 60
+        self.low_repeat = float(merged["low_repeat_min"]) * 60
+        self.ghost_cooldown = float(merged["ghost_cooldown_min"]) * 60
+
+    @classmethod
+    def load(cls, path=CONFIG):
+        parser = configparser.ConfigParser()
+        if path.exists():
+            parser.read(path)
+        return cls(dict(parser["reminders"]) if parser.has_section("reminders") else None)
+
+
+def within(moment, start, end):
+    """True when moment lies in [start, end), including windows that cross midnight."""
+    if start <= end:
+        return start <= moment < end
+    return moment >= start or moment < end
+
+
+def label(moment):
+    return moment.strftime("%I:%M %p").lstrip("0").replace(":00", "").lower()
+
+
+def is_ghost(line):
+    """Same rule as touchpad-health-report's classify(): late second contacts."""
+    seconds = line.get("touched_seconds") or 0
+    if seconds < 5:
+        return False
+    late = line.get("late_second_contacts", 0)
+    return late >= 2 and late * 60 / seconds >= 4
+
+
+class Planner:
+    """Pure decision logic: power state and new health lines in, notifications out."""
+
+    def __init__(self, settings):
+        self.settings = settings
+        self.last = {}
+        self.ghost_minutes = []
+
+    def due(self, key, now, interval):
+        last = self.last.get(key)
+        return last is None or (now - last).total_seconds() >= interval
+
+    def step(self, now, power, lines):
+        s = self.settings
+        moment = now.time()
+        on_battery = power.get("on_battery")
+        percent = power.get("percent")
+        shown = f"{percent:.0f}%" if percent is not None else "unknown"
+        notes = []
+
+        if on_battery is False:
+            # Re-arm, so unplugging again inside a window warns at once.
+            self.last.pop("outage", None)
+            self.last.pop("low", None)
+        if on_battery and within(moment, s.prep_start, s.outage_start):
+            if self.due("outage", now, s.outage_repeat):
+                notes.append(("battery-caution", "critical",
+                              f"Plug in: power outage at {label(s.outage_start)}",
+                              f"Battery {shown}. The outage runs {label(s.outage_start)} to "
+                              f"{label(s.outage_end)}, so charge up before then."))
+                self.last["outage"] = now
+        elif (on_battery and percent is not None and percent <= s.plug_in_percent
+              and not within(moment, s.prep_start, s.outage_end)):
+            if self.due("low", now, s.low_repeat):
+                notes.append(("battery-low", "normal", f"Battery at {shown}: plug in",
+                              f"The {label(s.outage_start)} outage needs a well-charged battery."))
+                self.last["low"] = now
+
+        for line in lines:
+            if line.get("kind") == "minute" and is_ghost(line):
+                self.ghost_minutes.append(float(line.get("ts", now.timestamp())))
+        self.ghost_minutes = self.ghost_minutes[-2:]
+        pair = (len(self.ghost_minutes) == 2
+                and self.ghost_minutes[1] - self.ghost_minutes[0] <= GHOST_PAIR_SECONDS)
+        if pair and self.due("ghost", now, s.ghost_cooldown):
+            if on_battery is False and not within(moment, s.prep_start, s.outage_end):
+                body = ("Unplug the charger and keep using the pad for about 5 minutes. "
+                        "Still bad? Lift your fingers and press Ctrl+Alt+Shift+F12.")
+            else:
+                body = "Lift your fingers and press Ctrl+Alt+Shift+F12 to recalibrate it."
+            notes.append(("input-touchpad", "normal", "Touchpad is ghosting", body))
+            self.last["ghost"] = now
+            self.ghost_minutes = []
+        return notes
+
+
+def read_power(run=subprocess.run):
+    """UPower via busctl, with short timeouts. Unknown values come back as None."""
+    try:
+        values = []
+        for command in POWER_COMMANDS:
+            result = run(command, capture_output=True, text=True, timeout=5)
+            if result.returncode != 0:
+                return dict(NO_POWER)
+            values += [json.loads(line)["data"] for line in result.stdout.splitlines() if line.strip()]
+        on_battery, state, percent = values
+        return {"on_battery": bool(on_battery), "state": UPOWER_STATES.get(int(state), str(state)),
+                "percent": float(percent)}
+    except (OSError, ValueError, KeyError, subprocess.TimeoutExpired):
+        return dict(NO_POWER)
+
+
+class Follower:
+    """Yield complete new JSON lines from a file that may be rotated (renamed and recreated)."""
+
+    def __init__(self, path, from_start=False):
+        self.path = path
+        self.inode = None
+        self.offset = 0
+        self.partial = b""
+        if not from_start:
+            try:
+                info = path.stat()
+                self.inode, self.offset = info.st_ino, info.st_size
+            except OSError:
+                pass
+
+    def read(self):
+        try:
+            info = self.path.stat()
+        except OSError:
+            return []
+        if info.st_ino != self.inode or info.st_size < self.offset:
+            self.inode, self.offset, self.partial = info.st_ino, 0, b""
+        if info.st_size == self.offset:
+            return []
+        try:
+            with self.path.open("rb") as handle:
+                handle.seek(self.offset)
+                data = handle.read()
+        except OSError:
+            return []
+        self.offset += len(data)
+        chunks = (self.partial + data).split(b"\n")
+        self.partial = chunks.pop()
+        lines = []
+        for chunk in chunks:
+            try:
+                lines.append(json.loads(chunk))
+            except ValueError:
+                continue
+        return lines
+
+
+def notify(note, dry_run=False):
+    icon, urgency, title, body = note
+    if dry_run:
+        print(json.dumps({"title": title, "body": body, "urgency": urgency}), flush=True)
+        return
+    try:
+        subprocess.run(["notify-send", "-a", "Touchpad and battery", "-i", icon, "-u", urgency,
+                        title, body], timeout=5, check=False)
+    except (OSError, subprocess.TimeoutExpired):
+        pass
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("--once", action="store_true", help="evaluate once and exit")
+    parser.add_argument("--dry-run", action="store_true", help="print notifications instead of showing them")
+    parser.add_argument("--status", action="store_true", help="print the current power state and settings")
+    parser.add_argument("--test", action="store_true", help="show one sample notification")
+    args = parser.parse_args()
+    settings = Settings.load()
+    if args.status:
+        print(json.dumps({"power": read_power(), "config": str(CONFIG),
+                          "outage": f"{settings.outage_start}-{settings.outage_end}",
+                          "prep_start": str(settings.prep_start),
+                          "plug_in_percent": settings.plug_in_percent}, indent=2))
+        return
+    if args.test:
+        notify(("input-touchpad", "normal", "Touchpad and battery reminders are on",
+                "This is a test notification."), args.dry_run)
+        return
+    planner = Planner(settings)
+    follower = Follower(HEALTH_LOG)
+    while True:
+        for note in planner.step(dt.datetime.now(), read_power(), follower.read()):
+            notify(note, args.dry_run)
+        if args.once:
+            return
+        time.sleep(POLL_SECONDS)
+
+
+if __name__ == "__main__":
+    main()

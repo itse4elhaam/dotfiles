@@ -1,9 +1,10 @@
 #!/bin/bash
 set -euo pipefail
 script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
-if output=$("$script_dir/fixtouchpad" --hardware 2>&1); then
-    notify-send 'Touchpad driver reset' "$output"
+# FIXTOUCHPAD_NOTIFY makes fixtouchpad show "lift your fingers" before it waits.
+if output=$(FIXTOUCHPAD_NOTIFY=1 "$script_dir/fixtouchpad" --hardware 2>&1); then
+    notify-send 'Touchpad recalibrated' "$output"
 else
-    notify-send -u critical 'Touchpad reset failed' "$output"
+    notify-send -u critical 'Touchpad recalibration problem' "$output"
     exit 1
 fi

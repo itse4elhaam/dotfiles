@@ -96,7 +96,10 @@
   "threadDetailsUsageEnabled": false,
   "threadDetailsItems": {
     "openIn": false,
-    "scripts": false
+    "scripts": false,
+    "environment": false,
+    "gitActions": false,
+    "changes": false
   },
   "sidebarWorkingShelfEnabled": true,
   "sidebarProjectGroupingMode": "separate",

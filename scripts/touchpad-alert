@@ -1,0 +1,32 @@
+#!/usr/bin/python3 -I
+"""Show touchpad-watch's latest dead-strip alert once as a desktop notification."""
+import argparse
+import json
+import os
+from pathlib import Path
+import subprocess
+
+parser = argparse.ArgumentParser(description=__doc__)
+parser.add_argument("--alert", type=Path, default=Path("/run/touchpad-watch/alert"))
+parser.add_argument("--state", type=Path,
+                    default=Path(os.environ.get("XDG_RUNTIME_DIR", "/tmp")) / "touchpad-alert.last")
+args = parser.parse_args()
+try:
+    alert = json.loads(args.alert.read_text())
+except (OSError, ValueError):
+    raise SystemExit(0)
+stamp = str(alert.get("wall_time", ""))
+try:
+    if args.state.read_text() == stamp:
+        raise SystemExit(0)
+except OSError:
+    pass
+low, high = alert.get("band_mm", [None, None])
+edge = "left" if alert.get("axis") == "x" else "top"
+where = f" between {low:g} and {high:g} mm from the {edge} edge" if low is not None else ""
+body = (f"The touchpad kept losing the finger{where} and restarting it "
+        f"({alert.get('restarts_across_band', '?')} times in {alert.get('window_s', 30):g} s). "
+        "If the pointer skips or sticks, run fixtouchpad --mark to save it. A hands-off "
+        "recalibration (Ctrl+Alt+Shift+F12) may help but is unproven for this band.")
+subprocess.run(["notify-send", "-u", "normal", "Touchpad dead strip detected", body], check=False)
+args.state.write_text(stamp)

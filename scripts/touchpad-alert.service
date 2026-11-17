@@ -1,0 +1,6 @@
+[Unit]
+Description=Show the latest touchpad dead-strip alert (notification only, never resets)
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/python3 -I /home/elhaam/dotfiles/scripts/touchpad-alert

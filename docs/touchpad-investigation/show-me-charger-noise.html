@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Charger Noise Theory</title>
+<style>
+  :root {
+    --x-ink: var(--foreground, #1d1d1b);
+    --x-muted: var(--muted-foreground, #5f5e59);
+    --x-card: var(--card, #ffffff);
+    --x-line: var(--border, #e3e1db);
+    --x-warn: var(--warning, #b7791f);
+    --x-ok: var(--success, #2f855a);
+    --x-info: var(--info, #2b6cb0);
+    --x-code: var(--code-background, #efede7);
+    --x-radius: var(--radius, 10px);
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; color: var(--x-ink); font: 15px/1.5 var(--font-sans, system-ui, -apple-system, "Segoe UI", sans-serif); }
+  h2 { font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--x-muted); margin: 18px 0 10px; }
+  h2:first-child { margin-top: 0; }
+  .states { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  .state { background: var(--x-card); border: 1px solid var(--x-line); border-radius: var(--x-radius); padding: 14px; }
+  .state.suspect { border: 2px solid var(--x-warn); }
+  .state h3 { margin: 0 0 2px; font-size: 1rem; }
+  .state .tag { font-size: 0.75rem; color: var(--x-muted); }
+  .suspect .tag { color: var(--x-warn); font-weight: 600; }
+  .flow { margin: 12px 0 8px; display: grid; gap: 6px; font-size: 0.9rem; }
+  .row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .box { border: 1px solid var(--x-line); border-radius: 6px; padding: 2px 8px; background: var(--x-code); white-space: nowrap; }
+  .box.off { opacity: 0.45; text-decoration: line-through; }
+  .arrow { color: var(--x-muted); }
+  .meta { font-size: 0.85rem; margin: 6px 0 0; padding: 0; list-style: none; }
+  .meta li { margin: 3px 0; }
+  .meta b { font-variant-numeric: tabular-nums; }
+  .wave { height: 26px; width: 100%; display: block; margin-top: 8px; }
+  .chain { display: grid; gap: 0; background: var(--x-card); border: 1px solid var(--x-line); border-radius: var(--x-radius); padding: 6px 14px; }
+  .step { display: grid; grid-template-columns: 28px 1fr; gap: 10px; padding: 9px 0; border-bottom: 1px dashed var(--x-line); align-items: start; }
+  .step:last-child { border-bottom: none; }
+  .num { width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; font-size: 0.8rem; font-weight: 700;
+    color: var(--x-warn); border: 1.5px solid var(--x-warn); }
+  .step p { margin: 0; font-size: 0.92rem; }
+  .step small { color: var(--x-muted); }
+  .verdict { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .verdict div { background: var(--x-card); border: 1px solid var(--x-line); border-radius: var(--x-radius); padding: 12px 14px; font-size: 0.9rem; }
+  .verdict h4 { margin: 0 0 4px; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; }
+  .verdict .for h4 { color: var(--x-warn); } .verdict .against h4 { color: var(--x-info); }
+  .verdict ul { margin: 0; padding-left: 18px; } .verdict li { margin: 3px 0; }
+  .check { margin-top: 10px; font-size: 0.9rem; border-left: 3px solid var(--x-ok); padding: 4px 0 4px 12px; }
+  code { font-family: var(--font-mono, ui-monospace, monospace); font-size: 0.86em; background: var(--x-code); padding: 1px 5px; border-radius: 4px; }
+  @media (max-width: 620px) {
+    .states, .verdict { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<h2>Who powers the laptop, in each state</h2>
+<div class="states">
+  <div class="state">
+    <h3>On battery</h3><span class="tag">no charger in the picture</span>
+    <div class="flow">
+      <div class="row"><span class="box off">Charger</span></div>
+      <div class="row"><span class="box">Battery</span><span class="arrow">→</span><span class="box">Laptop</span></div>
+    </div>
+    <ul class="meta">
+      <li>Battery current: <b>13–28 W</b> out</li>
+      <li>Charger noise: none</li>
+    </ul>
+  </div>
+  <div class="state">
+    <h3>Plugged in, charging</h3><span class="tag">charger works hard</span>
+    <div class="flow">
+      <div class="row"><span class="box">Charger</span><span class="arrow">→</span><span class="box">Laptop</span></div>
+      <div class="row"><span class="box">Charger</span><span class="arrow">→</span><span class="box">Battery</span></div>
+    </div>
+    <ul class="meta">
+      <li>Charger load: heavy (laptop + battery)</li>
+      <li>Switching: fast and steady</li>
+    </ul>
+    <svg class="wave" viewBox="0 0 200 26" preserveAspectRatio="none" aria-label="steady fast switching">
+      <polyline fill="none" stroke="currentColor" stroke-width="1.4" opacity="0.6"
+        points="0,20 5,6 10,20 15,6 20,20 25,6 30,20 35,6 40,20 45,6 50,20 55,6 60,20 65,6 70,20 75,6 80,20 85,6 90,20 95,6 100,20 105,6 110,20 115,6 120,20 125,6 130,20 135,6 140,20 145,6 150,20 155,6 160,20 165,6 170,20 175,6 180,20 185,6 190,20 195,6 200,20"/>
+    </svg>
+  </div>
+  <div class="state suspect">
+    <h3>Plugged in, not charging</h3><span class="tag">"pending-charge": the suspect</span>
+    <div class="flow">
+      <div class="row"><span class="box">Charger</span><span class="arrow">→</span><span class="box">Laptop</span></div>
+      <div class="row"><span class="box off">Battery</span><span class="arrow">idle</span></div>
+    </div>
+    <ul class="meta">
+      <li>Battery current: <b>0.02–0.04 W</b> (tonight), so effectively zero</li>
+      <li>Charger load: light, so it may switch in pulses</li>
+    </ul>
+    <svg class="wave" viewBox="0 0 200 26" preserveAspectRatio="none" aria-label="bursty pulsed switching">
+      <polyline fill="none" stroke="var(--x-warn)" stroke-width="1.4"
+        points="0,20 3,6 6,20 9,6 12,20 15,6 18,20 40,20 43,6 46,20 49,6 52,20 55,6 58,20 80,20 83,6 86,20 89,6 92,20 95,6 98,20 120,20 123,6 126,20 129,6 132,20 135,6 138,20 160,20 163,6 166,20 169,6 172,20 175,6 178,20 200,20"/>
+    </svg>
+  </div>
+</div>
+
+<h2>How the noise could reach the touchpad</h2>
+<div class="chain">
+  <div class="step"><span class="num">1</span><p>At light load, many chargers stop switching steadily and work in <b>bursts</b>. That makes electrical noise at <b>lower frequencies</b>.<br><small>A common power-saving trick in USB-C chargers. Not measured on yours.</small></p></div>
+  <div class="step"><span class="num">2</span><p>The charger isn't earthed, so that noise rides on the <b>laptop's own ground</b>, which wobbles slightly against the room.</p></div>
+  <div class="step"><span class="num">3</span><p>Your body sits close to the room's ground. Touching the pad, <b>your finger bridges the two</b> and injects the noise right where you touch.</p></div>
+  <div class="step"><span class="num">4</span><p>The pad senses tiny charge changes many times a second. If the noise lands <b>near the frequency it scans at</b>, the firmware can't separate noise from finger.</p></div>
+  <div class="step"><span class="num">5</span><p>Result: <b>ghost second fingers</b> (phantom scrolls and taps), <b>lost touches</b> (jumps), worst where your finger spends the most time, in the middle.</p></div>
+</div>
+
+<h2>Is it true? Not proven yet</h2>
+<div class="verdict">
+  <div class="for"><h4>Fits</h4><ul>
+    <li>Tonight's spell (21:55–23:47) ran entirely in "not charging"</li>
+    <li>The Nov 5 spells started in the same state</li>
+    <li>You notice that unplugging helps</li>
+  </ul></div>
+  <div class="against"><h4>Doesn't fit</h4><ul>
+    <li>The "touch jump" log warnings happened while charging</li>
+    <li>Tonight's last two recordings were also "not charging" and had no ghosts</li>
+    <li>The dead band also shows up on battery</li>
+  </ul></div>
+</div>
+<p class="check">The logger now compares <b>bad minutes per state</b> (battery, charging, not charging) and <b>before vs after every unplug</b>. Run <code>touchpad-health-report</code> in a week or two for the answer.</p>
+</body>
+</html>

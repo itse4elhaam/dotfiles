@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Touchpad Culprits</title>
+<style>
+  :root {
+    --bg: #f6f5f2; --card: #ffffff; --ink: #1d1d1b; --muted: #5f5e59; --line: #e3e1db;
+    --one: #b4441e; --one-bg: #fbeee8; --two: #9a6a00; --two-bg: #fbf3df; --three: #2f5f8a; --three-bg: #e9f1f8;
+    --ok: #2f6b3a; --ok-bg: #e8f3ea; --code-bg: #efede7;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #161614; --card: #201f1c; --ink: #ecebe6; --muted: #a9a79f; --line: #34332e;
+      --one: #f08a63; --one-bg: #3a231a; --two: #e6b84f; --two-bg: #352c15; --three: #84b4e0; --three-bg: #1a2a38;
+      --ok: #8fcf98; --ok-bg: #1b2e1e; --code-bg: #2a2925;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #161614; --card: #201f1c; --ink: #ecebe6; --muted: #a9a79f; --line: #34332e;
+    --one: #f08a63; --one-bg: #3a231a; --two: #e6b84f; --two-bg: #352c15; --three: #84b4e0; --three-bg: #1a2a38;
+    --ok: #8fcf98; --ok-bg: #1b2e1e; --code-bg: #2a2925;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+    font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 760px; margin: 0 auto; padding: 24px 16px 48px; }
+  h1 { font-size: 1.6rem; margin: 0 0 4px; letter-spacing: -0.01em; }
+  .sub { color: var(--muted); margin: 0 0 24px; font-size: 0.92rem; }
+  h2 { font-size: 1.05rem; margin: 32px 0 10px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
+  .proven { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 14px 18px; }
+  .proven li { margin: 6px 0; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; margin: 14px 0; overflow: hidden; }
+  .head { display: flex; gap: 12px; align-items: flex-start; padding: 16px 18px 6px; }
+  .rank { flex: none; width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center;
+    font-weight: 700; color: #fff; }
+  .c1 .rank { background: var(--one); } .c2 .rank { background: var(--two); } .c3 .rank { background: var(--three); }
+  .head h3 { margin: 0; font-size: 1.15rem; line-height: 1.3; }
+  .tag { display: inline-block; margin-top: 4px; font-size: 0.78rem; font-weight: 600; padding: 2px 8px; border-radius: 999px; }
+  .c1 .tag { color: var(--one); background: var(--one-bg); }
+  .c2 .tag { color: var(--two); background: var(--two-bg); }
+  .c3 .tag { color: var(--three); background: var(--three-bg); }
+  .body { padding: 4px 18px 16px 64px; }
+  .body p { margin: 6px 0; }
+  .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin: 10px 0; }
+  .cols h4, .fix h4 { margin: 0 0 4px; font-size: 0.82rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); }
+  .cols ul, .fix ul { margin: 0; padding-left: 18px; }
+  .cols li, .fix li { margin: 4px 0; font-size: 0.95rem; }
+  .fix { background: var(--ok-bg); border-radius: 10px; padding: 12px 14px; margin-top: 12px; }
+  .fix h4 { color: var(--ok); }
+  .fix b { color: var(--ok); }
+  code { background: var(--code-bg); padding: 1px 6px; border-radius: 5px; font-size: 0.88em;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace; overflow-wrap: anywhere; }
+  table { width: 100%; border-collapse: collapse; font-size: 0.93rem; background: var(--card);
+    border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+  th, td { text-align: left; padding: 8px 12px; border-bottom: 1px solid var(--line); }
+  th { font-weight: 600; color: var(--muted); font-size: 0.82rem; }
+  td.num { font-variant-numeric: tabular-nums; }
+  tr:last-child td { border-bottom: none; }
+  ol.steps { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 14px 18px 14px 38px; margin: 0; }
+  ol.steps li { margin: 8px 0; }
+  .note { color: var(--muted); font-size: 0.88rem; margin-top: 10px; }
+  @media (max-width: 560px) {
+    .cols { grid-template-columns: 1fr; }
+    .body { padding-left: 18px; }
+    h1 { font-size: 1.35rem; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <h1>Your trackpad: the 3 likely culprits</h1>
+  <p class="sub">As of 12 Nov 2026, 00:35. Based on 4 raw recordings from tonight, the Nov 5 data, and charger history since Nov 5.</p>
+
+  <h2>What's proven</h2>
+  <ul class="proven">
+    <li><b>The bad data comes out of the touchpad itself.</b> The raw bytes already contain the ghost fingers, dropped touches and frozen X. Linux passes them through unchanged, so no setting can fix it.</li>
+    <li><b>There are two separate faults.</b> A dead band that drifts across the pad (your finger drops and the pointer jumps), and ghost-finger spells (phantom clicks and scrolls).</li>
+    <li><b>A clean recalibration stops ghost spells, but not the dead band.</b> The numbers are below.</li>
+  </ul>
+
+  <table style="margin-top:12px">
+    <tr><th></th><th>During the bad spell</th><th>After clean reset</th></tr>
+    <tr><td>Ghost two-finger frames</td><td class="num">249</td><td class="num">8</td></tr>
+    <tr><td>Phantom scrolls</td><td class="num">15</td><td class="num">0</td></tr>
+    <tr><td>Ghost "second finger" per min</td><td class="num">8.4</td><td class="num">4.3 → 0</td></tr>
+    <tr><td>Drop-and-jump crossings</td><td class="num">yes</td><td class="num">yes (band moved)</td></tr>
+  </table>
+
+  <h2>Top 3 culprits</h2>
+
+  <section class="card c1">
+    <div class="head"><div class="rank">1</div>
+      <div><h3>ELAN touchpad firmware (affects the whole model)</h3><span class="tag">Most likely</span></div></div>
+    <div class="body">
+      <p>The pad's own firmware handles noise and its "no touch" baseline badly, so it misreads where your finger is.</p>
+      <div class="cols">
+        <div><h4>For</h4><ul>
+          <li>The data is wrong before Linux sees it</li>
+          <li>The dead band moves around, even with no reset, so it's not one broken spot</li>
+          <li>Your other 840 G10 did the same thing</li>
+          <li>Linux is offered only firmware 0x0008, with no updates</li>
+          <li>No bulge, drop or spill</li>
+        </ul></div>
+        <div><h4>Against</h4><ul>
+          <li>Nobody has shown that newer firmware, or Windows, behaves better</li>
+        </ul></div>
+      </div>
+      <div class="fix"><h4>Fixes</h4><ul>
+        <li><b>Now:</b> when ghosts appear, press <code>Ctrl+Alt+Shift+F12</code>. It waits until nothing touches the pad, then recalibrates.</li>
+        <li><b>Permanent:</b> ask HP support for 840 G10 ClickPad firmware newer than 0x0008. HP ships ELAN firmware 22.50.0.0 for the 630/640/650 G10. Don't flash another model's firmware.</li>
+        <li><b>Fallback:</b> a filter between the pad and the desktop that joins up split-second drops and throws away ghost touches. It's designed but not built.</li>
+        <li><b>Check:</b> a 90-second recording on your other laptop would confirm whether the whole model is affected.</li>
+      </ul></div>
+    </div>
+  </section>
+
+  <section class="card c2">
+    <div class="head"><div class="rank">2</div>
+      <div><h3>Charger noise (mostly when plugged in and full)</h3><span class="tag">Likely trigger for ghost spells</span></div></div>
+    <div class="body">
+      <p>Electrical noise from the charger reaches the sensor through your finger. The pad sees fake touches and loses real ones.</p>
+      <div class="cols">
+        <div><h4>For</h4><ul>
+          <li>You notice that unplugging helps</li>
+          <li>Tonight's spell and the Nov 5 spells all started while plugged in and full</li>
+          <li>The dead band moved around the time you unplugged</li>
+        </ul></div>
+        <div><h4>Against</h4><ul>
+          <li>You're plugged in about 99% of the time, so "it happened while plugged in" proves little</li>
+          <li>Tonight's plug-in test showed no change, but the spell had already faded</li>
+          <li>The dead band also appears on battery</li>
+        </ul></div>
+      </div>
+      <div class="fix"><h4>Fixes</h4><ul>
+        <li><b>When it acts up:</b> unplug and keep using the pad for about 5 minutes. If it's still bad, press F12.</li>
+        <li><b>Cheap try:</b> if the charger cord has a 3-pin plug, use a properly earthed socket.</li>
+        <li><b>Avoid:</b> a battery charge limit. It keeps the laptop "plugged in, not charging" for longer, which is the state under suspicion.</li>
+        <li><b>Check:</b> the new log compares before and after every unplug. A few unplugs during a spell will settle it.</li>
+      </ul></div>
+    </div>
+  </section>
+
+  <section class="card c3">
+    <div class="head"><div class="rank">3</div>
+      <div><h3>Heat or waking from sleep</h3><span class="tag">Worth watching</span></div></div>
+    <div class="body">
+      <p>The pad's baseline drifts over time. Something that changes over minutes, like temperature or the power-up after sleep, could be pushing it.</p>
+      <div class="cols">
+        <div><h4>For</h4><ul>
+          <li>The dead band moved within 7 minutes with no reset</li>
+          <li>Tonight's bad spell followed waking from sleep at 21:55</li>
+          <li>On resume the pad only gets a "power on" command, never a full reset</li>
+        </ul></div>
+        <div><h4>Against</h4><ul>
+          <li>There's no direct evidence yet. Temperature wasn't recorded before tonight</li>
+        </ul></div>
+      </div>
+      <div class="fix"><h4>Fix</h4><ul>
+        <li><b>Check:</b> the log now records CPU temperature and every wake-up. If spells follow either one, an automatic hands-off recalibration after wake-up is the fix.</li>
+      </ul></div>
+    </div>
+  </section>
+
+  <p class="note">Ruled out: the <code>acpi_osi</code> boot setting, because the trackpad problems started before it was added.</p>
+
+  <h2>When it acts up</h2>
+  <ol class="steps">
+    <li><b>Unplug</b> and keep using the pad for about 5 minutes. The log captures before and after on its own.</li>
+    <li><b>Still bad?</b> Press <code>Ctrl+Alt+Shift+F12</code>, then lift your fingers when asked. It saves the raw data and recalibrates.</li>
+    <li>Don't press F12 before unplugging, or we can't tell which one fixed it.</li>
+  </ol>
+
+  <h2>How we'll know</h2>
+  <p>The logger records every minute you use the pad. Run <code>/home/elhaam/dotfiles/scripts/touchpad-health-report</code> anytime. No sudo needed. After a week or two it will rank these three culprits with real numbers.</p>
+</main>
+</body>
+</html>

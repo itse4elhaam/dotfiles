@@ -1,0 +1,303 @@
+#!/usr/bin/python3 -I
+"""Summarize touchpad-watch's health log around charger and calibration events; no sudo.
+
+Each "minute" line holds one minute (or less, if the charger or calibration
+changed) in which the touchpad was touched. Touched time is the only
+denominator: the charger is plugged in most of the time, so awake or wall
+time would mostly measure that habit.
+
+The first section is an event study. For every plug, unplug, battery-state
+change (charging, pending-charge, fully-charged, ...), resume and driver
+rebind, it compares up to EVENT_MINUTES touched minutes just before with
+just after. Each window stops at the neighbouring event and at EVENT_HOURS,
+so no window spans a second change.
+
+Two fault signatures from the 2026-11-11 captures are classified separately:
+
+  dead band  fast_drop_restarts >= 3 and >= 5 per touched minute. A lone finger
+             is lost and a new contact starts <100 ms later >=150 units away.
+             Present in captures A, B, C and D; healthy use should give ~0.
+  ghost      late_second_contacts >= 2 and >= 4 per touched minute: a second
+             contact starts while another has been down for 200 ms or more.
+             Replayed: Nov 5 7.2/min, A 8.4/min, B 4.3/min, C 1.4/min, D 0.
+             Use the user rated "perfect" (2026-11-12 00:24-00:28) gave 0.
+             Tap-like contacts and 2+ contact frames are not used: that same
+             healthy use had 11.2 taps/min and 3.0 % multi-contact frames
+             (tap-to-click and two-finger scrolling), above capture A's 2.7 %.
+
+Minutes with under MIN_TOUCH touched seconds are counted for touch time but
+not classified.
+
+Since touchpad-filter, minutes are measured from raw HID reports
+(health_source "hid"), so they describe the touchpad itself whether or not the
+filter is on. filter_on, bridged_drops and suppressed_ghosts say what the
+filter did in that minute; older lines lack them.
+"""
+import argparse
+from collections import Counter, defaultdict
+from datetime import datetime
+import json
+import math
+from pathlib import Path
+
+MIN_TOUCH = 5.0
+EVENT_MINUTES = 5
+EVENT_HOURS = 6
+EVENT_KINDS = ("power_change", "resume", "rebind")
+
+
+def charger_state(ac_online, battery_state):
+    if ac_online is None:
+        return "unknown"
+    if not ac_online:
+        return "battery"
+    if battery_state == "charging":
+        return "AC charging"
+    if battery_state in ("fully-charged", "pending-charge"):
+        return "AC full"
+    return f"AC {battery_state or 'unknown'}"
+
+
+def classify(line):
+    seconds = line.get("touched_seconds") or 0
+    if seconds < MIN_TOUCH:
+        return None
+    per_minute = 60 / seconds
+    drops = line.get("fast_drop_restarts", 0)
+    frames = line.get("touched_frames") or 1
+    dead = drops >= 3 and drops * per_minute >= 5
+    late = line.get("late_second_contacts", 0)
+    ghost = late >= 2 and late * per_minute >= 4
+    return dead, ghost
+
+
+def wilson(hits, total):
+    if not total:
+        return None
+    z, p = 1.96, hits / total
+    centre = (p + z * z / (2 * total)) / (1 + z * z / total)
+    margin = z * math.sqrt(p * (1 - p) / total + z * z / (4 * total * total)) / (1 + z * z / total)
+    return max(0.0, centre - margin), min(1.0, centre + margin)
+
+
+def read_lines(directory, since):
+    lines = []
+    for path in sorted(directory.glob("health.jsonl*"), key=lambda item: -int(item.suffix[1:])
+                       if item.suffix[1:].isdigit() else 0):
+        try:
+            text = path.read_text()
+        except OSError as error:
+            raise SystemExit(f"Cannot read {path}: {error}")
+        for raw in text.splitlines():
+            try:
+                line = json.loads(raw)
+            except ValueError:
+                continue
+            if isinstance(line, dict) and line.get("ts", 0) >= since:
+                lines.append(line)
+    return sorted(lines, key=lambda line: line["ts"])
+
+
+def summarize(minutes):
+    total = Counter()
+    bands = Counter()
+    temperatures = []
+    for line in minutes:
+        seconds = line.get("touched_seconds") or 0
+        total["seconds"] += seconds
+        total["minutes"] += 1
+        for field in ("touched_frames", "contact_starts", "multi_contact_frames", "late_second_contacts",
+                      "tap_like_contacts", "fast_drop_restarts", "frozen_x_runs"):
+            total[field] += line.get(field, 0) or 0
+        verdict = classify(line)
+        if verdict is not None:
+            total["classified"] += 1
+            total["rated_seconds"] += seconds
+            total["dead"] += verdict[0]
+            total["ghost"] += verdict[1]
+            total["dead_seconds"] += seconds * verdict[0]
+            total["ghost_seconds"] += seconds * verdict[1]
+            if verdict[0] and line.get("sparse_x_at") is not None:
+                bands[line["sparse_x_at"]] += 1
+        if line.get("cpu_pkg_temp_c") is not None:
+            temperatures.append(line["cpu_pkg_temp_c"])
+    total["temperature"] = sum(temperatures) / len(temperatures) if temperatures else None
+    total["band"] = bands.most_common(1)[0] if bands else None
+    return total
+
+
+def percent(seconds, rated_seconds, hits, total):
+    """Share of rated touched time, with a 95% interval from the minute counts as a rough guide."""
+    if not total:
+        return "-"
+    low, high = wilson(hits, total)
+    return f"{100 * seconds / rated_seconds:5.1f}% ({100 * low:.0f}-{100 * high:.0f})"
+
+
+def rates(total):
+    minutes = total["seconds"] / 60
+    if not minutes:
+        return None
+    rated = total["rated_seconds"] or 1
+    return {"min": total["minutes"], "touch_min": minutes,
+            "drops": total["fast_drop_restarts"] / minutes, "taps": total["tap_like_contacts"] / minutes,
+            "multi": 100 * total["multi_contact_frames"] / (total["touched_frames"] or 1),
+            "dead": 100 * total["dead_seconds"] / rated if total["classified"] else None,
+            "ghost": 100 * total["ghost_seconds"] / rated if total["classified"] else None}
+
+
+def describe(event):
+    kind = event.get("kind")
+    state = charger_state(event.get("ac_online"), event.get("battery_state"))
+    if kind == "power_change":
+        before = event.get("previous_ac_online")
+        previous = charger_state(before, event.get("previous_battery_state"))
+        if before is True and event.get("ac_online") is False:
+            return "unplug", f"unplug {previous} -> {state}"
+        if before is False and event.get("ac_online") is True:
+            return "plug", f"plug {previous} -> {state}"
+        return "battery state", f"{event.get('previous_battery_state')} -> {event.get('battery_state')}"
+    if kind == "resume":
+        return "resume", f"resume on {state}"
+    return "rebind", f"driver rebind on {state}"
+
+
+def window_text(values):
+    if values is None:
+        return f"{'-':>4}{'':>34}"
+    dead = "-" if values["dead"] is None else f"{values['dead']:.0f}%"
+    ghost = "-" if values["ghost"] is None else f"{values['ghost']:.0f}%"
+    return (f"{values['min']:4d}{values['drops']:7.1f}{values['taps']:6.1f}{values['multi']:6.1f}%"
+            f"{dead:>6}{ghost:>7}")
+
+
+def event_study(lines):
+    """Lines are in log order; windows use that order so a minute flushed by an event stays before it."""
+    events = [index for index, line in enumerate(lines) if line.get("kind") in EVENT_KINDS]
+    print(f"\nEvent study: up to {EVENT_MINUTES} touched minutes before vs after each change")
+    if not events:
+        print("No plug, unplug, battery-state, resume or rebind events in this period.")
+        return
+    columns = f"{'min':>4}{'drop/m':>7}{'tap/m':>6}{'multi':>7}{'dead':>6}{'ghost':>7}"
+    print(f"{'when':<17}{'event':<44}  {'before':-^37}  {'after':-^37}")
+    print(f"{'':<61}  {columns}  {columns}")
+    groups = defaultdict(list)
+    limit = EVENT_HOURS * 3600
+    for number, position in enumerate(events):
+        event = lines[position]
+        start = events[number - 1] + 1 if number else 0
+        end = events[number + 1] if number + 1 < len(events) else len(lines)
+        before = [line for line in lines[start:position]
+                  if line.get("kind") == "minute" and line["ts"] >= event["ts"] - limit]
+        after = [line for line in lines[position + 1:end]
+                 if line.get("kind") == "minute" and line["ts"] <= event["ts"] + limit]
+        before_rates = rates(summarize(before[-EVENT_MINUTES:]))
+        after_rates = rates(summarize(after[:EVENT_MINUTES]))
+        family, label = describe(event)
+        groups[family].append((before_rates, after_rates))
+        when = datetime.fromtimestamp(event["ts"]).strftime("%m-%d %H:%M:%S")
+        print(f"{when:<17}{label[:44]:<44}  {window_text(before_rates)}  {window_text(after_rates)}")
+    print("\nEvent study summary (only events with touched minutes on both sides)")
+    print(f"{'event type':<16}{'events':>7}{'paired':>7}{'drops/min before -> after':>28}"
+          f"{'dead% before -> after':>24}{'ghost% before -> after':>25}{'fewer drops after':>19}")
+    for family in ("unplug", "plug", "battery state", "resume", "rebind"):
+        pairs = groups.get(family, [])
+        paired = [(before, after) for before, after in pairs if before and after]
+
+        def mean(side, field):
+            values = [pair[side][field] for pair in paired if pair[side][field] is not None]
+            return f"{sum(values) / len(values):.1f}" if values else "-"
+        fewer = sum(after["drops"] < before["drops"] for before, after in paired)
+        more = sum(after["drops"] > before["drops"] for before, after in paired)
+        print(f"{family:<16}{len(pairs):7d}{len(paired):7d}"
+              f"{mean(0, 'drops') + ' -> ' + mean(1, 'drops'):>28}"
+              f"{mean(0, 'dead') + ' -> ' + mean(1, 'dead'):>24}"
+              f"{mean(0, 'ghost') + ' -> ' + mean(1, 'ghost'):>25}"
+              f"{f'{fewer} of {len(paired)} ({more} more)':>19}")
+
+
+def table(title, groups, all_seconds):
+    print(f"\n{title}")
+    header = (f"{'state':<16}{'touch h':>8}{'share':>7}{'min':>6}{'rated':>6}"
+              f"{'dead band % (95% CI)':>22}{'ghost % (95% CI)':>20}"
+              f"{'drops/min':>10}{'taps/min':>9}{'multi%':>7}{'late2/min':>10}{'starts/s':>9}"
+              f"{'temp C':>7}  common dead-band X")
+    print(header)
+    for name in sorted(groups):
+        total = summarize(groups[name])
+        minutes = total["seconds"] / 60 or 1
+        frames = total["touched_frames"] or 1
+        band = f"{total['band'][0]} ({total['band'][1]} min)" if total["band"] else "-"
+        temperature = f"{total['temperature']:.0f}" if total["temperature"] is not None else "-"
+        print(f"{name:<16}{total['seconds'] / 3600:8.2f}"
+              f"{100 * total['seconds'] / (all_seconds or 1):6.1f}%{total['minutes']:6d}{total['classified']:6d}"
+              f"{percent(total['dead_seconds'], total['rated_seconds'], total['dead'], total['classified']):>22}"
+              f"{percent(total['ghost_seconds'], total['rated_seconds'], total['ghost'], total['classified']):>20}"
+              f"{total['fast_drop_restarts'] / minutes:10.1f}{total['tap_like_contacts'] / minutes:9.1f}"
+              f"{100 * total['multi_contact_frames'] / frames:6.1f}%{total['late_second_contacts'] / minutes:10.1f}"
+              f"{total['contact_starts'] / (total['seconds'] or 1):9.2f}{temperature:>7}  {band}")
+
+
+def filter_group(line):
+    if "filter_on" not in line:
+        return "no filter field"
+    return "filter on" if line["filter_on"] else "filter off"
+
+
+def temperature_band(line):
+    value = line.get("cpu_pkg_temp_c")
+    if value is None:
+        return "unknown"
+    low = int(value // 10 * 10)
+    return f"{low}-{low + 9} C"
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("--since", help="local date or time, e.g. 2026-11-12 or 2026-11-12T09:00")
+    parser.add_argument("--log", type=Path, default=Path("/var/log/touchpad-watch"),
+                        help="directory holding health.jsonl (default: %(default)s)")
+    args = parser.parse_args()
+    since = 0.0
+    if args.since:
+        try:
+            since = datetime.fromisoformat(args.since).timestamp()
+        except ValueError:
+            parser.error("--since must look like 2026-11-12 or 2026-11-12T09:00")
+    lines = read_lines(args.log, since)
+    if not lines:
+        raise SystemExit(f"No health records in {args.log}" + (f" since {args.since}" if args.since else ""))
+    minutes = [line for line in lines if line.get("kind") == "minute"]
+    events = Counter(line.get("kind") for line in lines if line.get("kind") != "minute")
+    first = datetime.fromtimestamp(lines[0]["ts"]).strftime("%Y-%m-%d %H:%M")
+    last = datetime.fromtimestamp(lines[-1]["ts"]).strftime("%Y-%m-%d %H:%M")
+    all_seconds = sum(line.get("touched_seconds") or 0 for line in minutes)
+    print(f"Touchpad health {first} to {last}: {len(minutes)} touched minutes, "
+          f"{all_seconds / 3600:.2f} h of touch.")
+    print("Events: " + (", ".join(f"{kind} {count}" for kind, count in sorted(events.items())) or "none"))
+    print(f"Rated minutes have >= {MIN_TOUCH:g} touched seconds. Rates are per touched minute and "
+          "shares are of touched time. See --help for the fault definitions.")
+    filtered = [line for line in minutes if line.get("filter_on")]
+    if any("filter_on" in line for line in minutes):
+        print(f"Touchpad filter on in {len(filtered)} of {len(minutes)} touched minutes; it bridged "
+              f"{sum(line.get('bridged_drops', 0) for line in minutes)} drops and suppressed "
+              f"{sum(line.get('suppressed_ghosts', 0) for line in minutes)} ghost contacts.")
+    event_study(lines)
+    groupings = (
+        ("By charger state now", lambda line: charger_state(line.get("ac_online"), line.get("battery_state"))),
+        ("By charger state at the last calibration (driver rebind or resume)",
+         lambda line: charger_state(line.get("calibration_ac_online"), line.get("calibration_battery_state"))),
+        ("By charger state at the last driver rebind",
+         lambda line: charger_state(line.get("rebind_ac_online"), line.get("rebind_battery_state"))),
+        ("By CPU package temperature", temperature_band),
+        ("By touchpad filter (rates are of the raw touchpad either way)", filter_group),
+    )
+    for title, key in groupings:
+        groups = defaultdict(list)
+        for line in minutes:
+            groups[key(line)].append(line)
+        table(title, groups, all_seconds)
+
+
+if __name__ == "__main__":
+    main()

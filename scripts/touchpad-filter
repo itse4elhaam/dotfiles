@@ -1,0 +1,117 @@
+#!/bin/bash
+# Turn the opt-in ELAN touchpad filter on or off. See docs/touchpad-recovery.md.
+set -euo pipefail
+unit=touchpad-filter.service
+# Test seam only; the default is where the service writes its status.
+status_file=${TOUCHPAD_FILTER_STATUS:-/run/touchpad-filter/status.json}
+filter_name='ELAN07AC:00 04F3:31EC Touchpad (filtered)'
+usage='Usage: touchpad-filter on|off|toggle|status [--notify]'
+action=${1:-}
+notify=false
+if [[ $# -eq 2 && $2 == --notify ]]; then
+    notify=true
+elif [[ $# -ne 1 ]]; then
+    echo "$usage" >&2
+    exit 2
+fi
+case $action in
+    on|off|toggle|status) ;;
+    -h|--help)
+        echo "$usage"
+        echo 'on      start touchpad-filter.service (waits until it has grabbed the untouched pad)'
+        echo 'off     stop it; the touchpad is unfiltered again'
+        echo 'toggle  on if off, off if on (the Ctrl+Alt+Shift+F11 shortcut)'
+        echo 'status  service state, correction counts and whether X11 lists the filtered device'
+        echo '--notify  also show the result as a desktop notification'
+        exit 0
+        ;;
+    *) echo "$usage" >&2; exit 2 ;;
+esac
+
+say() {
+    printf '%s. %s\n' "$1" "$2"
+    if $notify; then
+        notify-send ${3:+-u "$3"} 'Touchpad filter' "$1. $2" 2>/dev/null || true
+    fi
+}
+
+summary() {
+    /usr/bin/python3 -I - "$status_file" <<'PY'
+import json
+import sys
+try:
+    with open(sys.argv[1]) as handle:
+        data = json.load(handle)
+except (OSError, ValueError):
+    print("No filter status yet.")
+    raise SystemExit
+stats = data.get("stats") or {}
+line = (f"State {data.get('state')}: bridged {stats.get('bridged_drops', 0)} drops, "
+        f"suppressed {stats.get('suppressed_ghosts', 0)} ghosts")
+if data.get("virtual"):
+    line += f", virtual device {data['virtual']}"
+if data.get("error"):
+    line += f". {data['error']}"
+print(line + ".")
+PY
+}
+
+is_active() {
+    systemctl is-active --quiet "$unit"
+}
+
+control() {
+    # The sudoers rule installed by install-touchpad-filter allows exactly these two commands.
+    if ! output=$(sudo -n /usr/bin/systemctl "$1" "$unit" 2>&1); then
+        if [[ $output == *password* ]]; then
+            output='Not installed: run sudo /home/elhaam/dotfiles/scripts/install-touchpad-filter'
+        fi
+        printf '%s' "$output"
+        return 1
+    fi
+}
+
+turn_on() {
+    if is_active; then
+        say 'Already on' "$(summary)"
+        return 0
+    fi
+    if ! output=$(control start); then
+        say 'Did not start; the touchpad is unfiltered' "$output $(summary)" critical
+        return 1
+    fi
+    say 'On' "Lone-finger drops are bridged and short ghost contacts held. $(summary)"
+}
+
+turn_off() {
+    if ! is_active; then
+        say 'Already off' 'The touchpad is unfiltered.'
+        return 0
+    fi
+    if ! output=$(control stop); then
+        say 'Could not stop it' "$output" critical
+        return 1
+    fi
+    say 'Off' 'The touchpad is unfiltered.'
+}
+
+if [[ $action == status ]]; then
+    echo "$unit: $(systemctl is-active "$unit" 2>/dev/null || true)"
+    summary
+    if [[ -n ${DISPLAY:-} ]] && command -v xinput >/dev/null; then
+        if xinput list --name-only 2>/dev/null | grep -Fxq "$filter_name"; then
+            echo "X11 lists \"$filter_name\"."
+        else
+            echo "X11 does not list \"$filter_name\"."
+        fi
+    fi
+    exit 0
+fi
+
+exec 9>>"${XDG_RUNTIME_DIR:?XDG_RUNTIME_DIR is required}/touchpad-filter.lock"
+flock -n 9 || { echo 'A touchpad filter change is already running.'; exit 0; }
+case $action in
+    on) turn_on ;;
+    off) turn_off ;;
+    toggle) if is_active; then turn_off; else turn_on; fi ;;
+esac

@@ -1,6 +1,6 @@
 [Unit]
 Description=ELAN touchpad incident recorder (no automatic resets)
-After=systemd-udevd.service
+After=systemd-udevd.service upower.service
 
 [Service]
 Type=simple
@@ -13,6 +13,9 @@ RuntimeDirectory=touchpad-watch
 RuntimeDirectoryMode=0750
 StateDirectory=touchpad-watch
 StateDirectoryMode=0750
+# health.jsonl: per-minute aggregates only, readable without sudo.
+LogsDirectory=touchpad-watch
+LogsDirectoryMode=0755
 UMask=0027
 NoNewPrivileges=yes
 ProtectSystem=strict
