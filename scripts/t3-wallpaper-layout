@@ -18,7 +18,8 @@ def compact_css(css):
     for index in range(0, len(tokens), 2):
         value = re.sub(r"/\*[\s\S]*?\*/", "", tokens[index])
         value = re.sub(r"\s+", " ", value)
-        tokens[index] = re.sub(r"\s*([{};,])\s*", r"\1", value).replace(" !important", "!important")
+        value = re.sub(r"\s*([{};,])\s*", r"\1", value).replace(" !important", "!important")
+        tokens[index] = re.sub(r"(?<=[{;])([\w-]+):\s+", r"\1:", value).replace("background:transparent", "background:#0000")
     result = "".join(tokens).strip()
     # Share action visibility instead of repeating long label selectors.
     pattern = (
@@ -30,6 +31,11 @@ def compact_css(css):
         '[data-message-role]:is(:hover,:focus-within){--td-action-opacity:1}'
         f'[data-message-role] {m[1]}{{opacity:var(--td-action-opacity)!important}}'
     ), result)
+    result = result.replace("--td-action-opacity", "--td-a")
+    result = result.replace(
+        "background-image:linear-gradient(rgba(26,27,38,var(--td-shade)),rgba(26,27,38,.84)),var(--td-wallpaper);background-position:center;background-size:cover;background-repeat:no-repeat;",
+        "background:linear-gradient(rgba(26,27,38,var(--td-shade)),rgba(26,27,38,.84)),var(--td-wallpaper) center/cover no-repeat;",
+    )
     return re.sub(r'([~|^$*]?=)"([a-zA-Z_][a-zA-Z0-9_-]*)"\]', r'\1\2]', result)
 
 

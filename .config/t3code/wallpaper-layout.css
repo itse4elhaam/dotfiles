@@ -35,3 +35,10 @@
 .dark [data-sidebar="trigger"]:is(:hover,:focus-visible) {
   opacity: 1;
 }
+
+/* Workspace sheets should reach the top even when window controls overlay. */
+[data-slot="sheet-popup"]:has(>[data-preview-panel-mode="sheet"]) {
+  margin-top: 0 !important;
+  height: 100% !important;
+  max-height: 100% !important;
+}

@@ -61,3 +61,12 @@ shellcheck **/*.sh
 ## Screen readers and accessibility settings
 
 Never enable screen readers, Orca, speech-dispatcher, accessibility speech, or desktop accessibility settings. Never set `ScreenReaderEnabled`, `screen-reader-enabled`, or `toolkit-accessibility` to true, even temporarily for testing. Never unmask speech services or remove the speech safeguards. This applies to every task, including Neovim textbox integration. Only a new, explicit user request to enable speech can override this rule.
+
+## T3 Code UI changes
+
+For T3 Code UI bugs and styling changes, open the running app in T3 Code's
+browser and reproduce the reported behavior before editing. Exercise the
+interaction yourself and verify the fix there afterward. Match the reported
+viewport, zoom, panel mode, and window-controls overlay state when relevant;
+a wide browser view can miss a desktop bug in the narrower sheet layout.
+Keep the durable theme CSS and helpers in this dotfiles checkout.
