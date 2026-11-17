@@ -1,5 +1,5 @@
-/* Keep panel shortcuts independent: Zen hides only the top-bar controls.
-   The app owns sidebar, terminal, details and browser visibility. */
-:root :is([data-chat-header],[data-workspace-titlebar-controls],[data-sidebar-control]) {
+/* Keep the floating sidebar toggle available while hiding top-bar controls.
+   Sidebar, terminal, details and browser visibility remain app-owned. */
+:root :is([data-chat-header],[data-workspace-titlebar-controls]) {
   display: none !important;
 }

@@ -10,3 +10,23 @@
   background: rgba(26,27,38,.57) !important;
   backdrop-filter: blur(12px);
 }
+
+/* The PR list should fill the available pane, including wide displays. */
+[data-workspace-area="pull-requests"] .max-w-6xl {
+  max-width: none !important;
+}
+
+/* Strong reflections with soft edges, on both desktop and mobile sidebars. */
+.dark :is([data-slot="sidebar-inner"],[data-slot="sidebar"][data-mobile]) {
+  background: linear-gradient(135deg,#ffffff26,#ffffff05 42%,#ffffff12),#16161e38 !important;
+  backdrop-filter: blur(28px) saturate(1.8);
+  box-shadow: inset 0 1px #ffffff20,inset -1px 0 #ffffff08,0 8px 32px #0003;
+  border-right: 1px solid #ffffff0a;
+}
+.dark [data-sidebar="trigger"] {
+  background: linear-gradient(155deg,#ffffff38,#ffffff08 50%,#ffffff18),#16161e40 !important;
+  backdrop-filter: blur(20px) saturate(1.8);
+  box-shadow: inset 0 1px #ffffff40,0 4px 16px #0003;
+  border: 1px solid #ffffff12;
+  border-radius: 10px;
+}

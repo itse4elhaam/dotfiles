@@ -20,6 +20,16 @@ def compact_css(css):
         value = re.sub(r"\s+", " ", value)
         tokens[index] = re.sub(r"\s*([{};,])\s*", r"\1", value).replace(" !important", "!important")
     result = "".join(tokens).strip()
+    # Share action visibility instead of repeating long label selectors.
+    pattern = (
+        r'\[data-message-role\] (button:is\([^{}]+\))\{opacity:0\s*!important;?\}'
+        r'\[data-message-role\]:is\(:hover,:focus-within\) \1\{opacity:1\s*!important;?\}'
+    )
+    result = re.sub(pattern, lambda m: (
+        '[data-message-role]{--td-action-opacity:0}'
+        '[data-message-role]:is(:hover,:focus-within){--td-action-opacity:1}'
+        f'[data-message-role] {m[1]}{{opacity:var(--td-action-opacity)!important}}'
+    ), result)
     return re.sub(r'([~|^$*]?=)"([a-zA-Z_][a-zA-Z0-9_-]*)"\]', r'\1\2]', result)
 
 
@@ -38,9 +48,17 @@ def main():
         if "--td-wallpaper:" not in css or path.stem == "zen-mode":
             continue
         css = css.split(marker, 1)[0]
+        # Shared sidebar paint replaces the old per-theme glass block.
+        css = re.sub(r'\.dark \[data-slot=sidebar-inner\],\.dark \[data-slot=sidebar\]\[data-mobile\]\{[^{}]*\}', "", compact_css(css))
+        # Chromium supports backdrop-filter. Drop redundant prefixed copies
+        # to keep embedded wallpaper themes below the app's CSS limit.
+        css = re.sub(r'-webkit-backdrop-filter:[^;{}]*;', "", css)
         # Replace old header styling with the shared rule below the marker.
         css = re.sub(r'\.dark \[data-chat-header\]\s*\{[^{}]*\}', "", css)
         updated = compact_css(css) + "\n" + marker + "\n" + rules + "\n"
+        if len(updated) > 50_000:
+            # Keep the largest wallpaper intact; use native control radii.
+            updated = re.sub(r'(?:^|(?<=}))[^{]+\{border-radius:[^{}]+\}', '', updated)
         if len(updated) > 50_000:
             raise SystemExit(f"{path.name}: CSS exceeds T3's 50,000-character limit")
         if updated == theme["css"]:

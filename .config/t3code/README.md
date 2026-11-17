@@ -48,7 +48,8 @@ backup mechanism for this configuration.
 - **Ctrl+Alt+L** opens or closes the right panel, including from its browser.
 - **Ctrl+Alt+A** opens T3's theme picker if the desktop shortcut is unavailable.
 
-The default `zen-mode` theme hides only top-bar controls. Panels retain their
+The default `zen-mode` theme hides top-bar controls and keeps the floating
+sidebar toggle visible. Panels retain their
 native shortcuts, open states, and sizes. `t3-zen on`, `off`, and `status` also
 work from a terminal. The previous theme is remembered in
 `~/.local/state/t3-zen/restore.json`; setup seeds it from `restoreThemeId` only
@@ -58,7 +59,8 @@ environment as well as this machine's desktop app.
 Run `t3-wallpaper-layout` to refresh the shared wallpaper CSS on normal themes.
 It preserves backups and supports `--dry-run`. Re-select the theme afterward.
 Themes must fit T3's 50,000-character CSS limit. The largest deer wallpaper may
-use the app's default corner radii in Zen to fit that limit.
+use the app's default corner radii to fit that limit. The shared CSS also adds
+sidebar glass reflections and lets the PR list fill its available pane.
 
 ## Verification
 
