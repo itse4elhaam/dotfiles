@@ -18,6 +18,8 @@ def config_links(repo, home, t3_home):
         (config / "themes", userdata / "themes"),
         (config / "keybindings.json", userdata / "keybindings.json"),
         (config / "client-settings.json", userdata / "client-settings.json"),
+        (repo / "scripts/t3", home / ".local/bin/t3"),
+        (repo / ".local/share/applications/t3code.desktop", home / ".local/share/applications/t3code.desktop"),
         (repo / "scripts/t3-zen", home / ".local/bin/t3-zen"),
         (repo / "scripts/t3-wallpaper-layout", home / ".local/bin/t3-wallpaper-layout"),
     ]

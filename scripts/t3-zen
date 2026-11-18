@@ -20,6 +20,9 @@ ZEN_ID = "zen-mode"
 def build_theme(theme):
     compact = runpy.run_path(str(ROOT / "scripts/t3-wallpaper-layout"))["compact_css"]
     css = compact(theme.get("css", ""))
+    # Zen's title row only anchors floating controls and the details popover.
+    # Its normal glass paint would cover the conversation at the top.
+    css = re.sub(r'\.dark \[data-chat-header\]\{[^{}]*\}', '', css)
     # Share hover opacity through a custom property instead of repeating the
     # long action selector. Preserve keyboard focus and the original buttons.
     pattern = (

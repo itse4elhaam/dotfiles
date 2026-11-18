@@ -1,0 +1,34 @@
+#!/bin/bash
+# Launch the newest installed T3 Code AppImage with its native close button hidden.
+set -euo pipefail
+shopt -s nullglob
+
+appimages=("$HOME"/Applications/T3-Code-*-x86_64.AppImage)
+if (( ${#appimages[@]} == 0 )); then
+    echo "Error: no T3 Code AppImage found in $HOME/Applications" >&2
+    exit 1
+fi
+appimage=$(printf '%s\n' "${appimages[@]}" | sort -V | tail -n 1)
+script_dir=$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")
+module_source="$script_dir/../.config/t3code/no-close.c"
+module_dir="${XDG_CACHE_HOME:-$HOME/.cache}/t3code"
+module="$module_dir/no-close.so"
+
+if [[ ! -f "$module" || "$module_source" -nt "$module" ]]; then
+    mkdir -p "$module_dir"
+    temporary="$module.$$.tmp"
+    if cc -Wall -Wextra -Werror -shared -fPIC "$module_source" -o "$temporary"; then
+        mv "$temporary" "$module"
+    else
+        rm -f "$temporary"
+        echo "T3: could not build the close-button setting; launching with normal controls." >&2
+    fi
+fi
+if [[ -f "$module" ]]; then
+    export GTK_MODULES="${GTK_MODULES:+$GTK_MODULES:}$module"
+fi
+# T3 uses this supported override when registering its t3code:// URL handler.
+export T3CODE_DESKTOP_LAUNCHER_PATH="$HOME/.local/bin/t3"
+
+nohup env DISPLAY="${DISPLAY:-:0}" "$appimage" --no-sandbox "$@" >/dev/null 2>&1 &
+echo "T3 Code launched (PID $!)"

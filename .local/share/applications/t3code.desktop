@@ -1,0 +1,11 @@
+[Desktop Entry]
+Name=T3 Code
+Comment=Desktop GUI for coding agents (Codex, Claude, OpenCode)
+Exec=/home/elhaam/.local/bin/t3 %U
+Icon=/home/elhaam/.local/share/icons/t3code.png
+StartupWMClass=t3code
+Terminal=false
+Type=Application
+Categories=Development;
+StartupNotify=true
+MimeType=x-scheme-handler/t3code;text/html;

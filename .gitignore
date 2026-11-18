@@ -6,6 +6,7 @@
 !/.local/share/applications/
 /.local/share/applications/*
 !/.local/share/applications/slack_slack.desktop
+!/.local/share/applications/t3code.desktop
 tmp
 installation_id
 oauth_creds*
