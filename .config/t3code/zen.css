@@ -1,5 +1,16 @@
-/* Keep the floating sidebar toggle available while hiding top-bar controls.
-   Sidebar, terminal, details and browser visibility remain app-owned. */
-:root :is([data-chat-header],[data-workspace-titlebar-controls]) {
+/* Lift the title row out of the layout, keeping the thread-details anchor.
+   Panel shortcuts and open states stay app-owned. */
+[data-chat-header] {
+  position: absolute;
+  width: 100%;
+  background: transparent !important;
+  pointer-events: none;
+}
+[data-chat-header]>:not([data-workspace-titlebar-controls]) {
+  display: none;
+}
+/* Hide the three panel toggles without removing the details popover anchor
+   or changing the workspace sheet's full-height layout. */
+[data-panel-layout-controls] {
   display: none !important;
 }

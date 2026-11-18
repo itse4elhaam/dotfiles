@@ -48,9 +48,10 @@ backup mechanism for this configuration.
 - **Ctrl+Alt+L** opens or closes the right panel, including from its browser.
 - **Ctrl+Alt+A** opens T3's theme picker if the desktop shortcut is unavailable.
 
-The default `zen-mode` theme hides top-bar controls and keeps the floating
-sidebar toggle visible. Panels retain their
-native shortcuts, open states, and sizes. `t3-zen on`, `off`, and `status` also
+The default `zen-mode` theme hides the title row and the three panel buttons,
+and keeps the floating left sidebar toggle visible. **Ctrl+Shift+B** toggles thread
+details in Zen as usual, including its popover on narrow windows. Panels retain
+their native shortcuts, open states, and sizes. `t3-zen on`, `off`, and `status` also
 work from a terminal. The previous theme is remembered in
 `~/.local/state/t3-zen/restore.json`; setup seeds it from `restoreThemeId` only
 when absent. Theme switching affects browser clients served by the same T3
@@ -67,4 +68,24 @@ sidebar glass reflections and lets the PR list fill its available pane.
 ```bash
 python3 -m unittest discover -s tests -p test_t3_config.py -v
 ~/dotfiles/scripts/setup-t3-config --check
+```
+
+## Native close button
+
+The dotfiles `t3` launcher hides Electron's native caption buttons only in T3.
+It builds `.config/t3code/no-close.c` with the system C compiler on first launch
+and caches the GTK module under `~/.cache/t3code/`. Other applications keep
+GNOME's normal button layout, including editors and browsers started by T3.
+If compilation fails, T3 launches with normal controls and prints a warning.
+
+Setup links `~/.local/bin/t3` and the desktop launcher into this checkout.
+The launcher also sets `T3CODE_DESKTOP_LAUNCHER_PATH`, so T3 registers its URL
+handler through the same launcher. This applies after quitting and reopening
+T3; setup does not interrupt running work. Alt+F4 and the app's Quit command
+remain available. Launching an AppImage directly bypasses this setting.
+
+Check the launcher without opening T3:
+
+```bash
+python3 -m unittest discover -s tests -p test_t3_launcher.py -v
 ```
