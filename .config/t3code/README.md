@@ -48,8 +48,10 @@ backup mechanism for this configuration.
 - **Ctrl+Alt+L** opens or closes the right panel, including from its browser.
 - **Ctrl+Alt+A** opens T3's theme picker if the desktop shortcut is unavailable.
 
-The default `zen-mode` theme hides the title row and the three panel buttons,
-and keeps the floating left sidebar toggle visible. **Ctrl+Shift+B** toggles thread
+The default `zen-mode` theme hides the title row and keeps the floating left
+sidebar toggle visible. It hides the panel buttons while the right panel is
+closed. While the panel is open, its terminal and close buttons stay in the
+panel header beside maximize. **Ctrl+Shift+B** toggles thread
 details in Zen as usual, including its popover on narrow windows. Panels retain
 their native shortcuts, open states, and sizes. `t3-zen on`, `off`, and `status` also
 work from a terminal. The previous theme is remembered in
@@ -60,14 +62,23 @@ environment as well as this machine's desktop app.
 Run `t3-wallpaper-layout` to refresh the shared wallpaper CSS on normal themes.
 It preserves backups and supports `--dry-run`. Re-select the theme afterward.
 Themes must fit T3's 50,000-character CSS limit. The largest deer wallpaper may
-use the app's default corner radii to fit that limit. The shared CSS also adds
-sidebar glass reflections and lets the PR list fill its available pane.
+use the app's default corner radii to fit that limit. Deer is the tightest
+theme, so check its size after adding shared rules. The shared CSS also does the
+following:
+
+- Adds glass reflections to the sidebar and the right panel, including the panel
+  in the narrow-window sheet. Browser pages, diffs, PR details and terminals
+  keep their opaque content.
+- Shows the wallpaper behind the PR and issue lists.
+- Lets the PR list fill its available pane.
 
 The script paints the wallpaper as the page body's fixed background. Do not
 isolate `[data-slot=sidebar-wrapper]` or give it a negative-z layer. Desktop
 browser views are fixed layers mounted outside that wrapper. An isolated
 wrapper puts the right panel's resize edge and the floating preview's close
-and resize controls beneath the page.
+and resize controls beneath the page. For the same reason, blur the panel's
+content (`[data-preview-panel-mode]>:last-child`), never the panel root that
+holds the resize edge.
 
 ## Verification
 

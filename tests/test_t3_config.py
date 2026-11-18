@@ -4,6 +4,7 @@ import importlib.machinery
 import importlib.util
 import json
 from pathlib import Path
+import re
 import runpy
 import tempfile
 import unittest
@@ -94,11 +95,16 @@ class WallpaperStackingTests(unittest.TestCase):
                              "var(--td-wallpaper) center/cover no-repeat fixed!important}")
 
     def test_tracked_themes_keep_panel_controls_above_browser_views(self):
+        panel_root = re.compile(r"\[data-preview-panel-mode(?:=[\w-]+)?\](?=[,){])")
         for path in sorted((ROOT / ".config/t3code/themes").glob("*.json")):
             css = json.loads(path.read_text()).get("css", "")
             self.assertLessEqual(len(css), 50_000, path.name)
             self.assertNotIn("isolation:isolate", css, path.name)
             self.assertNotIn("sidebar-wrapper]::before", css, path.name)
+            # backdrop-filter on the panel root would trap its resize edge.
+            for selector, body in re.findall(r"([^{}]+)\{([^{}]*)\}", css):
+                if "backdrop-filter" in body:
+                    self.assertIsNone(panel_root.search(selector), f"{path.name}: {selector}")
 
 
 if __name__ == "__main__":
