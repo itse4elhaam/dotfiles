@@ -9,8 +9,10 @@
 [data-chat-header]>:not([data-workspace-titlebar-controls]) {
   display: none;
 }
-/* Hide the three panel toggles without removing the details popover anchor
-   or changing the workspace sheet's full-height layout. */
-[data-panel-layout-controls] {
+/* Hide the panel toggles without removing the details popover anchor or
+   changing the workspace sheet's full-height layout. While the right panel is
+   open, keep its group (terminal and close) in the panel header. With the
+   panel closed, the group would sit on the thread-details card. */
+[data-panel-layout-controls]:not(:has([data-right-panel-toggle][data-pressed])) {
   display: none !important;
 }
