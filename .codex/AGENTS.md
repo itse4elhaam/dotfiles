@@ -11,7 +11,7 @@ Keep Codex fast mode disabled. Do not enable fast mode, set `service_tier` to `f
 
 ## Claude usage
 
-The user explicitly lifted the Claude ban on 2026-11-17. Claude is permitted. Keep the existing quota usage guard enabled.
+The user explicitly lifted the Claude ban on 2026-11-17. Claude is permitted. The user paused the Claude usage guard (`claude-usage-guard.timer`) on 2026-11-18. Leave it disabled until they ask to turn it back on.
 
 ## Finish one-shot tickets and side-ships
 
