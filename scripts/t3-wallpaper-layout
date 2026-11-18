@@ -42,6 +42,20 @@ def compact_css(css):
     return re.sub(r'([~|^$*]?=)"([a-zA-Z_][a-zA-Z0-9_-]*)"\]', r'\1\2]', result)
 
 
+def paint_wallpaper_on_body(css):
+    # Desktop browser views are fixed layers mounted outside the sidebar
+    # wrapper. Isolating the wrapper put the right panel's resize edge and the
+    # floating preview's close and resize controls beneath those layers. Body
+    # paint keeps T3's stacking and still covers parked z-index:-1 views.
+    css = css.replace(".dark [data-slot=sidebar-wrapper]{isolation:isolate;", ".dark [data-slot=sidebar-wrapper]{")
+    return re.sub(
+        r'\.dark \[data-slot=sidebar-wrapper\]::before\{[^{}]*?'
+        r'(linear-gradient\((?:[^()]|\((?:[^()]|\([^()]*\))*\))*\))[^{}]*\}',
+        r'.dark body{background:\1 fixed,var(--td-wallpaper) center/cover no-repeat fixed!important}',
+        css,
+    )
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--themes-dir", type=Path, default=Path.home() / ".t3/userdata/themes")
@@ -62,6 +76,7 @@ def main():
         # Chromium supports backdrop-filter. Drop redundant prefixed copies
         # to keep embedded wallpaper themes below the app's CSS limit.
         css = re.sub(r'-webkit-backdrop-filter:[^;{}]*;', "", css)
+        css = paint_wallpaper_on_body(css)
         # Replace old header styling with the shared rule below the marker.
         css = re.sub(r'\.dark \[data-chat-header\]\s*\{[^{}]*\}', "", css)
         updated = compact_css(css) + "\n" + marker + "\n" + rules + "\n"

@@ -2,7 +2,9 @@
 
 import importlib.machinery
 import importlib.util
+import json
 from pathlib import Path
+import runpy
 import tempfile
 import unittest
 
@@ -74,6 +76,29 @@ class ConfigLinksTests(unittest.TestCase):
         with self.assertRaises(SystemExit):
             setup.install_links(self.links, self.backup)
         self.assertEqual(destination.read_text(), "local changes")
+
+
+class WallpaperStackingTests(unittest.TestCase):
+    """Desktop browser views are fixed layers outside the sidebar wrapper."""
+
+    def test_rewrite_moves_both_wallpaper_forms_onto_body(self):
+        rewrite = runpy.run_path(str(ROOT / "scripts/t3-wallpaper-layout"))["paint_wallpaper_on_body"]
+        wrapper = ".dark [data-slot=sidebar-wrapper]{isolation:isolate;background:#0000!important}"
+        layer = ".dark [data-slot=sidebar-wrapper]::before{content:\"\";position:fixed;inset:0;z-index:-1;"
+        gradient = "linear-gradient(rgb(26 27 38/var(--td-shade)),rgb(26 27 38/.84))"
+        for paint in (f"background:{gradient},var(--td-wallpaper) center/cover no-repeat}}",
+                      f"background-image:{gradient},var(--td-wallpaper);background-size:cover}}"):
+            self.assertEqual(rewrite(wrapper + layer + paint),
+                             ".dark [data-slot=sidebar-wrapper]{background:#0000!important}"
+                             f".dark body{{background:{gradient} fixed,"
+                             "var(--td-wallpaper) center/cover no-repeat fixed!important}")
+
+    def test_tracked_themes_keep_panel_controls_above_browser_views(self):
+        for path in sorted((ROOT / ".config/t3code/themes").glob("*.json")):
+            css = json.loads(path.read_text()).get("css", "")
+            self.assertLessEqual(len(css), 50_000, path.name)
+            self.assertNotIn("isolation:isolate", css, path.name)
+            self.assertNotIn("sidebar-wrapper]::before", css, path.name)
 
 
 if __name__ == "__main__":

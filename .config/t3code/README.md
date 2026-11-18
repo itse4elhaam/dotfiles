@@ -63,6 +63,12 @@ Themes must fit T3's 50,000-character CSS limit. The largest deer wallpaper may
 use the app's default corner radii to fit that limit. The shared CSS also adds
 sidebar glass reflections and lets the PR list fill its available pane.
 
+The script paints the wallpaper as the page body's fixed background. Do not
+isolate `[data-slot=sidebar-wrapper]` or give it a negative-z layer. Desktop
+browser views are fixed layers mounted outside that wrapper. An isolated
+wrapper puts the right panel's resize edge and the floating preview's close
+and resize controls beneath the page.
+
 ## Verification
 
 ```bash
