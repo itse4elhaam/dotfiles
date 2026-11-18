@@ -107,5 +107,46 @@ class WallpaperStackingTests(unittest.TestCase):
                     self.assertIsNone(panel_root.search(selector), f"{path.name}: {selector}")
 
 
+class ThemeBuildTests(unittest.TestCase):
+    """Shared theme rules must stay inside T3's 50,000-character CSS limit."""
+
+    def setUp(self):
+        self.layout = runpy.run_path(str(ROOT / "scripts/t3-wallpaper-layout"))
+
+    def test_compaction_drops_comment_gaps_and_shortens_transparent(self):
+        compact = self.layout["compact_css"]
+        self.assertEqual(compact("a{color:red}\n/* note */\nb {border-color: transparent;}\n"),
+                         "a{color:red}b{border-color:#0000}")
+        self.assertEqual(compact('a[aria-label="Copy message"] , b{x:1}'),
+                         'a[aria-label="Copy message"],b{x:1}')
+
+    def test_details_popover_rewrite_targets_only_popup_glass(self):
+        rewrite = self.layout["keep_details_popover_unpainted"]
+        glass = ".dark [data-slot=dialog-popup],.dark [data-slot=popover-popup],.dark [data-slot=menu-popup]{background:red}"
+        others = (".dark [data-slot=popover-popup],.dark [data-slot=menu-popup]{border-radius:16px}"
+                  ".dark [data-slot=popover-popup] [class*=bg-card]{background:none}")
+        once = rewrite(glass + others)
+        self.assertEqual(once, glass.replace("popover-popup]", "popover-popup]:not([data-workspace-area])") + others)
+        self.assertEqual(rewrite(once), once)
+
+    def test_tracked_wallpaper_themes_leave_details_popover_unpainted(self):
+        # The narrow-window details card paints its own glass inside a popover.
+        for path in sorted((ROOT / ".config/t3code/themes").glob("*.json")):
+            css = json.loads(path.read_text()).get("css", "")
+            if "--td-wallpaper:" not in css:
+                continue
+            glass = [selector for selector, body in re.findall(r"([^{}]+)\{([^{}]*)\}", css)
+                     if "popover-popup" in selector and "backdrop-filter" in body]
+            self.assertTrue(glass, path.name)
+            for selector in glass:
+                self.assertIn("[data-slot=popover-popup]:not([data-workspace-area])", selector, path.name)
+
+    def test_tracked_zen_theme_matches_its_build(self):
+        build = runpy.run_path(str(ROOT / "scripts/t3-zen"))["build_theme"]
+        themes = ROOT / ".config/t3code/themes"
+        forest = json.loads((themes / "tokyo-drift-forest.json").read_text())
+        self.assertEqual(build(forest), json.loads((themes / "zen-mode.json").read_text()))
+
+
 if __name__ == "__main__":
     unittest.main()
