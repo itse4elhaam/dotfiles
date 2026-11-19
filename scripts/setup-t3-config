@@ -22,6 +22,8 @@ def config_links(repo, home, t3_home):
         (repo / ".local/share/applications/t3code.desktop", home / ".local/share/applications/t3code.desktop"),
         (repo / "scripts/t3-zen", home / ".local/bin/t3-zen"),
         (repo / "scripts/t3-wallpaper-layout", home / ".local/bin/t3-wallpaper-layout"),
+        (repo / "scripts/t3-double-ctrl", home / ".local/bin/t3-double-ctrl"),
+        (repo / "scripts/t3-double-ctrl.service", home / ".config/systemd/user/t3-double-ctrl.service"),
     ]
 
 
@@ -99,6 +101,13 @@ def main():
             subprocess.run([sys.executable, str(repo / "scripts/t3-zen"), "install"], check=True)
         else:
             print("Run t3-zen install from the GNOME X11 desktop to register Ctrl+Alt+Z.")
+        if home == Path.home() and os.environ.get("XDG_SESSION_TYPE") == "x11" and shutil.which("systemctl"):
+            # Double-tap Ctrl for dictation. restart picks up an updated script.
+            subprocess.run(["systemctl", "--user", "daemon-reload"], check=True)
+            subprocess.run(["systemctl", "--user", "enable", "t3-double-ctrl.service"], check=True)
+            subprocess.run(["systemctl", "--user", "restart", "t3-double-ctrl.service"], check=True)
+        else:
+            print("Run systemctl --user enable --now t3-double-ctrl.service from the X11 desktop.")
     if not args.skip_theme:
         cli = home / ".t3/bin/t3"
         if cli.is_file():

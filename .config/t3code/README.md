@@ -9,6 +9,8 @@ keybindings, client preferences, and CSS. T3 reads them through these links:
 ~/.t3/userdata/client-settings.json  -> ~/dotfiles/.config/t3code/client-settings.json
 ~/.local/bin/t3-zen                 -> ~/dotfiles/scripts/t3-zen
 ~/.local/bin/t3-wallpaper-layout     -> ~/dotfiles/scripts/t3-wallpaper-layout
+~/.local/bin/t3-double-ctrl          -> ~/dotfiles/scripts/t3-double-ctrl
+~/.config/systemd/user/t3-double-ctrl.service -> ~/dotfiles/scripts/t3-double-ctrl.service
 ```
 
 Install or verify the links:
@@ -80,10 +82,30 @@ and resize controls beneath the page. For the same reason, blur the panel's
 content (`[data-preview-panel-mode]>:last-child`), never the panel root that
 holds the resize edge.
 
+## Voice dictation shortcuts
+
+**Ctrl+Shift+D** and a **double tap of Ctrl** both start dictation, and stop it
+while it records. T3's keybindings need a non-modifier key, so the double tap
+comes from the `t3-double-ctrl` user service. It watches X11 key events without
+grabbing any. When a T3 window is focused, it sends the existing Ctrl+Shift+D
+shortcut, which T3 handles as usual outside the terminal.
+
+Both taps must be on the same Ctrl key, each held under 250 ms, with the second
+ending within 400 ms of the first. Any other key or mouse button in between
+cancels, so Ctrl+C, Ctrl+click and a held Ctrl never trigger it. It works on
+X11 only. Setup enables the service; `--skip-shortcut` leaves it alone.
+
+```bash
+systemctl --user status t3-double-ctrl.service
+journalctl --user -u t3-double-ctrl.service -n 20   # one line per trigger
+systemctl --user disable --now t3-double-ctrl.service
+```
+
 ## Verification
 
 ```bash
 python3 -m unittest discover -s tests -p test_t3_config.py -v
+python3 -m unittest discover -s tests -p test_t3_double_ctrl.py -v
 ~/dotfiles/scripts/setup-t3-config --check
 ```
 
