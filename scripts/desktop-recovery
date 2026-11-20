@@ -159,19 +159,15 @@ def edge_inventory(sessions, current):
     """Correlate saved browser windows with X11 windows without logging titles."""
     if len(sessions) != len(current):
         return None
-    available = list(current)
     assignments = {}
     for session in sessions:
-        candidates = [w for w in available if session['selected_title']
+        candidates = [w for w in current if session['selected_title']
                       and w['title'].startswith(session['selected_title'])]
         if len(candidates) != 1:
             candidates = [w for w in candidates if edge_title_tab_count(w['title']) == session['tabs']]
-        if len(candidates) != 1:
-            candidates = [w for w in candidates if w['workspace'] == session['workspace']]
-        if len(candidates) != 1:
+        if len(candidates) != 1 or candidates[0]['id'] in assignments:
             return None
         window = candidates[0]
-        available.remove(window)
         assignments[window['id']] = session
     return assignments
 
@@ -294,9 +290,10 @@ def recover_edge():
     if not existing:
         launch('microsoft-edge', '--profile-directory=Default', '--restore-last-session')
     if baseline_file is None:
-        _, saved = edge_snapshot()
-        settled = wait_for_windows(match, 2, lambda current: len(current) >= len(saved),
-                                   15, stage='edge_reuse')
+        def ready_existing(current):
+            _, saved = edge_snapshot()
+            return bool(edge_inventory(saved, current))
+        settled = wait_for_windows(match, 2, ready_existing, 15, stage='edge_reuse')
     else:
         baseline = Path(baseline_file)
         saved = edge_sessions(baseline.read_bytes())
@@ -393,14 +390,16 @@ def place(window, workspace, monitor):
 
 def attached_tmux_windows(ghostty_windows):
     try:
-        clients = run('tmux', 'list-clients', '-F', '#{client_pid}').splitlines()
+        clients = run('tmux', 'list-clients', '-F',
+                      '#{client_pid}\t#{session_name}\t#{window_index}\t#{pane_index}\t#{window_zoomed_flag}').splitlines()
     except subprocess.CalledProcessError:
         return []
-    ancestors = set()
+    ancestry = {}
     for client in clients:
-        pid = int(client)
-        while pid > 1 and pid not in ancestors:
-            ancestors.add(pid)
+        identifier, state = client.split('\t', 1)
+        pid = int(identifier)
+        while pid > 1:
+            ancestry.setdefault(pid, set()).add(state)
             try:
                 pid = int(Path(f'/proc/{pid}/stat').read_text().rsplit(')', 1)[1].split()[1])
             except FileNotFoundError:
@@ -412,9 +411,12 @@ def attached_tmux_windows(ghostty_windows):
         except subprocess.CalledProcessError:
             continue
         match = re.search(r'= (\d+)$', prop)
-        if match and int(match[1]) in ancestors:
-            candidates.setdefault(int(match[1]), []).append(window)
-    return [group[0] for group in candidates.values() if len(group) == 1]
+        if match and int(match[1]) in ancestry:
+            pid = int(match[1])
+            candidates.setdefault(pid, []).append(dict(window, tmux_views=ancestry[pid]))
+    if any(len(group) != 1 for group in candidates.values()):
+        raise RuntimeError('ghostty_tmux_window_ambiguous')
+    return [group[0] for group in candidates.values()]
 
 
 def tmux_layout():
@@ -437,7 +439,8 @@ def recover_ghostty(match, workspace, monitor):
     live_layout = tmux_layout()
     expected = live_layout or saved_tmux_layout()
     existing = [w for w in windows() if match(w)]
-    if existing and not attached_tmux_windows(existing):
+    attached_before = {w['id']: w['tmux_views'] for w in attached_tmux_windows(existing)}
+    if existing and not attached_before:
         raise RuntimeError('ghostty_has_no_tmux_client')
     if not existing:
         # Put the server and its pane processes in their own unit so they
@@ -458,7 +461,9 @@ def recover_ghostty(match, workspace, monitor):
         attached = attached_tmux_windows(found)
         return target_ids == {w['id'] for w in attached} and all(
             w['workspace'] == workspace and on_monitor(w, monitor) for w in attached
-        ) and expected <= tmux_layout()
+        ) and expected <= tmux_layout() and all(
+            attached_before.get(w['id'], w['tmux_views']) == w['tmux_views'] for w in attached
+        )
     wait_for_windows(match, 0.4, placed, 5, stage='ghostty_placement_and_zoom')
     LOG.info('event=tmux_verified expected_panes=%d', len(expected))
     return current

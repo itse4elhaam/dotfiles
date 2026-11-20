@@ -63,10 +63,11 @@ same_title = [dict(windows[0], id='seven', title='Mail and 6 more pages - Micros
 same_saved = [dict(workspace=0, selected_title='Mail', tabs=10),
               dict(workspace=1, selected_title='Mail', tabs=7)]
 assert r['edge_inventory'](same_saved, same_title) == {'ten': same_saved[0], 'seven': same_saved[1]}
+assert r['edge_inventory']([dict(item, tabs=7) for item in same_saved], same_title) is None
 
 # Cold Ghostty starts the tmux server in a separate unit and only attaches.
 g = r['recover_ghostty'].__globals__
-ghost = dict(windows[0], workspace=3, x=monitors[0]['x'], y=monitors[0]['y'])
+ghost = dict(windows[0], workspace=3, x=monitors[0]['x'], y=monitors[0]['y'], tmux_views={'main\t1\t1\t0'})
 launches = []
 with patch.dict(g, {'tmux_layout': lambda: set(), 'saved_tmux_layout': lambda: set(),
                     'windows': lambda: [] if not launches else [ghost],
