@@ -22,8 +22,14 @@ def compact_css(css):
         # Modern RGB syntax keeps exact alpha values with fewer characters.
         value = re.sub(r"rgba\(([\d.]+),([\d.]+),([\d.]+),", r"rgb(\1 \2 \3/", value)
         value = re.sub(r"\s*>\s*", ">", value)
-        tokens[index] = re.sub(r"(?<=[{;])([\w-]+):\s+", r"\1:", value).replace("background:transparent", "background:#0000").replace(";}", "}")
+        value = re.sub(r"(?<=[{;])([\w-]+):\s+", r"\1:", value)
+        tokens[index] = re.sub(r":transparent(?=[;}!])", ":#0000", value).replace(";}", "}")
     result = "".join(tokens).strip()
+    # Removed comments leave spaces at rule boundaries; drop them too.
+    parts = re.split(r'''("(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*')''', result)
+    for index in range(0, len(parts), 2):
+        parts[index] = re.sub(r"\s*([{};,])\s*", r"\1", re.sub(r"\s+", " ", parts[index]))
+    result = "".join(parts)
     # Share action visibility instead of repeating long label selectors.
     pattern = (
         r'\[data-message-role\] (button:is\([^{}]+\))\{opacity:0\s*!important;?\}'
@@ -56,6 +62,17 @@ def paint_wallpaper_on_body(css):
     )
 
 
+def keep_details_popover_unpainted(css):
+    # Narrow windows show thread details in a popover whose card paints its
+    # own glass. Painting the popover too draws a second frame around it.
+    # Other popovers are not workspace areas and keep the shared glass.
+    return re.sub(
+        r'\.dark \[data-slot=popover-popup\](?=,[^{}]*\{background:)',
+        '.dark [data-slot=popover-popup]:not([data-workspace-area])',
+        css,
+    )
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--themes-dir", type=Path, default=Path.home() / ".t3/userdata/themes")
@@ -76,7 +93,7 @@ def main():
         # Chromium supports backdrop-filter. Drop redundant prefixed copies
         # to keep embedded wallpaper themes below the app's CSS limit.
         css = re.sub(r'-webkit-backdrop-filter:[^;{}]*;', "", css)
-        css = paint_wallpaper_on_body(css)
+        css = keep_details_popover_unpainted(paint_wallpaper_on_body(css))
         # Replace old header styling with the shared rule below the marker.
         css = re.sub(r'\.dark \[data-chat-header\]\s*\{[^{}]*\}', "", css)
         updated = compact_css(css) + "\n" + marker + "\n" + rules + "\n"

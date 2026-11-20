@@ -16,3 +16,8 @@
 [data-panel-layout-controls]:not(:has([data-right-panel-toggle][data-pressed])) {
   display: none !important;
 }
+/* The PR and issue pages keep their title, without an opaque band over the
+   wallpaper. */
+.dark :is([data-workspace-area="pull-requests"],[class*="issue-list"])>header {
+  background: transparent !important;
+}

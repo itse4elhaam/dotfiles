@@ -52,7 +52,8 @@ The default `zen-mode` theme hides the title row and keeps the floating left
 sidebar toggle visible. It hides the panel buttons while the right panel is
 closed. While the panel is open, its terminal and close buttons stay in the
 panel header beside maximize. **Ctrl+Shift+B** toggles thread
-details in Zen as usual, including its popover on narrow windows. Panels retain
+details in Zen as usual, including its popover on narrow windows. Zen also
+drops the opaque title band on the PR and Issues pages. Panels retain
 their native shortcuts, open states, and sizes. `t3-zen on`, `off`, and `status` also
 work from a terminal. The previous theme is remembered in
 `~/.local/state/t3-zen/restore.json`; setup seeds it from `restoreThemeId` only
@@ -71,6 +72,8 @@ following:
   keep their opaque content.
 - Shows the wallpaper behind the PR and issue lists.
 - Lets the PR list fill its available pane.
+- Leaves the thread-details popover unpainted on narrow windows. Its card
+  already has glass, so painting the popover drew a second frame around it.
 
 The script paints the wallpaper as the page body's fixed background. Do not
 isolate `[data-slot=sidebar-wrapper]` or give it a negative-z layer. Desktop
