@@ -1,0 +1,152 @@
+#!/usr/bin/env python3
+"""Reuse the primary checkout's installed dependencies in new linked worktrees."""
+
+import json
+import os
+from pathlib import Path
+import subprocess
+import sys
+
+
+DOTFILES = Path(__file__).resolve().parents[1]
+HOOK = Path(".config/git/templates/hooks/post-checkout")
+LOCKFILES = {"package-lock.json", "npm-shrinkwrap.json", "pnpm-lock.yaml", "yarn.lock", "bun.lock", "bun.lockb"}
+SETTINGS = (
+    ".npmrc", ".yarnrc", ".yarnrc.yml", "bunfig.toml", ".node-version", ".nvmrc",
+    ".tool-versions", "mise.toml", ".mise.toml", "pnpm-workspace.yaml",
+)
+LOCAL_PROTOCOLS = ("file:", "link:", "portal:", "workspace:", "patch:")
+
+
+def git(cwd, *args, check=True):
+    return subprocess.run(
+        ["git", "-C", cwd, *args], stdout=subprocess.PIPE, check=check,
+    )
+
+
+def current_worktree(cwd):
+    result = git(cwd, "rev-parse", "--path-format=absolute", "--show-toplevel", "--git-dir", "--git-common-dir")
+    root, admin, common = map(Path, os.fsdecode(result.stdout).splitlines())
+    if admin == common:
+        return root, None
+    records = git(cwd, "worktree", "list", "--porcelain").stdout.splitlines()
+    if records[1] == b"bare":
+        return root, None
+    primary = Path(os.fsdecode(records[0].removeprefix(b"worktree ")))
+    return root, primary
+
+
+def same_files(left, right, names):
+    for name in names:
+        a, b = left / name, right / name
+        if a.is_symlink() or b.is_symlink():
+            return False
+        if a.exists() != b.exists() or (a.exists() and a.read_bytes() != b.read_bytes()):
+            return False
+    return True
+
+
+def has_local_dependencies(manifest):
+    if manifest.get("workspaces") or manifest.get("patchedDependencies"):
+        return True
+    for section in ("dependencies", "devDependencies", "optionalDependencies", "peerDependencies"):
+        if any(version.startswith(LOCAL_PROTOCOLS) for version in manifest.get(section, {}).values()):
+            return True
+    return False
+
+
+def is_compatible(root, primary, package):
+    for relative in (package, *package.parents):
+        left, right = root / relative, primary / relative
+        if left.resolve() != left or right.resolve() != right:
+            return False
+        if not same_files(left, right, ("package.json", *LOCKFILES, *SETTINGS)):
+            return False
+        if (left / "pnpm-workspace.yaml").exists():
+            return False
+        deps = left / "package.json"
+        if deps.is_file() and has_local_dependencies(json.loads(deps.read_bytes())):
+            return False
+    return (root / package / "package.json").is_file()
+
+
+def links_stay_inside(directory):
+    for entry in directory.iterdir():
+        if entry.is_symlink() and not entry.resolve().is_relative_to(directory):
+            return False
+        if entry.name.startswith("@") and entry.is_dir() and not entry.is_symlink():
+            if any(child.is_symlink() and not child.resolve().is_relative_to(directory) for child in entry.iterdir()):
+                return False
+    return True
+
+
+def checkout(cwd):
+    root, primary = current_worktree(cwd)
+    if primary is None or git(root, "config", "--bool", "--get", "worktreeDeps.share", check=False).stdout == b"false\n":
+        return
+
+    tracked = git(root, "ls-files", "-z").stdout.split(b"\0")
+    packages = {Path(os.fsdecode(path)).parent for path in tracked if Path(os.fsdecode(path)).name in LOCKFILES}
+    for package in sorted(packages):
+        target = root / package / "node_modules"
+        source = primary / package / "node_modules"
+        try:
+            if target.exists() or target.is_symlink() or not source.is_dir() or source.is_symlink():
+                continue
+            relative_target = target.relative_to(root)
+            if git(root, "check-ignore", "-q", "--", relative_target, check=False).returncode:
+                continue
+            if git(root, "ls-files", "-z", "--", relative_target).stdout:
+                continue
+            if is_compatible(root, primary, package) and links_stay_inside(source):
+                target.symlink_to(source, target_is_directory=True)
+        except FileExistsError:
+            continue
+        except (OSError, ValueError, AttributeError, RuntimeError) as error:
+            print(f"worktree-deps: skipped {target}: {error}", file=sys.stderr)
+
+
+def install_hook(cwd):
+    if git(cwd, "config", "--get", "core.hooksPath", check=False).returncode == 0:
+        raise ValueError("repository sets core.hooksPath. Call the post-checkout hook from its existing hook directory")
+    common = Path(os.fsdecode(git(cwd, "rev-parse", "--path-format=absolute", "--git-common-dir").stdout.rstrip(b"\n")))
+    destination = common / "hooks" / "post-checkout"
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    source = DOTFILES / HOOK
+    if destination.is_symlink() and destination.resolve() == source:
+        return
+    if destination.is_file() and destination.read_bytes() == source.read_bytes() and os.access(destination, os.X_OK):
+        return
+    destination.symlink_to(source)
+
+
+def local_install(cwd, command):
+    root, primary = current_worktree(cwd)
+    target = cwd / "node_modules"
+    if target.is_symlink():
+        expected = primary / cwd.relative_to(root) / "node_modules" if primary else None
+        if expected is None or Path(os.readlink(target)) != expected or target.resolve() != expected:
+            raise ValueError(f"expected a link to the primary worktree's node_modules at {target}")
+        target.unlink()
+    os.execvp(command[0], command)
+
+
+def main(args):
+    try:
+        if args == ["checkout"]:
+            checkout(Path.cwd())
+        elif args and args[0] == "install-hook" and len(args) <= 2:
+            install_hook(Path(args[1]) if len(args) == 2 else Path.cwd())
+        elif len(args) > 1 and args[0] == "install":
+            local_install(Path.cwd(), args[1:])
+        else:
+            print("usage: worktree-deps {install-hook [repo] | install <command> [args...]}", file=sys.stderr)
+            return 2
+    except (OSError, ValueError, subprocess.CalledProcessError) as error:
+        print(f"worktree-deps: {error}", file=sys.stderr)
+        return 0 if args == ["checkout"] else 1
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

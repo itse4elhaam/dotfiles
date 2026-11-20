@@ -1,7 +1,5 @@
-[post-start]
-copy = "wt step copy-ignored"
-
 [post-create]
+dependencies = '"$HOME/dotfiles/scripts/worktree-deps" checkout'
 tmux = "$HOME/dotfiles/scripts/wt-setup '{{ worktree_path }}'"
 
 [post-switch]
