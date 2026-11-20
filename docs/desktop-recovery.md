@@ -46,15 +46,15 @@ When no regular Edge window exists, the script backs up the Default profile's
 before either PWA. Existing browser windows are reused. Recovery never sends
 Ctrl+Shift+T, closes browser windows, or overwrites Edge's session files.
 
-Before a cold launch, recovery records the saved window and tab counts by
+Before a cold launch, recovery records the saved tab identities by
 workspace from the newest `Session_*` file. It waits for a fresh browser
 session record with the same inventory and five seconds of stable X11 window
-geometry. Recovery also checks that the restored windows match the recorded
-workspaces. Edge places its own windows. A pending restore keeps its original
+geometry. Recovery matches the restored windows and verifies their original
+workspaces, moving a window only when its original workspace is known. A pending restore keeps its original
 baseline across retries. Existing Edge sessions without a pending restore
 keep their current workspaces and get a short settling check.
 
-If recovery cannot verify a pending restore within 60 seconds, it stops
+If recovery cannot verify a pending restore within five minutes, it stops
 before launching the other apps. Check Edge and retry Recover. The browser
 session inventory counts restored tabs, including tabs Edge defers loading.
 

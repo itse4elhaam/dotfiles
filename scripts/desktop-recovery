@@ -103,7 +103,9 @@ def edge_sessions(data):
                 characters = struct.unpack_from('<i', payload, pos)[0]
                 if 0 <= characters <= (len(payload) - pos - 4) // 2:
                     title = payload[pos + 4:pos + 4 + characters * 2].decode('utf-16-le', errors='replace')
-            tab(tid)['nav'][index] = title
+            # Keep identities in memory only. Session URLs may contain private data.
+            identity = hashlib.sha256(payload[16:16 + length]).digest()
+            tab(tid)['nav'][index] = (title, identity)
         elif command in (16, 17) and len(payload) >= 4:
             identifier = struct.unpack_from('<i', payload)[0]
             if command == 16:
@@ -133,8 +135,9 @@ def edge_sessions(data):
         if not members:
             continue
         entries = [(t, t['nav'][min(t['nav'], key=lambda i: abs(i - t['selected']))]) for t in members]
-        selected = next((entry for t, entry in entries if t['index'] == session['selected']), '')
-        result.append(dict(workspace=session['workspace'], selected_title=selected, tabs=len(entries)))
+        selected = next((entry[0] for t, entry in entries if t['index'] == session['selected']), '')
+        result.append(dict(workspace=session['workspace'], selected_title=selected, tabs=len(entries),
+                           tab_ids=tuple(sorted(entry[1] for _, entry in entries))))
     return result
 
 
@@ -283,11 +286,16 @@ def recover_edge():
     if not existing:
         launch('microsoft-edge', '--profile-directory=Default', '--restore-last-session')
     if baseline_file is None:
-        settled = wait_for_windows(match, 2, lambda _: True, 15, stage='edge_reuse')
+        _, saved = edge_snapshot()
+        settled = wait_for_windows(match, 2, lambda current: len(current) >= len(saved),
+                                   15, stage='edge_reuse')
     else:
         baseline = Path(baseline_file)
         saved = edge_sessions(baseline.read_bytes())
-        expected = Counter((s['workspace'], s['tabs']) for s in saved)
+        expected = Counter(s['tab_ids'] for s in saved)
+        saved_workspaces = {}
+        for session in saved:
+            saved_workspaces.setdefault(session['tab_ids'], []).append(session['workspace'])
         LOG.info('event=edge_snapshot expected_windows=%d saved_tabs=%d',
                  len(saved), sum(s['tabs'] for s in saved))
         inventory = None
@@ -306,17 +314,31 @@ def recover_edge():
             if latest.name <= baseline.name:
                 reason = 'waiting_for_fresh_inventory'
                 return False
-            if Counter((s['workspace'], s['tabs']) for s in live) != expected:
+            if Counter(s['tab_ids'] for s in live) != expected:
                 reason = 'workspace_or_tab_inventory'
                 return False
             inventory = edge_inventory(live, current)
-            if not inventory or any(inventory[w['id']]['workspace'] != w['workspace'] for w in current):
+            if not inventory:
                 reason = 'window_identity_or_workspace'
                 return False
+            for window in current:
+                candidates = saved_workspaces[inventory[window['id']]['tab_ids']]
+                if len(set(candidates)) != 1:
+                    reason = 'saved_window_identity_ambiguous'
+                    return False
             return True
 
         try:
-            settled = wait_for_windows(match, 5, ready, 60, stage='edge_restore')
+            settled = wait_for_windows(match, 5, ready, 300, stage='edge_restore')
+            assignments = {wid: saved_workspaces[session['tab_ids']][0]
+                           for wid, session in inventory.items()}
+            if any(w['workspace'] != assignments[w['id']] for w in settled):
+                reason = 'workspace_placement'
+                for window in settled:
+                    move_workspace(window, assignments[window['id']])
+                settled = wait_for_windows(match, 2, lambda current: len(current) == len(assignments)
+                                           and all(assignments.get(w['id']) == w['workspace'] for w in current),
+                                           15, stage='edge_placement')
         except RuntimeError:
             LOG.warning('event=edge_gate_blocked reason=%s expected_windows=%d', reason, len(saved))
             raise
@@ -375,7 +397,7 @@ def attached_tmux_windows(ghostty_windows):
                 pid = int(Path(f'/proc/{pid}/stat').read_text().rsplit(')', 1)[1].split()[1])
             except FileNotFoundError:
                 break
-    result = []
+    candidates = {}
     for window in ghostty_windows:
         try:
             prop = run('xprop', '-id', window['id'], '_NET_WM_PID')
@@ -383,14 +405,14 @@ def attached_tmux_windows(ghostty_windows):
             continue
         match = re.search(r'= (\d+)$', prop)
         if match and int(match[1]) in ancestors:
-            result.append(window)
-    return result
+            candidates.setdefault(int(match[1]), []).append(window)
+    return [group[0] for group in candidates.values() if len(group) == 1]
 
 
 def tmux_layout():
     try:
         return set(run('tmux', 'list-panes', '-as', '-F',
-                       '#{session_name}\t#{window_index}\t#{pane_index}\t#{window_zoomed_flag}').splitlines())
+                       '#{session_name}\t#{window_index}\t#{pane_index}\t#{?window_zoomed_flag,#{pane_active},0}').splitlines())
     except subprocess.CalledProcessError:
         return set()
 
@@ -400,7 +422,7 @@ def saved_tmux_layout():
     if not path.exists():
         return set()
     panes = [line.split('\t') for line in path.read_text().splitlines() if line.startswith('pane\t')]
-    return {'\t'.join((row[1], row[2], row[5], str(int('Z' in row[4])))) for row in panes}
+    return {'\t'.join((row[1], row[2], row[5], str(int('Z' in row[4] and row[8] == '1')))) for row in panes}
 
 
 def recover_ghostty(match, workspace, monitor):
@@ -416,11 +438,17 @@ def recover_ghostty(match, workspace, monitor):
             wait_for_windows(match, 0.8, lambda found: bool(attached_tmux_windows(found))
                              and expected <= tmux_layout(), 25, stage='ghostty_tmux_restore')
     current = attached_tmux_windows([w for w in windows() if match(w)])
+    if not current:
+        raise RuntimeError('ghostty_tmux_window_ambiguous')
     for window in current:
         move_workspace(window, workspace)
-    wait_for_windows(match, 0.4, lambda found: any(
-        w['workspace'] == workspace for w in attached_tmux_windows(found))
-        and expected <= tmux_layout(), 5, stage='ghostty_placement_and_zoom')
+    target_ids = {window['id'] for window in current}
+    def placed(found):
+        attached = attached_tmux_windows(found)
+        return target_ids == {w['id'] for w in attached} and all(
+            w['workspace'] == workspace and on_monitor(w, monitor) for w in attached
+        ) and expected <= tmux_layout()
+    wait_for_windows(match, 0.4, placed, 5, stage='ghostty_placement_and_zoom')
     LOG.info('event=tmux_verified expected_panes=%d', len(expected))
     return current
 

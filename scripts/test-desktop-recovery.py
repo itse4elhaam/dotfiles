@@ -67,8 +67,8 @@ with tempfile.TemporaryDirectory() as directory:
     ready_observations = []
     saved = [dict(item) for item in parsed]
     def wait(match, settle, ready, timeout, **kwargs):
-        for observed in ([dict(item, tabs=1) for item in saved],
-                         [dict(saved[0], workspace=1), dict(saved[1], workspace=0)],
+        for observed in ([dict(item, tabs=1, tab_ids=item['tab_ids'][:1]) for item in saved],
+                         [dict(saved[0], tab_ids=(b'replacement',)), saved[1]],
                          saved):
             with patch.dict(g, {'edge_snapshot': lambda: (state / 'Session_2', observed)}):
                 ready_observations.append(ready(windows[:2]))
