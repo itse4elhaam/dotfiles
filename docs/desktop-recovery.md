@@ -6,12 +6,11 @@ one of these actions before opening or moving applications.
 
 | Application | Workspace | Display with two displays |
 | --- | --- | --- |
-| Edge window with more Upwork tabs | 2 | Primary |
-| Other Edge window | 1 | Primary |
-| Ghostty running tmux | 1 | Secondary |
-| Zoho Mail PWA | 3 | Primary |
-| Discord | 4 | Primary |
-| T3 Code | 5 | Primary |
+| Edge | Existing or saved workspace numbers | Edge's placement |
+| T3 Code | 1 | Primary |
+| Ghostty running tmux | 4 | Secondary |
+| Discord | 5 | Primary |
+| Zoho Mail PWA | 5 | Primary |
 | WhatsApp PWA | 6 | Secondary |
 
 Other application windows keep their current display and workspace.
@@ -21,10 +20,10 @@ It uses six or more fixed workspaces and maximizes the windows it places.
 
 ## Quiet recovery
 
-Recovery places Edge on workspace 1 first, then the Upwork Edge on workspace 2,
-before launching the remaining apps. Existing windows are reused. New windows
-start on the secondary display on their intended workspace, settle, then move to
-their final display. With one display, they use that display instead.
+Recovery waits for Edge first, then handles T3 Code, Ghostty, Discord, Zoho
+Mail, and WhatsApp in that order. Existing windows are reused. Each app after
+Edge has its own wait and placement check. A failed app is reported by name
+and the remaining apps still run.
 
 Recovery never activates another workspace. It temporarily uses GNOME's strict
 new-window focus policy and sets X11 launch properties to discourage focus
@@ -46,12 +45,17 @@ When no regular Edge window exists, the script backs up the Default profile's
 before either PWA. Existing browser windows are reused. Recovery never sends
 Ctrl+Shift+T, closes browser windows, or overwrites Edge's session files.
 
-The script reads the newest saved `Session_*` file to count each tab's current
-Upwork URL, excluding navigation history and closed tabs. It matches the saved
-windows to open window titles and saved workspace positions. The window with the
-higher count goes to workspace 2. A tie favors the window already on workspace 2.
-If the saved session has not caught up with the open windows, recovery reports
-an error; wait a few seconds and click Recover again.
+Before a cold launch, recovery reads the saved window count and workspace
+numbers from the newest `Session_*` file. It waits for all expected regular
+browser windows and five seconds of stable X11 window state. If Edge has
+already restored the saved workspace set, its placement is kept. Otherwise,
+recovery uses unambiguous saved active-tab titles to place the restored
+windows and verifies the result. Open Edge windows retain their current
+workspaces. If the restore cannot be verified within the allotted wait,
+recovery stops before launching the other apps. Check Edge and retry Recover.
+
+X11 verifies window count and settling. Edge controls tab restoration and
+may defer loading background tabs.
 
 The reader follows Chromium's [session command format](https://github.com/chromium/chromium/blob/main/components/sessions/core/session_service_commands.cc)
 and [navigation record format](https://github.com/chromium/chromium/blob/main/components/sessions/core/serialized_navigation_entry.cc).
@@ -64,7 +68,9 @@ the pre-launch backup from initial setup. `edge-reference-session` and
 These are local private data, outside the dotfiles repository. Backups are for
 manual recovery if Edge's own saved session is lost; they are never restored
 over a running browser automatically. The script cannot recover tabs that Edge
-never saved. It does not replace tmux session persistence across reboots.
+never saved. Ghostty attaches to tmux's `main` session. Running tmux panes retain their
+zoom. On a fresh tmux server the configured Continuum/Resurrect plugins
+restore the last saved layout and saved pane zoom.
 
 ## Installation and checks
 
@@ -75,14 +81,18 @@ replaces the old startup entry so there is only one login action.
 
 Requires GNOME on X11, `wmctrl`, `xrandr`, `systemd-run`, `bluetoothctl`, Python Xlib,
 Python GI with GTK 3 and AyatanaAppIndicator3, and the installed applications.
-T3 Code uses the existing `t3code.desktop` launcher. Zoho and WhatsApp use the
-existing Edge Default-profile PWA IDs in `scripts/desktop-recovery`.
+T3 Code uses the installed `~/.local/bin/t3` launcher. Zoho and WhatsApp
+use the existing Edge Default-profile PWA IDs in `scripts/desktop-recovery`.
+Launches use transient user services. T3 Code runs in foreground mode so its
+service tracks the AppImage for the lifetime of the application.
 
-Run `./scripts/test-desktop-recovery.py` for offline checks without touching the
-desktop. Logs for recovery actions started from the tray are available through
-`journalctl --user -g desktop-recovery`. Application errors also produce a desktop
-notification. A failed recovery can leave some applications placed; another
-Recover click reuses those windows and retries.
+Run `./scripts/test-desktop-recovery.py` for checks without touching the
+desktop. Recovery writes to `~/.local/state/desktop-recovery/recovery.log`
+by default, with three 128 KiB rotated files and a 14-day age limit applied
+on the next run. Search all retained files for the same `run=` value to
+reconstruct a run. Launch events include systemd unit names, which can be
+looked up with `journalctl --user -u <unit>`. Recovery can reuse existing app
+windows on a retry.
 
 Use `./scripts/test-desktop-recovery.py --x11-staging` to additionally check real
 X11 staging with invisible, unmapped probe windows. It never launches apps or

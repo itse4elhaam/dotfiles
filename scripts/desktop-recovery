@@ -2,6 +2,9 @@
 """Recover the personal GNOME/X11 desktop, or keep a Recover menu in the tray."""
 import fcntl
 from contextlib import contextmanager
+import hashlib
+import logging
+from logging.handlers import RotatingFileHandler
 import os
 from pathlib import Path
 import re
@@ -11,10 +14,10 @@ import sys
 import struct
 import select
 import threading
-from urllib.parse import urlparse
 import time
 
 STATE = Path.home() / '.local/state/desktop-recovery'
+LOG = logging.getLogger('desktop-recovery')
 EDGE = 'microsoft-edge.Microsoft-edge'
 ZOHO = 'crx__ilnnabaccafamopchccjobpmmpmdnope.Microsoft-edge'
 WHATSAPP = 'crx__hnpfjngllnobngcgfapefoaidbinmjnm.Microsoft-edge'
@@ -25,7 +28,7 @@ def is_t3(window):
 
 
 def run(*args):
-    return subprocess.check_output(args, text=True).strip()
+    return subprocess.check_output(args, text=True, timeout=5).strip()
 
 
 def windows():
@@ -56,7 +59,7 @@ def monitors(output):
 
 
 def edge_sessions(data):
-    """Read Chromium SNSS commands, counting current URLs rather than history entries.
+    """Read Chromium SNSS window and current-tab metadata.
 
     Format: chromium/components/sessions/core/{session_service_commands,
     serialized_navigation_entry}.cc. Edge-only command IDs are ignored.
@@ -93,14 +96,13 @@ def edge_sessions(data):
             tid, index, length = struct.unpack_from('<iii', payload, 4)
             if length < 0 or 16 + length > len(payload):
                 raise ValueError('Invalid Edge navigation record')
-            url = payload[16:16 + length].decode('utf-8', errors='replace')
             pos = (16 + length + 3) & ~3
             title = ''
             if pos + 4 <= len(payload):
                 characters = struct.unpack_from('<i', payload, pos)[0]
                 if 0 <= characters <= (len(payload) - pos - 4) // 2:
                     title = payload[pos + 4:pos + 4 + characters * 2].decode('utf-16-le', errors='replace')
-            tab(tid)['nav'][index] = (url, title)
+            tab(tid)['nav'][index] = title
         elif command in (16, 17) and len(payload) >= 4:
             identifier = struct.unpack_from('<i', payload)[0]
             if command == 16:
@@ -130,32 +132,26 @@ def edge_sessions(data):
         if not members:
             continue
         entries = [(t, t['nav'][min(t['nav'], key=lambda i: abs(i - t['selected']))]) for t in members]
-        selected = next((entry for t, entry in entries if t['index'] == session['selected']), ('', ''))
-        result.append(dict(workspace=session['workspace'], selected_title=selected[1],
-                           titles=[entry[1] for _, entry in entries], tabs=len(entries),
-                           upwork=sum((urlparse(entry[0]).hostname or '').lower().rstrip('.') in ('upwork.com', 'www.upwork.com')
-                                      or (urlparse(entry[0]).hostname or '').lower().rstrip('.').endswith('.upwork.com')
-                                      for _, entry in entries)))
+        selected = next((entry for t, entry in entries if t['index'] == session['selected']), '')
+        result.append(dict(workspace=session['workspace'], selected_title=selected, tabs=len(entries)))
     return result
 
 
-def browser_workspaces(browser_windows, saved):
-    available = list(saved)
-    matches = []
+def restored_workspaces(browser_windows, saved):
+    """Keep native placement when it already matches the saved workspace set."""
+    expected = sorted(session['workspace'] for session in saved if session['workspace'] is not None)
+    if len(expected) != len(saved):
+        return {}
+    if sorted(window['workspace'] for window in browser_windows) == expected:
+        return {}
+    assignments = {}
     for window in browser_windows:
-        def score(session):
-            active = session['selected_title']
-            return (int(bool(active) and active in window['title']) * 100
-                    + int(any(title and title in window['title'] for title in session['titles'])) * 10
-                    + int(session['workspace'] == window['workspace']))
-        if not available or max(map(score, available)) == 0:
-            raise RuntimeError('Cannot match Edge windows to saved tabs yet; try Recover again in a few seconds')
-        match = max(available, key=score)
-        available.remove(match)
-        matches.append((window, match))
-    # Ties preserve the reference workspace instead of swapping windows arbitrarily.
-    main, _ = max(matches, key=lambda pair: (pair[1]['upwork'], pair[0]['workspace'] == 1))
-    return {w['id']: 1 if w == main else 0 for w in browser_windows}
+        candidates = [session for session in saved if session['selected_title']
+                      and session['selected_title'] in window['title']]
+        if len(candidates) != 1:
+            return None
+        assignments[window['id']] = candidates[0]['workspace']
+    return assignments if sorted(assignments.values()) == expected else None
 
 
 def saved_edge_sessions():
@@ -167,9 +163,12 @@ def saved_edge_sessions():
 
 
 def launch(*command):
-    # User services survive the shortcut process and keep application logs out of the terminal.
+    unit = f'desktop-recovery-{time.time_ns()}.service'
+    LOG.info('event=launch unit=%s executable=%s', unit, Path(command[0]).name)
     subprocess.run(['systemd-run', '--user', '--collect', '--quiet',
-                    '--unit=desktop-recovery-' + str(time.time_ns()), *command], check=True)
+                    '--property=Type=exec',
+                    '--unit=' + unit, *command], check=True, timeout=10)
+    return unit
 
 
 @contextmanager
@@ -234,27 +233,71 @@ def stage_windows(match, workspace, monitor):
             raise RuntimeError('Could not stage new windows: ' + str(failures[0]))
 
 
-def ensure_app(match, command, workspace, monitor, settle_seconds=2):
-    if any(match(w) for w in windows()):
-        return
+def wait_for_windows(match, settle_seconds, ready, timeout):
+    deadline = time.monotonic() + timeout
+    previous = None
+    while time.monotonic() < deadline:
+        current = sorted((w for w in windows() if match(w)), key=lambda w: w['id'])
+        if current != previous:
+            previous, stable_since = current, time.monotonic()
+        if current and time.monotonic() - stable_since >= settle_seconds and ready(current):
+            return current
+        time.sleep(0.2)
+    raise RuntimeError(f'window_timeout observed={len(previous or [])} timeout_seconds={timeout}')
+
+
+def ensure_app(match, command, workspace, monitor):
+    existing = [w for w in windows() if match(w)]
+    if existing:
+        LOG.info('event=reuse windows=%d', len(existing))
+        return existing
     with stage_windows(match, workspace, monitor):
         launch(*command)
-        deadline = time.monotonic() + 45
-        previous, stable_since = None, time.monotonic()
-        while time.monotonic() < deadline:
-            current = sorted(w['id'] for w in windows() if match(w))
-            if current != previous:
-                previous, stable_since = current, time.monotonic()
-            if current and time.monotonic() - stable_since >= settle_seconds:
-                return
-            time.sleep(0.1)
-        raise RuntimeError('No settled window appeared for ' + command[0])
+        return wait_for_windows(match, 0.8, lambda _: True, 18)
+
+
+def recover_edge():
+    match = lambda w: w['cls'].casefold() == EDGE.casefold()
+    existing = any(match(w) for w in windows())
+    saved = saved_edge_sessions()
+    if not saved:
+        raise RuntimeError('no_saved_browser_windows')
+    LOG.info('event=edge_snapshot expected_windows=%d saved_tabs=%d existing=%s',
+             len(saved), sum(session['tabs'] for session in saved), existing)
+    if not existing:
+        backup_edge()
+        launch('microsoft-edge', '--profile-directory=Default', '--restore-last-session')
+    assignments = {}
+
+    def ready(current):
+        nonlocal assignments
+        if len(current) < len(saved):
+            return False
+        if existing:
+            return True
+        if len(current) != len(saved):
+            return False
+        assignments = restored_workspaces(current, saved)
+        return assignments is not None
+
+    settled = wait_for_windows(match, 2 if existing else 5, ready, 60)
+    if assignments:
+        for window in settled:
+            workspace = assignments[window['id']]
+            if workspace != window['workspace']:
+                subprocess.run(['wmctrl', '-ir', window['id'], '-t', str(workspace)],
+                               check=True, timeout=5)
+        settled = wait_for_windows(match, 2, lambda current: len(current) == len(saved)
+                                   and all(assignments.get(w['id']) == w['workspace'] for w in current), 15)
+    LOG.info('event=edge_settled windows=%d workspaces=%s', len(settled),
+             ','.join(str(w['workspace'] + 1) for w in settled))
 
 
 def backup_edge():
     source = Path.home() / '.config/microsoft-edge/Default/Sessions'
     if not source.exists():
         raise RuntimeError('Edge session directory is missing; refusing a blank recovery')
+    STATE.mkdir(parents=True, exist_ok=True, mode=0o700)
     destination = STATE / ('edge-session-' + time.strftime('%Y%m%d-%H%M%S'))
     shutil.copytree(source, destination)
     for old in sorted(STATE.glob('edge-session-*'))[:-5]:
@@ -265,33 +308,36 @@ def place(window, workspace, monitor):
     wid = window['id']
     if workspace is not None:
         if window.get('workspace') == -1:
-            subprocess.run(['wmctrl', '-ir', wid, '-b', 'remove,sticky'], check=True)
+            subprocess.run(['wmctrl', '-ir', wid, '-b', 'remove,sticky'], check=True, timeout=5)
         if window.get('workspace') != workspace:
-            subprocess.run(['wmctrl', '-ir', wid, '-t', str(workspace)], check=True)
+            subprocess.run(['wmctrl', '-ir', wid, '-t', str(workspace)], check=True, timeout=5)
     same_screen = ('x' in window
                    and monitor['x'] <= window['x'] + window['width'] / 2 < monitor['x'] + monitor['width']
                    and monitor['y'] <= window['y'] + window['height'] / 2 < monitor['y'] + monitor['height'])
     if not same_screen:
-        subprocess.run(['wmctrl', '-ir', wid, '-b', 'remove,maximized_vert,maximized_horz'], check=True)
+        subprocess.run(['wmctrl', '-ir', wid, '-b', 'remove,maximized_vert,maximized_horz'], check=True, timeout=5)
         geometry = f"0,{monitor['x'] + 40},{monitor['y'] + 70},{monitor['width'] - 80},{monitor['height'] - 140}"
-        subprocess.run(['wmctrl', '-ir', wid, '-e', geometry], check=True)
-    subprocess.run(['wmctrl', '-ir', wid, '-b', 'add,maximized_vert,maximized_horz'], check=True)
+        subprocess.run(['wmctrl', '-ir', wid, '-e', geometry], check=True, timeout=5)
+    subprocess.run(['wmctrl', '-ir', wid, '-b', 'add,maximized_vert,maximized_horz'], check=True, timeout=5)
 
 
 def notify(message):
-    subprocess.run(['notify-send', 'Desktop recovery', message], check=False)
+    try:
+        subprocess.run(['notify-send', 'Desktop recovery', message], check=True, timeout=5)
+    except (OSError, subprocess.SubprocessError) as error:
+        LOG.warning('event=notification_failed error=%s', type(error).__name__)
 
 
 @contextmanager
 def quiet_launches():
     schema = 'org.gnome.desktop.wm.preferences'
     original = run('gsettings', 'get', schema, 'focus-new-windows')
-    subprocess.run(['gsettings', 'set', schema, 'focus-new-windows', 'strict'], check=True)
+    subprocess.run(['gsettings', 'set', schema, 'focus-new-windows', 'strict'], check=True, timeout=5)
     try:
         yield
     finally:
         if run('gsettings', 'get', schema, 'focus-new-windows') == "'strict'":
-            subprocess.run(['gsettings', 'set', schema, 'focus-new-windows', original], check=True)
+            subprocess.run(['gsettings', 'set', schema, 'focus-new-windows', original], check=True, timeout=5)
 
 
 def connect_earbuds():
@@ -316,67 +362,109 @@ def connect_earbuds():
         return 'OnePlus Buds 4 unavailable; reconnect from Bluetooth when ready.'
 
 
+def configure_logging():
+    run_id = str(time.time_ns())
+    formatter = logging.Formatter(
+        f'%(asctime)s %(levelname)s run={run_id} %(message)s', datefmt='%Y-%m-%dT%H:%M:%S%z')
+    LOG.setLevel(logging.INFO)
+    stderr = logging.StreamHandler()
+    stderr.setFormatter(formatter)
+    LOG.addHandler(stderr)
+
+
+def enable_file_logging():
+    formatter = LOG.handlers[0].formatter
+    try:
+        STATE.mkdir(parents=True, exist_ok=True, mode=0o700)
+        for path in STATE.glob('recovery.log.[1-3]'):
+            if time.time() - path.stat().st_mtime > 14 * 86400:
+                path.unlink()
+        log_path = STATE / 'recovery.log'
+        if log_path.exists() and time.time() - log_path.stat().st_mtime > 14 * 86400:
+            log_path.unlink()
+        handler = RotatingFileHandler(log_path, maxBytes=128 * 1024, backupCount=3,
+                                      encoding='utf-8')
+        log_path.chmod(0o600)
+        handler.setFormatter(formatter)
+        LOG.addHandler(handler)
+    except OSError:
+        LOG.warning('event=log_storage_unavailable')
+
+
+def pwa(app_id):
+    return ['microsoft-edge', '--profile-directory=Default', '--app-id=' + app_id]
+
+
 def recover():
-    STATE.mkdir(parents=True, exist_ok=True, mode=0o700)
-    with (STATE / 'recover.lock').open('w') as lock:
+    runtime = Path(os.environ.get('XDG_RUNTIME_DIR') or STATE)
+    runtime.mkdir(parents=True, exist_ok=True, mode=0o700)
+    with (runtime / 'desktop-recovery.lock').open('a') as lock:
         try:
             fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BlockingIOError:
+            LOG.info('event=already_running')
             notify('Recovery is already running.')
             return
+        if LOG.handlers:
+            enable_file_logging()
+        LOG.info('event=start revision=%s', hashlib.sha256(Path(__file__).read_bytes()).hexdigest()[:12])
         if os.environ.get('XDG_SESSION_TYPE') != 'x11':
             raise RuntimeError('This layout requires the GNOME X11 session.')
         screens = monitors(run('xrandr', '--listmonitors'))
         if not screens:
             raise RuntimeError('No connected monitor found')
         if len(screens) > 1:
-            # Both displays must participate in workspace switching for Ghostty/WhatsApp.
             subprocess.run(['gsettings', 'set', 'org.gnome.mutter',
-                            'workspaces-only-on-primary', 'false'], check=True)
-        subprocess.run(['gsettings', 'set', 'org.gnome.mutter', 'dynamic-workspaces', 'false'], check=True)
+                            'workspaces-only-on-primary', 'false'], check=True, timeout=5)
+        subprocess.run(['gsettings', 'set', 'org.gnome.mutter', 'dynamic-workspaces', 'false'],
+                       check=True, timeout=5)
         count = len(run('wmctrl', '-d').splitlines())
         if count < 6:
-            subprocess.run(['wmctrl', '-n', '6'], check=True)
-        errors = []
+            subprocess.run(['wmctrl', '-n', '6'], check=True, timeout=5)
+        failures = []
         with quiet_launches():
+            LOG.info('event=stage_start app=Edge')
             try:
-                if not any(w['cls'] == EDGE for w in windows()):
-                    backup_edge()
-                    ensure_app(lambda w: w['cls'] == EDGE,
-                               ['microsoft-edge', '--profile-directory=Default', '--restore-last-session'],
-                               0, screens[-1], settle_seconds=5)
-                browsers = [w for w in windows() if w['cls'] == EDGE]
-                assignments = browser_workspaces(browsers, saved_edge_sessions()) if browsers else {}
-                # Put workspace 1's Edge in place before opening any other application.
-                for window in sorted(browsers, key=lambda w: assignments[w['id']]):
-                    place(window, assignments[window['id']], screens[0])
-            except (OSError, RuntimeError, subprocess.SubprocessError) as error:
-                errors.append(str(error))
+                recover_edge()
+            except Exception as error:
+                log_failure('Edge', error)
+                LOG.warning('event=remaining_apps_skipped reason=edge_gate')
+                raise RuntimeError('Edge restore incomplete. Check Edge, then retry Recover.') from error
             apps = [
-                (lambda w: 'ghostty' in w['cls'].lower(),
-                 ['ghostty', '-e', 'tmux', 'new-session', '-A', '-s', 'main'], 0, screens[-1]),
-                (lambda w: w['cls'] == ZOHO,
-                 ['gtk-launch', 'msedge-ilnnabaccafamopchccjobpmmpmdnope-Default'], 2, screens[0]),
-                (lambda w: w['cls'].lower() == 'discord.discord', ['discord'], 3, screens[0]),
-                (is_t3, ['gtk-launch', 't3code'], 4, screens[0]),
-                (lambda w: w['cls'] == WHATSAPP,
-                 ['gtk-launch', 'msedge-hnpfjngllnobngcgfapefoaidbinmjnm-Default'], 5, screens[-1]),
+                ('T3 Code', is_t3, [str(Path.home() / '.local/bin/t3'), '--foreground'], 0, screens[0]),
+                ('Ghostty', lambda w: 'ghostty' in w['cls'].lower(),
+                 ['ghostty', '-e', 'tmux', 'new-session', '-A', '-s', 'main'], 3, screens[-1]),
+                ('Discord', lambda w: w['cls'].lower() == 'discord.discord', ['discord'], 4, screens[0]),
+                ('Zoho Mail', lambda w: w['cls'] == ZOHO, pwa('ilnnabaccafamopchccjobpmmpmdnope'), 4, screens[0]),
+                ('WhatsApp', lambda w: w['cls'] == WHATSAPP, pwa('hnpfjngllnobngcgfapefoaidbinmjnm'), 5, screens[-1]),
             ]
-            for match, command, workspace, monitor in apps:
+            for app, match, command, workspace, monitor in apps:
+                start = time.monotonic()
+                LOG.info('event=stage_start app=%s workspace=%d', app, workspace + 1)
                 try:
-                    ensure_app(match, command, workspace, screens[-1])
-                    for window in windows():
-                        if match(window):
-                            place(window, workspace, monitor)
-                except (OSError, RuntimeError, subprocess.SubprocessError) as error:
-                    errors.append(str(error))
-        # Let the last placement settle before asking Bluetooth to connect.
-        time.sleep(2)
+                    current = ensure_app(match, command, workspace, monitor)
+                    for window in current:
+                        place(window, workspace, monitor)
+                    wait_for_windows(match, 0.4, lambda found: all(
+                        w['workspace'] == workspace for w in found), 5)
+                    LOG.info('event=stage_complete app=%s windows=%d elapsed_ms=%d',
+                             app, len(current), (time.monotonic() - start) * 1000)
+                except Exception as error:
+                    log_failure(app, error)
+                    failures.append(app)
         earbuds = connect_earbuds()
-        if errors:
-            raise RuntimeError('; '.join(errors) + '. ' + earbuds)
-        notify('Desktop ready. T3 Code is on workspace 5. ' + earbuds)
+        LOG.info('event=earbuds result=%s', earbuds)
+        if failures:
+            raise RuntimeError('Could not recover: ' + ', '.join(failures))
+        LOG.info('event=complete')
+        notify('Desktop ready. T3 Code is on workspace 1. ' + earbuds)
 
+
+def log_failure(app, error):
+    detail = str(error) if str(error).startswith('window_timeout ') else ''
+    LOG.error('event=stage_failed app=%s error=%s errno=%s exit=%s %s', app,
+              type(error).__name__, getattr(error, 'errno', None),
+              getattr(error, 'returncode', None), detail)
 
 
 def tray():
@@ -411,8 +499,13 @@ if __name__ == '__main__':
         if sys.argv[1:] == ['tray']:
             tray()
         else:
+            configure_logging()
             recover()
+    except KeyboardInterrupt:
+        LOG.warning('event=cancelled')
+        sys.exit(130)
     except Exception as error:
-        print(f'Desktop recovery failed: {error}', file=sys.stderr)
-        notify(f'Recovery incomplete: {error}. See journalctl --user -g desktop-recovery')
+        LOG.error('event=failed error=%s', type(error).__name__)
+        message = str(error) if type(error) is RuntimeError else type(error).__name__
+        notify(f'Recovery incomplete: {message} See ~/.local/state/desktop-recovery/recovery.log')
         sys.exit(1)

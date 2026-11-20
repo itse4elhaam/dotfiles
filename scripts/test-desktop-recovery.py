@@ -53,62 +53,73 @@ session += navigation(21, 0, 'https://upwork.com/jobs', 'Old job')
 session += integers(0, 1, 13) + navigation(13, 0, 'https://upwork.com/', 'Closed')
 session += integers(16, 13)
 parsed = r['edge_sessions'](session + b'\xff\x7f\x06partial')
-assert [(w['tabs'], w['upwork']) for w in parsed] == [(2, 2), (2, 0)]
-assert r['browser_workspaces'](windows[:2], parsed) == {'0x001': 1, '0x002': 0}
-# Saved desktop positions handle equal counts without gratuitously swapping windows.
-parsed[1]['upwork'] = 2
-assert r['browser_workspaces'](windows[:2], parsed) == {'0x001': 0, '0x002': 1}
-try:
-    r['browser_workspaces'](windows[:2], [])
-except RuntimeError:
-    pass
-else:
-    raise AssertionError('Missing sessions must not silently misplace Edge')
+assert [w['tabs'] for w in parsed] == [2, 2]
+assert r['restored_workspaces'](windows[:2], parsed) == {}
+parsed[0]['workspace'], parsed[1]['workspace'] = 2, 3
+assert r['restored_workspaces'](windows[:2], parsed) == {'0x001': 2, '0x002': 3}
+assert r['restored_workspaces']([dict(windows[0], title='Unknown'), windows[1]], parsed) is None
 
-# Recover a mixed desktop without activating workspaces, launching duplicates,
-# or touching unrelated windows. Bluetooth must run after the final placement.
+# Run the full orchestration with a fake desktop and a controlled stage failure.
 g = r['recover'].__globals__
-desktop = windows[:2] + [dict(id='t3', cls='com.t3tools.t3code.com.t3tools.T3Code', workspace=4),
-                         dict(id='chat', cls=r['WHATSAPP'], workspace=-1),
-                         dict(id='other', cls='editor.Editor', workspace=0)]
-events = []
+for failure in (None, 'Edge', 'Discord'):
+    desktop = [dict(w) for w in windows[:2]] + [
+        dict(id='other', cls='editor.Editor', workspace=0)]
+    events = []
 
+    def edge():
+        events.append('Edge')
+        if failure == 'Edge':
+            raise RuntimeError('window_timeout observed=1 timeout_seconds=60')
 
-def ensure(match, command, workspace, monitor, **kwargs):
-    if not any(match(w) for w in desktop):
-        events.append(('launch', workspace))
-        cls = {0: 'ghostty.Ghostty', 2: r['ZOHO'], 3: 'discord.discord'}[workspace]
-        desktop.append(dict(id=str(workspace), cls=cls, workspace=workspace))
+    def ensure(match, command, workspace, monitor):
+        cls = {0: 'com.t3tools.t3code.com.t3tools.T3Code', 3: 'ghostty.Ghostty',
+               5: r['WHATSAPP']}.get(workspace)
+        if workspace == 4:
+            cls = r['ZOHO'] if command[0] == 'microsoft-edge' else 'discord.discord'
+        events.append(cls)
+        if failure == 'Discord' and cls == 'discord.discord':
+            raise FileNotFoundError()
+        window = dict(id=cls, cls=cls, workspace=-1)
+        assert match(window)
+        desktop.append(window)
+        return [window]
 
-
-for fail_discord in (False, True):
-    events.clear()
-    def ensure_or_fail(match, command, workspace, monitor, **kwargs):
-        if fail_discord and workspace == 3:
-            raise RuntimeError('Discord unavailable')
-        ensure(match, command, workspace, monitor, **kwargs)
+    def place(window, workspace, monitor):
+        window['workspace'] = workspace
 
     with tempfile.TemporaryDirectory() as directory, patch.dict(g, {
         'STATE': Path(directory), 'windows': lambda: desktop,
         'run': lambda *args: 'Monitors: 1\n 0: +*DP-1 1920/300x1080/200+0+0 DP-1' if args[0] == 'xrandr' else 'desktop\n' * 6,
-        'quiet_launches': nullcontext, 'ensure_app': ensure_or_fail,
-        'saved_edge_sessions': lambda: parsed,
-        'place': lambda w, workspace, monitor: events.append(('place', w['id'], workspace)),
-        'connect_earbuds': lambda: events.append(('bluetooth',)) or 'Connected.',
+        'quiet_launches': nullcontext, 'ensure_app': ensure, 'recover_edge': edge,
+        'place': place, 'connect_earbuds': lambda: events.append('Bluetooth') or 'Connected.',
         'notify': lambda message: None,
-    }), patch.dict('os.environ', {'XDG_SESSION_TYPE': 'x11'}), \
-            patch.object(g['subprocess'], 'run') as commands, patch.object(g['time'], 'sleep'):
+    }), patch.dict('os.environ', {'XDG_SESSION_TYPE': 'x11', 'XDG_RUNTIME_DIR': directory}), \
+            patch.object(g['subprocess'], 'run') as commands, \
+            patch.object(g['time'], 'sleep'), patch.object(g['time'], 'monotonic', side_effect=range(1000)):
+        g['configure_logging']()
         try:
             r['recover']()
         except RuntimeError as error:
-            assert fail_discord and 'Discord unavailable' in str(error)
+            assert failure and failure in str(error)
         else:
-            assert not fail_discord, 'Failed apps must be reported'
-        assert events[:2] == [('place', '0x001', 0), ('place', '0x002', 1)]
-        assert ('place', 't3', 4) in events and ('launch', 4) not in events
-        assert ('place', 'chat', 5) in events
-        assert not any(event[:2] == ('place', 'other') for event in events)
-        assert events[-1] == ('bluetooth',)
+            assert failure is None
+        finally:
+            for handler in g['LOG'].handlers[:]:
+                g['LOG'].removeHandler(handler)
+                handler.close()
+        log = (Path(directory) / 'recovery.log').read_text()
+        assert 'event=start revision=' in log
+        if failure == 'Edge':
+            assert events == ['Edge']
+            assert 'remaining_apps_skipped' in log
+        else:
+            assert events == ['Edge', 'com.t3tools.t3code.com.t3tools.T3Code',
+                              'ghostty.Ghostty', 'discord.discord', r['ZOHO'], r['WHATSAPP'], 'Bluetooth']
+            assert [w['workspace'] for w in desktop[3:]] == ([0, 3, 4, 5] if failure else [0, 3, 4, 4, 5])
+            assert 'event=stage_complete app=WhatsApp' in log
+        if failure:
+            assert f'event=stage_failed app={failure}' in log
+        assert desktop[:3] == windows[:2] + [dict(id='other', cls='editor.Editor', workspace=0)]
         assert not any('-ia' in call.args[0] or '-s' in call.args[0] for call in commands.call_args_list)
 
 # Already connected buds are reused, unavailable buds do not fail recovery,
