@@ -150,6 +150,11 @@ def edge_snapshot():
     return latest, edge_sessions(latest.read_bytes())
 
 
+def edge_title_tab_count(title):
+    match = re.search(r' and (\d+) more pages(?:\s|$)', title)
+    return int(match[1]) + 1 if match else None
+
+
 def edge_inventory(sessions, current):
     """Correlate saved browser windows with X11 windows without logging titles."""
     if len(sessions) != len(current):
@@ -160,6 +165,8 @@ def edge_inventory(sessions, current):
         candidates = [w for w in available if session['selected_title']
                       and w['title'].startswith(session['selected_title'])]
         if len(candidates) != 1:
+            candidates = [w for w in candidates if edge_title_tab_count(w['title']) == session['tabs']]
+        if len(candidates) != 1:
             candidates = [w for w in candidates if w['workspace'] == session['workspace']]
         if len(candidates) != 1:
             return None
@@ -169,12 +176,13 @@ def edge_inventory(sessions, current):
     return assignments
 
 
-def launch(*command):
+def launch(*command, detached_server=False):
     unit = f'desktop-recovery-{time.time_ns()}.service'
     LOG.info('event=launch unit=%s executable=%s', unit, Path(command[0]).name)
+    properties = (['--property=Type=oneshot', '--property=RemainAfterExit=yes']
+                  if detached_server else ['--property=Type=exec'])
     subprocess.run(['systemd-run', '--user', '--collect', '--quiet',
-                    '--property=Type=exec',
-                    '--unit=' + unit, *command], check=True, timeout=10)
+                    *properties, '--unit=' + unit, *command], check=True, timeout=10)
     return unit
 
 
@@ -426,15 +434,18 @@ def saved_tmux_layout():
 
 
 def recover_ghostty(match, workspace, monitor):
-    expected = tmux_layout() or saved_tmux_layout()
+    live_layout = tmux_layout()
+    expected = live_layout or saved_tmux_layout()
     existing = [w for w in windows() if match(w)]
     if existing and not attached_tmux_windows(existing):
         raise RuntimeError('ghostty_has_no_tmux_client')
     if not existing:
-        # Attach to the last-used session. Only bootstrap a session on a cold server.
+        # Put the server and its pane processes in their own unit so they
+        # survive a Ghostty exit. The client attaches to the last-used session.
+        if not live_layout:
+            launch('tmux', 'new-session', '-d', '-s', 'main', detached_server=True)
         with stage_windows(match, workspace, monitor, maximize=False):
-            launch('ghostty', '-e', '/bin/sh', '-c',
-                   'tmux attach-session || exec tmux new-session -A -s main')
+            launch('ghostty', '-e', 'tmux', 'attach-session')
             wait_for_windows(match, 0.8, lambda found: bool(attached_tmux_windows(found))
                              and expected <= tmux_layout(), 25, stage='ghostty_tmux_restore')
     current = attached_tmux_windows([w for w in windows() if match(w)])

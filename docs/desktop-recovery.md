@@ -73,7 +73,8 @@ never saved. Ghostty attaches to the most recently used tmux session. Recovery p
 an existing Ghostty window's fullscreen and font settings. It checks for
 an attached tmux client and verifies that pane zoom is retained. On a fresh
 tmux server, Continuum and Resurrect restore the last saved layout and pane
-zoom.
+zoom. A new tmux server runs in its own user service so closing Ghostty leaves
+its panes running.
 
 ## Installation and checks
 

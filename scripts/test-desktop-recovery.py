@@ -58,6 +58,28 @@ parsed[0]['workspace'], parsed[1]['workspace'] = 0, 1
 assert r['edge_inventory'](parsed, windows[:2]) == {'0x001': parsed[0], '0x002': parsed[1]}
 assert r['edge_inventory'](parsed, [dict(windows[0], title='Unknown'), windows[1]]) is None
 
+same_title = [dict(windows[0], id='seven', title='Mail and 6 more pages - Microsoft Edge'),
+              dict(windows[1], id='ten', title='Mail and 9 more pages - Microsoft Edge')]
+same_saved = [dict(workspace=0, selected_title='Mail', tabs=10),
+              dict(workspace=1, selected_title='Mail', tabs=7)]
+assert r['edge_inventory'](same_saved, same_title) == {'ten': same_saved[0], 'seven': same_saved[1]}
+
+# Cold Ghostty starts the tmux server in a separate unit and only attaches.
+g = r['recover_ghostty'].__globals__
+ghost = dict(windows[0], workspace=3, x=monitors[0]['x'], y=monitors[0]['y'])
+launches = []
+with patch.dict(g, {'tmux_layout': lambda: set(), 'saved_tmux_layout': lambda: set(),
+                    'windows': lambda: [] if not launches else [ghost],
+                    'attached_tmux_windows': lambda found: found,
+                    'stage_windows': lambda *args, **kwargs: nullcontext(),
+                    'launch': lambda *args, **kwargs: launches.append((args, kwargs)),
+                    'wait_for_windows': lambda match, settle, ready, timeout, **kwargs:
+                    [ghost] if ready([ghost]) else (_ for _ in ()).throw(AssertionError()),
+                    'move_workspace': lambda *args: None}):
+    assert r['recover_ghostty'](lambda _: True, 3, monitors[0]) == [ghost]
+assert launches == [(('tmux', 'new-session', '-d', '-s', 'main'), {'detached_server': True}),
+                    (('ghostty', '-e', 'tmux', 'attach-session'), {})]
+
 # The real cold gate waits for a fresh inventory with every saved tab and workspace.
 g = r['recover_edge'].__globals__
 with tempfile.TemporaryDirectory() as directory:
