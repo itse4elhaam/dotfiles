@@ -54,10 +54,36 @@ session += integers(0, 1, 13) + navigation(13, 0, 'https://upwork.com/', 'Closed
 session += integers(16, 13)
 parsed = r['edge_sessions'](session + b'\xff\x7f\x06partial')
 assert [w['tabs'] for w in parsed] == [2, 2]
-assert r['restored_workspaces'](windows[:2], parsed) == {}
-parsed[0]['workspace'], parsed[1]['workspace'] = 2, 3
-assert r['restored_workspaces'](windows[:2], parsed) == {'0x001': 2, '0x002': 3}
-assert r['restored_workspaces']([dict(windows[0], title='Unknown'), windows[1]], parsed) is None
+parsed[0]['workspace'], parsed[1]['workspace'] = 0, 1
+assert r['edge_inventory'](parsed, windows[:2]) == {'0x001': parsed[0], '0x002': parsed[1]}
+assert r['edge_inventory'](parsed, [dict(windows[0], title='Unknown'), windows[1]]) is None
+
+# The real cold gate waits for a fresh inventory with every saved tab and workspace.
+g = r['recover_edge'].__globals__
+with tempfile.TemporaryDirectory() as directory:
+    state = Path(directory)
+    baseline = state / 'Session_1'
+    baseline.write_bytes(session)
+    ready_observations = []
+    saved = [dict(item) for item in parsed]
+    def wait(match, settle, ready, timeout, **kwargs):
+        for observed in ([dict(item, tabs=1) for item in saved],
+                         [dict(saved[0], workspace=1), dict(saved[1], workspace=0)],
+                         saved):
+            with patch.dict(g, {'edge_snapshot': lambda: (state / 'Session_2', observed)}):
+                ready_observations.append(ready(windows[:2]))
+        assert ready_observations == [False, False, True]
+        return windows[:2]
+
+    def parse(_):
+        return saved
+
+    with patch.dict(g, {'STATE': state, 'windows': lambda: [],
+                        'edge_snapshot': lambda: (baseline, saved),
+                        'edge_sessions': parse, 'backup_edge': lambda: state,
+                        'launch': lambda *args: None, 'wait_for_windows': wait}):
+        r['recover_edge']()
+    assert not (state / 'edge-restore-pending').exists()
 
 # Run the full orchestration with a fake desktop and a controlled stage failure.
 g = r['recover'].__globals__
@@ -79,7 +105,7 @@ for failure in (None, 'Edge', 'Discord'):
         events.append(cls)
         if failure == 'Discord' and cls == 'discord.discord':
             raise FileNotFoundError()
-        window = dict(id=cls, cls=cls, workspace=-1)
+        window = dict(id=cls, cls=cls, workspace=-1, x=0, y=0, width=800, height=600)
         assert match(window)
         desktop.append(window)
         return [window]
@@ -87,11 +113,16 @@ for failure in (None, 'Edge', 'Discord'):
     def place(window, workspace, monitor):
         window['workspace'] = workspace
 
+    def ghostty(match, workspace, monitor):
+        current = ensure(match, ['ghostty'], workspace, monitor)
+        place(current[0], workspace, monitor)
+        return current
+
     with tempfile.TemporaryDirectory() as directory, patch.dict(g, {
         'STATE': Path(directory), 'windows': lambda: desktop,
         'run': lambda *args: 'Monitors: 1\n 0: +*DP-1 1920/300x1080/200+0+0 DP-1' if args[0] == 'xrandr' else 'desktop\n' * 6,
         'quiet_launches': nullcontext, 'ensure_app': ensure, 'recover_edge': edge,
-        'place': place, 'connect_earbuds': lambda: events.append('Bluetooth') or 'Connected.',
+        'place': place, 'recover_ghostty': ghostty, 'connect_earbuds': lambda: events.append('Bluetooth') or 'Connected.',
         'notify': lambda message: None,
     }), patch.dict('os.environ', {'XDG_SESSION_TYPE': 'x11', 'XDG_RUNTIME_DIR': directory}), \
             patch.object(g['subprocess'], 'run') as commands, \

@@ -2,6 +2,7 @@
 """Recover the personal GNOME/X11 desktop, or keep a Recover menu in the tray."""
 import fcntl
 from contextlib import contextmanager
+from collections import Counter
 import hashlib
 import logging
 from logging.handlers import RotatingFileHandler
@@ -65,7 +66,7 @@ def edge_sessions(data):
     serialized_navigation_entry}.cc. Edge-only command IDs are ignored.
     """
     if len(data) < 8 or data[:4] != b'SNSS' or struct.unpack_from('<I', data, 4)[0] not in (1, 3):
-        raise ValueError('Unsupported Edge session format')
+        raise ValueError('edge_session_format_unsupported')
     tabs, sessions = {}, {}
     offset = 8
     def tab(tid):
@@ -95,7 +96,7 @@ def edge_sessions(data):
         elif command == 6 and len(payload) >= 16:
             tid, index, length = struct.unpack_from('<iii', payload, 4)
             if length < 0 or 16 + length > len(payload):
-                raise ValueError('Invalid Edge navigation record')
+                raise ValueError('edge_navigation_record_invalid')
             pos = (16 + length + 3) & ~3
             title = ''
             if pos + 4 <= len(payload):
@@ -137,29 +138,32 @@ def edge_sessions(data):
     return result
 
 
-def restored_workspaces(browser_windows, saved):
-    """Keep native placement when it already matches the saved workspace set."""
-    expected = sorted(session['workspace'] for session in saved if session['workspace'] is not None)
-    if len(expected) != len(saved):
-        return {}
-    if sorted(window['workspace'] for window in browser_windows) == expected:
-        return {}
+def edge_snapshot():
+    directory = Path.home() / '.config/microsoft-edge/Default/Sessions'
+    files = sorted(directory.glob('Session_*'))
+    if not files:
+        raise RuntimeError('edge_session_missing')
+    latest = files[-1]
+    return latest, edge_sessions(latest.read_bytes())
+
+
+def edge_inventory(sessions, current):
+    """Correlate saved browser windows with X11 windows without logging titles."""
+    if len(sessions) != len(current):
+        return None
+    available = list(current)
     assignments = {}
-    for window in browser_windows:
-        candidates = [session for session in saved if session['selected_title']
-                      and session['selected_title'] in window['title']]
+    for session in sessions:
+        candidates = [w for w in available if session['selected_title']
+                      and w['title'].startswith(session['selected_title'])]
+        if len(candidates) != 1:
+            candidates = [w for w in candidates if w['workspace'] == session['workspace']]
         if len(candidates) != 1:
             return None
-        assignments[window['id']] = candidates[0]['workspace']
-    return assignments if sorted(assignments.values()) == expected else None
-
-
-def saved_edge_sessions():
-    directory = Path.home() / '.config/microsoft-edge/Default/Sessions'
-    latest = max(directory.glob('Session_*'), default=None)
-    if latest is None:
-        raise RuntimeError('No Edge session to count tabs from')
-    return edge_sessions(latest.read_bytes())
+        window = candidates[0]
+        available.remove(window)
+        assignments[window['id']] = session
+    return assignments
 
 
 def launch(*command):
@@ -172,7 +176,7 @@ def launch(*command):
 
 
 @contextmanager
-def stage_windows(match, workspace, monitor):
+def stage_windows(match, workspace, monitor, *, maximize=True):
     """Give new app windows a quiet workspace/display before the WM maps them.
 
     MapNotify is a fallback for apps that overwrite the initial X11 properties.
@@ -214,7 +218,10 @@ def stage_windows(match, workspace, monitor):
                             prepared.add(window.id)
                         if event.type == X.MapNotify and window.id not in mapped:
                             mapped.add(window.id)
-                            place({'id': hex(window.id)}, workspace, monitor)
+                            if maximize:
+                                place({'id': hex(window.id)}, workspace, monitor)
+                            else:
+                                move_workspace({'id': hex(window.id)}, workspace)
                     connection.flush()
                 except error.XError:
                     pass  # Splash windows can disappear before their properties are read.
@@ -233,17 +240,19 @@ def stage_windows(match, workspace, monitor):
             raise RuntimeError('Could not stage new windows: ' + str(failures[0]))
 
 
-def wait_for_windows(match, settle_seconds, ready, timeout):
+def wait_for_windows(match, settle_seconds, ready, timeout, *, stage='windows'):
     deadline = time.monotonic() + timeout
     previous = None
     while time.monotonic() < deadline:
         current = sorted((w for w in windows() if match(w)), key=lambda w: w['id'])
-        if current != previous:
-            previous, stable_since = current, time.monotonic()
+        geometry = [tuple(w.get(key) for key in ('id', 'workspace', 'x', 'y', 'width', 'height'))
+                    for w in current]
+        if geometry != previous:
+            previous, stable_since = geometry, time.monotonic()
         if current and time.monotonic() - stable_since >= settle_seconds and ready(current):
             return current
         time.sleep(0.2)
-    raise RuntimeError(f'window_timeout observed={len(previous or [])} timeout_seconds={timeout}')
+    raise RuntimeError(f'window_timeout stage={stage} observed={len(previous or [])} timeout_seconds={timeout}')
 
 
 def ensure_app(match, command, workspace, monitor):
@@ -259,36 +268,59 @@ def ensure_app(match, command, workspace, monitor):
 def recover_edge():
     match = lambda w: w['cls'].casefold() == EDGE.casefold()
     existing = any(match(w) for w in windows())
-    saved = saved_edge_sessions()
-    if not saved:
-        raise RuntimeError('no_saved_browser_windows')
-    LOG.info('event=edge_snapshot expected_windows=%d saved_tabs=%d existing=%s',
-             len(saved), sum(session['tabs'] for session in saved), existing)
+    pending = STATE / 'edge-restore-pending'
+    baseline_file = pending.read_text().strip() if pending.exists() else None
+    if baseline_file is None and not existing:
+        source, saved = edge_snapshot()
+        if not saved or any(session['workspace'] is None for session in saved):
+            raise RuntimeError('edge_saved_workspace_missing')
+        backup = backup_edge()
+        baseline_file = str(backup / source.name)
+        temporary = pending.with_suffix('.tmp')
+        temporary.write_text(baseline_file)
+        temporary.chmod(0o600)
+        temporary.replace(pending)
     if not existing:
-        backup_edge()
         launch('microsoft-edge', '--profile-directory=Default', '--restore-last-session')
-    assignments = {}
+    if baseline_file is None:
+        settled = wait_for_windows(match, 2, lambda _: True, 15, stage='edge_reuse')
+    else:
+        baseline = Path(baseline_file)
+        saved = edge_sessions(baseline.read_bytes())
+        expected = Counter((s['workspace'], s['tabs']) for s in saved)
+        LOG.info('event=edge_snapshot expected_windows=%d saved_tabs=%d',
+                 len(saved), sum(s['tabs'] for s in saved))
+        inventory = None
+        reason = 'unstable_or_missing_windows'
 
-    def ready(current):
-        nonlocal assignments
-        if len(current) < len(saved):
-            return False
-        if existing:
+        def ready(current):
+            nonlocal inventory, reason
+            if len(current) != len(saved):
+                reason = 'window_count'
+                return False
+            try:
+                latest, live = edge_snapshot()
+            except (OSError, ValueError, RuntimeError):
+                reason = 'unreadable_live_inventory'
+                return False
+            if latest.name <= baseline.name:
+                reason = 'waiting_for_fresh_inventory'
+                return False
+            if Counter((s['workspace'], s['tabs']) for s in live) != expected:
+                reason = 'workspace_or_tab_inventory'
+                return False
+            inventory = edge_inventory(live, current)
+            if not inventory or any(inventory[w['id']]['workspace'] != w['workspace'] for w in current):
+                reason = 'window_identity_or_workspace'
+                return False
             return True
-        if len(current) != len(saved):
-            return False
-        assignments = restored_workspaces(current, saved)
-        return assignments is not None
 
-    settled = wait_for_windows(match, 2 if existing else 5, ready, 60)
-    if assignments:
-        for window in settled:
-            workspace = assignments[window['id']]
-            if workspace != window['workspace']:
-                subprocess.run(['wmctrl', '-ir', window['id'], '-t', str(workspace)],
-                               check=True, timeout=5)
-        settled = wait_for_windows(match, 2, lambda current: len(current) == len(saved)
-                                   and all(assignments.get(w['id']) == w['workspace'] for w in current), 15)
+        try:
+            settled = wait_for_windows(match, 5, ready, 60, stage='edge_restore')
+        except RuntimeError:
+            LOG.warning('event=edge_gate_blocked reason=%s expected_windows=%d', reason, len(saved))
+            raise
+        pending.unlink()
     LOG.info('event=edge_settled windows=%d workspaces=%s', len(settled),
              ','.join(str(w['workspace'] + 1) for w in settled))
 
@@ -302,23 +334,95 @@ def backup_edge():
     shutil.copytree(source, destination)
     for old in sorted(STATE.glob('edge-session-*'))[:-5]:
         shutil.rmtree(old)
+    return destination
+
+
+def move_workspace(window, workspace):
+    wid = window['id']
+    if window.get('workspace') == -1:
+        subprocess.run(['wmctrl', '-ir', wid, '-b', 'remove,sticky'], check=True, timeout=5)
+    if window.get('workspace') != workspace:
+        subprocess.run(['wmctrl', '-ir', wid, '-t', str(workspace)], check=True, timeout=5)
+
+
+def on_monitor(window, monitor):
+    return ('x' in window
+            and monitor['x'] <= window['x'] + window['width'] / 2 < monitor['x'] + monitor['width']
+            and monitor['y'] <= window['y'] + window['height'] / 2 < monitor['y'] + monitor['height'])
 
 
 def place(window, workspace, monitor):
     wid = window['id']
-    if workspace is not None:
-        if window.get('workspace') == -1:
-            subprocess.run(['wmctrl', '-ir', wid, '-b', 'remove,sticky'], check=True, timeout=5)
-        if window.get('workspace') != workspace:
-            subprocess.run(['wmctrl', '-ir', wid, '-t', str(workspace)], check=True, timeout=5)
-    same_screen = ('x' in window
-                   and monitor['x'] <= window['x'] + window['width'] / 2 < monitor['x'] + monitor['width']
-                   and monitor['y'] <= window['y'] + window['height'] / 2 < monitor['y'] + monitor['height'])
-    if not same_screen:
+    move_workspace(window, workspace)
+    if not on_monitor(window, monitor):
         subprocess.run(['wmctrl', '-ir', wid, '-b', 'remove,maximized_vert,maximized_horz'], check=True, timeout=5)
         geometry = f"0,{monitor['x'] + 40},{monitor['y'] + 70},{monitor['width'] - 80},{monitor['height'] - 140}"
         subprocess.run(['wmctrl', '-ir', wid, '-e', geometry], check=True, timeout=5)
     subprocess.run(['wmctrl', '-ir', wid, '-b', 'add,maximized_vert,maximized_horz'], check=True, timeout=5)
+
+
+def attached_tmux_windows(ghostty_windows):
+    try:
+        clients = run('tmux', 'list-clients', '-F', '#{client_pid}').splitlines()
+    except subprocess.CalledProcessError:
+        return []
+    ancestors = set()
+    for client in clients:
+        pid = int(client)
+        while pid > 1 and pid not in ancestors:
+            ancestors.add(pid)
+            try:
+                pid = int(Path(f'/proc/{pid}/stat').read_text().rsplit(')', 1)[1].split()[1])
+            except FileNotFoundError:
+                break
+    result = []
+    for window in ghostty_windows:
+        try:
+            prop = run('xprop', '-id', window['id'], '_NET_WM_PID')
+        except subprocess.CalledProcessError:
+            continue
+        match = re.search(r'= (\d+)$', prop)
+        if match and int(match[1]) in ancestors:
+            result.append(window)
+    return result
+
+
+def tmux_layout():
+    try:
+        return set(run('tmux', 'list-panes', '-as', '-F',
+                       '#{session_name}\t#{window_index}\t#{pane_index}\t#{window_zoomed_flag}').splitlines())
+    except subprocess.CalledProcessError:
+        return set()
+
+
+def saved_tmux_layout():
+    path = Path.home() / '.local/share/tmux/resurrect/last'
+    if not path.exists():
+        return set()
+    panes = [line.split('\t') for line in path.read_text().splitlines() if line.startswith('pane\t')]
+    return {'\t'.join((row[1], row[2], row[5], str(int('Z' in row[4])))) for row in panes}
+
+
+def recover_ghostty(match, workspace, monitor):
+    expected = tmux_layout() or saved_tmux_layout()
+    existing = [w for w in windows() if match(w)]
+    if existing and not attached_tmux_windows(existing):
+        raise RuntimeError('ghostty_has_no_tmux_client')
+    if not existing:
+        # Attach to the last-used session. Only bootstrap a session on a cold server.
+        with stage_windows(match, workspace, monitor, maximize=False):
+            launch('ghostty', '-e', '/bin/sh', '-c',
+                   'tmux attach-session || exec tmux new-session -A -s main')
+            wait_for_windows(match, 0.8, lambda found: bool(attached_tmux_windows(found))
+                             and expected <= tmux_layout(), 25, stage='ghostty_tmux_restore')
+    current = attached_tmux_windows([w for w in windows() if match(w)])
+    for window in current:
+        move_workspace(window, workspace)
+    wait_for_windows(match, 0.4, lambda found: any(
+        w['workspace'] == workspace for w in attached_tmux_windows(found))
+        and expected <= tmux_layout(), 5, stage='ghostty_placement_and_zoom')
+    LOG.info('event=tmux_verified expected_panes=%d', len(expected))
+    return current
 
 
 def notify(message):
@@ -433,7 +537,7 @@ def recover():
             apps = [
                 ('T3 Code', is_t3, [str(Path.home() / '.local/bin/t3'), '--foreground'], 0, screens[0]),
                 ('Ghostty', lambda w: 'ghostty' in w['cls'].lower(),
-                 ['ghostty', '-e', 'tmux', 'new-session', '-A', '-s', 'main'], 3, screens[-1]),
+                 None, 3, screens[-1]),
                 ('Discord', lambda w: w['cls'].lower() == 'discord.discord', ['discord'], 4, screens[0]),
                 ('Zoho Mail', lambda w: w['cls'] == ZOHO, pwa('ilnnabaccafamopchccjobpmmpmdnope'), 4, screens[0]),
                 ('WhatsApp', lambda w: w['cls'] == WHATSAPP, pwa('hnpfjngllnobngcgfapefoaidbinmjnm'), 5, screens[-1]),
@@ -442,11 +546,15 @@ def recover():
                 start = time.monotonic()
                 LOG.info('event=stage_start app=%s workspace=%d', app, workspace + 1)
                 try:
-                    current = ensure_app(match, command, workspace, monitor)
-                    for window in current:
-                        place(window, workspace, monitor)
-                    wait_for_windows(match, 0.4, lambda found: all(
-                        w['workspace'] == workspace for w in found), 5)
+                    if app == 'Ghostty':
+                        current = recover_ghostty(match, workspace, monitor)
+                    else:
+                        current = ensure_app(match, command, workspace, monitor)
+                        for window in current:
+                            place(window, workspace, monitor)
+                        wait_for_windows(match, 0.4, lambda found: all(
+                            w['workspace'] == workspace and on_monitor(w, monitor) for w in found),
+                            5, stage='app_placement')
                     LOG.info('event=stage_complete app=%s windows=%d elapsed_ms=%d',
                              app, len(current), (time.monotonic() - start) * 1000)
                 except Exception as error:
@@ -461,7 +569,10 @@ def recover():
 
 
 def log_failure(app, error):
-    detail = str(error) if str(error).startswith('window_timeout ') else ''
+    reason = str(error)
+    detail = reason if re.fullmatch(r'[a-z_]+(?: [a-z_]+=[a-z_0-9]+)*', reason) else ''
+    if isinstance(error, subprocess.SubprocessError) and getattr(error, 'cmd', None):
+        detail += f' executable={Path(error.cmd[0]).name}'
     LOG.error('event=stage_failed app=%s error=%s errno=%s exit=%s %s', app,
               type(error).__name__, getattr(error, 'errno', None),
               getattr(error, 'returncode', None), detail)

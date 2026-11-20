@@ -16,7 +16,8 @@ one of these actions before opening or moving applications.
 Other application windows keep their current display and workspace.
 With one display, everything uses that display. Recovery enables workspaces on
 both displays so Ghostty and WhatsApp can occupy different workspaces there.
-It uses six or more fixed workspaces and maximizes the windows it places.
+It uses six or more fixed workspaces and maximizes the windows it places
+except Ghostty, which keeps its existing window state.
 
 ## Quiet recovery
 
@@ -45,17 +46,17 @@ When no regular Edge window exists, the script backs up the Default profile's
 before either PWA. Existing browser windows are reused. Recovery never sends
 Ctrl+Shift+T, closes browser windows, or overwrites Edge's session files.
 
-Before a cold launch, recovery reads the saved window count and workspace
-numbers from the newest `Session_*` file. It waits for all expected regular
-browser windows and five seconds of stable X11 window state. If Edge has
-already restored the saved workspace set, its placement is kept. Otherwise,
-recovery uses unambiguous saved active-tab titles to place the restored
-windows and verifies the result. Open Edge windows retain their current
-workspaces. If the restore cannot be verified within the allotted wait,
-recovery stops before launching the other apps. Check Edge and retry Recover.
+Before a cold launch, recovery records the saved window and tab counts by
+workspace from the newest `Session_*` file. It waits for a fresh browser
+session record with the same inventory and five seconds of stable X11 window
+geometry. Recovery also checks that the restored windows match the recorded
+workspaces. Edge places its own windows. A pending restore keeps its original
+baseline across retries. Existing Edge sessions without a pending restore
+keep their current workspaces and get a short settling check.
 
-X11 verifies window count and settling. Edge controls tab restoration and
-may defer loading background tabs.
+If recovery cannot verify a pending restore within 60 seconds, it stops
+before launching the other apps. Check Edge and retry Recover. The browser
+session inventory counts restored tabs, including tabs Edge defers loading.
 
 The reader follows Chromium's [session command format](https://github.com/chromium/chromium/blob/main/components/sessions/core/session_service_commands.cc)
 and [navigation record format](https://github.com/chromium/chromium/blob/main/components/sessions/core/serialized_navigation_entry.cc).
@@ -68,9 +69,11 @@ the pre-launch backup from initial setup. `edge-reference-session` and
 These are local private data, outside the dotfiles repository. Backups are for
 manual recovery if Edge's own saved session is lost; they are never restored
 over a running browser automatically. The script cannot recover tabs that Edge
-never saved. Ghostty attaches to tmux's `main` session. Running tmux panes retain their
-zoom. On a fresh tmux server the configured Continuum/Resurrect plugins
-restore the last saved layout and saved pane zoom.
+never saved. Ghostty attaches to the most recently used tmux session. Recovery preserves
+an existing Ghostty window's fullscreen and font settings. It checks for
+an attached tmux client and verifies that pane zoom is retained. On a fresh
+tmux server, Continuum and Resurrect restore the last saved layout and pane
+zoom.
 
 ## Installation and checks
 
@@ -79,7 +82,7 @@ registers the launcher, shortcut, and tray autostart, then starts the tray. It
 replaces the old startup entry so there is only one login action.
 `./scripts/startup-setup.sh` remains a compatible command for direct recovery.
 
-Requires GNOME on X11, `wmctrl`, `xrandr`, `systemd-run`, `bluetoothctl`, Python Xlib,
+Requires GNOME on X11, `wmctrl`, `xprop`, `xrandr`, `systemd-run`, `bluetoothctl`, Python Xlib,
 Python GI with GTK 3 and AyatanaAppIndicator3, and the installed applications.
 T3 Code uses the installed `~/.local/bin/t3` launcher. Zoho and WhatsApp
 use the existing Edge Default-profile PWA IDs in `scripts/desktop-recovery`.
