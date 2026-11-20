@@ -8,7 +8,7 @@ one of these actions before opening or moving applications.
 | --- | --- | --- |
 | Edge | Existing or saved workspace numbers | Edge's placement |
 | T3 Code | 1 | Primary |
-| Ghostty running tmux | 4 | Secondary |
+| Ghostty running tmux | 4 | Existing display, secondary preferred on launch |
 | Discord | 5 | Primary |
 | Zoho Mail PWA | 5 | Primary |
 | WhatsApp PWA | 6 | Secondary |
@@ -73,7 +73,7 @@ These are local private data, outside the dotfiles repository. Backups are for
 manual recovery if Edge's own saved session is lost; they are never restored
 over a running browser automatically. The script cannot recover tabs that Edge
 never saved. Ghostty attaches to the most recently used tmux session. Recovery preserves
-an existing Ghostty window's fullscreen and font settings. It checks for
+an existing Ghostty window's display, fullscreen and font settings. It checks for
 an attached tmux client and verifies that pane zoom is retained. On a fresh
 tmux server, Continuum and Resurrect restore the last saved layout and pane
 zoom. A new tmux server runs in its own user service so closing Ghostty leaves

@@ -463,7 +463,7 @@ def recover_ghostty(match, workspace, monitor):
     def placed(found):
         attached = attached_tmux_windows(found)
         return target_ids == {w['id'] for w in attached} and all(
-            w['workspace'] == workspace and on_monitor(w, monitor) for w in attached
+            w['workspace'] == workspace for w in attached
         ) and expected <= tmux_layout() and all(
             attached_before.get(w['id'], w['tmux_views']) == w['tmux_views'] for w in attached
         )

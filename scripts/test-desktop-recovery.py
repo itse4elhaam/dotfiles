@@ -103,6 +103,17 @@ with patch.dict(g, {'tmux_layout': lambda: {'pane'}, 'windows': lambda: [ghost],
         raise AssertionError('Replacement Ghostty was accepted')
     assert not moves
 
+# Reuse an attached Ghostty window on its current display.
+moves = []
+with patch.dict(g, {'tmux_layout': lambda: {'pane'}, 'windows': lambda: [ghost],
+                    'attached_tmux_windows': lambda found: found,
+                    'move_workspace': lambda window, workspace:
+                    moves.append((window['id'], workspace)),
+                    'wait_for_windows': lambda match, settle, ready, timeout, **kwargs:
+                    [ghost] if ready([ghost]) else (_ for _ in ()).throw(AssertionError())}):
+    assert r['recover_ghostty'](lambda _: True, 3, monitors[1]) == [ghost]
+assert moves == [(ghost['id'], 3)]
+
 # The real cold gate waits for a fresh inventory with every saved tab and workspace.
 g = r['recover_edge'].__globals__
 with tempfile.TemporaryDirectory() as directory:
