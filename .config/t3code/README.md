@@ -95,6 +95,14 @@ and caches the GTK module under `~/.cache/t3code/`. Other applications keep
 GNOME's normal button layout, including editors and browsers started by T3.
 If compilation fails, T3 launches with normal controls and prints a warning.
 
+The same module gives T3's native right-click menus (thread, project, draft)
+Tokyo Drift colours: a navy background, light text, a blue hover row, a muted
+separator, and dimmed disabled items. Electron draws these menus itself and
+takes only colours from GTK. Blur, corner radius, and padding cannot be
+changed this way. Edit `menu_css` in `no-close.c` to change the colours. The
+launcher recompiles the module when the source is newer. Changes apply after
+you quit and reopen T3 through `t3`.
+
 Setup links `~/.local/bin/t3` and the desktop launcher into this checkout.
 The launcher also sets `T3CODE_DESKTOP_LAUNCHER_PATH`, so T3 registers its URL
 handler through the same launcher. This applies after quitting and reopening
