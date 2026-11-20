@@ -10,12 +10,12 @@ from contextlib import nullcontext
 from unittest.mock import patch
 
 r = runpy.run_path(str(Path(__file__).with_name('desktop-recovery')))
-windows = r['parse_windows']('''0x001  0 0 40 1920 1160 microsoft-edge.Microsoft-edge host Messages and 15 more pages
+windows = r['parse_windows']('''0x001  0 0 40 1920 1160 microsoft-edge.Microsoft-edge host Messages and 1 more pages
 0x002  1 0 40 1920 1160 microsoft-edge.Microsoft-edge host YouTube
 0x003  2 0 40 1920 1160 crx__zoho.Microsoft-edge host Zoho Mail
 ''')
 assert windows[0] == dict(id='0x001', workspace=0, x=0, y=40, width=1920, height=1160,
-                          cls=r['EDGE'], title='Messages and 15 more pages')
+                          cls=r['EDGE'], title='Messages and 1 more pages')
 monitors = r['monitors']('''Monitors: 2
  0: +HDMI-1 2560/600x1440/340+0+0 HDMI-1
  1: +*eDP-1 1920/302x1200/189+2560+240 eDP-1
@@ -64,6 +64,8 @@ same_saved = [dict(workspace=0, selected_title='Mail', tabs=10),
               dict(workspace=1, selected_title='Mail', tabs=7)]
 assert r['edge_inventory'](same_saved, same_title) == {'ten': same_saved[0], 'seven': same_saved[1]}
 assert r['edge_inventory']([dict(item, tabs=7) for item in same_saved], same_title) is None
+
+assert r['edge_inventory']([same_saved[0]], [same_title[0]]) is None
 
 # Cold Ghostty starts the tmux server in a separate unit and only attaches.
 g = r['recover_ghostty'].__globals__

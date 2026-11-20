@@ -48,14 +48,17 @@ Ctrl+Shift+T, closes browser windows, or overwrites Edge's session files.
 
 Before a cold launch, recovery records the saved tab identities by
 workspace from the newest `Session_*` file. It waits for a fresh browser
-session record with the same inventory and five seconds of stable X11 window
+session record with the same browser tab IDs and five seconds of stable X11 window
 geometry. Recovery matches the restored windows and verifies their original
 workspaces, moving a window only when its original workspace is known. A pending restore keeps its original
 baseline across retries. Existing Edge sessions without a pending restore
 keep their current workspaces and get a short settling check.
 
 If recovery cannot verify a pending restore within five minutes, it stops
-before launching the other apps. Check Edge and retry Recover. The browser
+before launching the other apps. Check Edge and retry Recover. If you have
+manually verified the restore and deliberately changed the browser layout,
+you can remove `~/.local/state/desktop-recovery/edge-restore-pending` before
+retrying. This clears the pending comparison and keeps the backup. The browser
 session inventory counts restored tabs, including tabs Edge defers loading.
 
 The reader follows Chromium's [session command format](https://github.com/chromium/chromium/blob/main/components/sessions/core/session_service_commands.cc)

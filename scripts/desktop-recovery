@@ -103,9 +103,7 @@ def edge_sessions(data):
                 characters = struct.unpack_from('<i', payload, pos)[0]
                 if 0 <= characters <= (len(payload) - pos - 4) // 2:
                     title = payload[pos + 4:pos + 4 + characters * 2].decode('utf-16-le', errors='replace')
-            # Keep identities in memory only. Session URLs may contain private data.
-            identity = hashlib.sha256(payload[16:16 + length]).digest()
-            tab(tid)['nav'][index] = (title, identity)
+            tab(tid)['nav'][index] = title
         elif command in (16, 17) and len(payload) >= 4:
             identifier = struct.unpack_from('<i', payload)[0]
             if command == 16:
@@ -131,13 +129,13 @@ def edge_sessions(data):
     for wid, session in sessions.items():
         if session['kind'] != 0:
             continue
-        members = [t for t in tabs.values() if t['window'] == wid and t['nav']]
+        members = [(tid, t) for tid, t in tabs.items() if t['window'] == wid and t['nav']]
         if not members:
             continue
-        entries = [(t, t['nav'][min(t['nav'], key=lambda i: abs(i - t['selected']))]) for t in members]
-        selected = next((entry[0] for t, entry in entries if t['index'] == session['selected']), '')
-        result.append(dict(workspace=session['workspace'], selected_title=selected, tabs=len(entries),
-                           tab_ids=tuple(sorted(entry[1] for _, entry in entries))))
+        active = next((t for _, t in members if t['index'] == session['selected']), None)
+        title = active['nav'][min(active['nav'], key=lambda i: abs(i - active['selected']))] if active else ''
+        result.append(dict(workspace=session['workspace'], selected_title=title, tabs=len(members),
+                           tab_ids=tuple(sorted(tid for tid, _ in members))))
     return result
 
 
@@ -163,7 +161,9 @@ def edge_inventory(sessions, current):
     for session in sessions:
         candidates = [w for w in current if session['selected_title']
                       and w['title'].startswith(session['selected_title'])]
-        if len(candidates) != 1:
+        candidates = [w for w in candidates
+                      if edge_title_tab_count(w['title']) in (None, session['tabs'])]
+        if len(candidates) > 1:
             candidates = [w for w in candidates if edge_title_tab_count(w['title']) == session['tabs']]
         if len(candidates) != 1 or candidates[0]['id'] in assignments:
             return None
@@ -456,7 +456,7 @@ def recover_ghostty(match, workspace, monitor):
         raise RuntimeError('ghostty_tmux_window_ambiguous')
     for window in current:
         move_workspace(window, workspace)
-    target_ids = {window['id'] for window in current}
+    target_ids = set(attached_before) or {window['id'] for window in current}
     def placed(found):
         attached = attached_tmux_windows(found)
         return target_ids == {w['id'] for w in attached} and all(
