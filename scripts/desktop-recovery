@@ -148,8 +148,8 @@ def edge_snapshot():
     return latest, edge_sessions(latest.read_bytes())
 
 
-def edge_title_tab_count(title):
-    match = re.search(r' and (\d+) more pages(?:\s|$)', title)
+def edge_title_tab_count(suffix):
+    match = re.match(r' and (\d+) more pages(?:\s|$)', suffix)
     return int(match[1]) + 1 if match else None
 
 
@@ -159,12 +159,13 @@ def edge_inventory(sessions, current):
         return None
     assignments = {}
     for session in sessions:
-        candidates = [w for w in current if session['selected_title']
-                      and w['title'].startswith(session['selected_title'])]
-        candidates = [w for w in candidates
-                      if edge_title_tab_count(w['title']) in (None, session['tabs'])]
+        title = session['selected_title']
+        candidates = [(w, edge_title_tab_count(w['title'][len(title):]))
+                      for w in current if title and w['title'].startswith(title)]
+        candidates = [(w, count) for w, count in candidates if count in (None, session['tabs'])]
         if len(candidates) > 1:
-            candidates = [w for w in candidates if edge_title_tab_count(w['title']) == session['tabs']]
+            candidates = [(w, count) for w, count in candidates if count == session['tabs']]
+        candidates = [w for w, _ in candidates]
         if len(candidates) != 1 or candidates[0]['id'] in assignments:
             return None
         window = candidates[0]
@@ -454,6 +455,8 @@ def recover_ghostty(match, workspace, monitor):
     current = attached_tmux_windows([w for w in windows() if match(w)])
     if not current:
         raise RuntimeError('ghostty_tmux_window_ambiguous')
+    if attached_before and attached_before != {w['id']: w['tmux_views'] for w in current}:
+        raise RuntimeError('ghostty_tmux_view_changed')
     for window in current:
         move_workspace(window, workspace)
     target_ids = set(attached_before) or {window['id'] for window in current}

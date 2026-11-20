@@ -66,6 +66,12 @@ assert r['edge_inventory'](same_saved, same_title) == {'ten': same_saved[0], 'se
 assert r['edge_inventory']([dict(item, tabs=7) for item in same_saved], same_title) is None
 
 assert r['edge_inventory']([same_saved[0]], [same_title[0]]) is None
+quoted_title = 'Inbox and 2 more pages'
+for title_suffix, tabs in [('', 1), (' and 6 more pages', 7)]:
+    assert r['edge_inventory'](
+        [dict(selected_title=quoted_title, tabs=tabs)],
+        [dict(id='inbox', title=quoted_title + title_suffix + ' - Microsoft Edge')],
+    )
 
 # Cold Ghostty starts the tmux server in a separate unit and only attaches.
 g = r['recover_ghostty'].__globals__
@@ -82,6 +88,20 @@ with patch.dict(g, {'tmux_layout': lambda: set(), 'saved_tmux_layout': lambda: s
     assert r['recover_ghostty'](lambda _: True, 3, monitors[0]) == [ghost]
 assert launches == [(('tmux', 'new-session', '-d', '-s', 'main'), {'detached_server': True}),
                     (('ghostty', '-e', 'tmux', 'attach-session'), {})]
+
+# Never move another Ghostty window if the original client has gone away.
+replacement = dict(ghost, id='replacement')
+with patch.dict(g, {'tmux_layout': lambda: {'pane'}, 'windows': lambda: [ghost],
+                    'attached_tmux_windows': lambda _: next(attachments),
+                    'move_workspace': lambda *_: moves.append('moved')}):
+    attachments, moves = iter([[ghost], [replacement]]), []
+    try:
+        r['recover_ghostty'](lambda _: True, 3, monitors[0])
+    except RuntimeError as error:
+        assert str(error) == 'ghostty_tmux_view_changed'
+    else:
+        raise AssertionError('Replacement Ghostty was accepted')
+    assert not moves
 
 # The real cold gate waits for a fresh inventory with every saved tab and workspace.
 g = r['recover_edge'].__globals__
