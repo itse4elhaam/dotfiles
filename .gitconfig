@@ -154,6 +154,9 @@
 [url "git@github.com:itse4elhaam/dotfiles.git"]
     insteadOf = "el:"
 
+[init]
+	templateDir = ~/dotfiles/.config/git/templates
+
 [include]
   path = /home/elhaam/gitconfig.local
 [coderabbit]
