@@ -1,0 +1,67 @@
+#!/usr/bin/python3
+"""Toggle the GNOME desktop panel, or install the global shortcut."""
+
+import argparse
+import fcntl
+import os
+from pathlib import Path
+import shlex
+
+from gi.repository import Gio
+
+
+MEDIA_KEYS = 'org.gnome.settings-daemon.plugins.media-keys'
+SHORTCUT = '/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/desktop-zen/'
+BINDING = '<Super><Shift>z'
+
+
+def install():
+    settings = Gio.Settings.new(MEDIA_KEYS)
+    paths = settings.get_strv('custom-keybindings')
+    for path in paths:
+        entry = Gio.Settings.new_with_path(MEDIA_KEYS + '.custom-keybinding', path)
+        if path != SHORTCUT and entry.get_string('binding').lower() in (
+            BINDING.lower(), '<shift><super>z'
+        ):
+            raise SystemExit('Super+Shift+Z is already assigned to another custom shortcut.')
+
+    entry = Gio.Settings.new_with_path(MEDIA_KEYS + '.custom-keybinding', SHORTCUT)
+    for key, value in (
+        ('name', 'Desktop Zen mode'),
+        ('command', shlex.quote(str(Path(__file__).resolve()))),
+        ('binding', BINDING),
+    ):
+        if not entry.set_string(key, value):
+            raise SystemExit(f'Could not set desktop Zen shortcut {key}.')
+    if SHORTCUT not in paths and not settings.set_strv('custom-keybindings', paths + [SHORTCUT]):
+        raise SystemExit('Could not register the desktop Zen shortcut.')
+    Gio.Settings.sync()
+    print('Installed Super+Shift+Z for desktop Zen mode.')
+
+
+def toggle():
+    extension = 'just-perfection-desktop@just-perfection'
+    data = Path(os.environ.get('XDG_DATA_HOME') or Path.home() / '.local/share')
+    schemas = data / 'gnome-shell/extensions' / extension / 'schemas'
+    source = Gio.SettingsSchemaSource.get_default()
+    if (schemas / 'gschemas.compiled').is_file():
+        source = Gio.SettingsSchemaSource.new_from_directory(str(schemas), source, False)
+    schema = source.lookup('org.gnome.shell.extensions.just-perfection', True)
+    if schema is None:
+        raise SystemExit('Install and enable the Just Perfection GNOME extension.')
+    settings = Gio.Settings.new_full(schema, None, None)
+    # Serialize presses through the settings write.
+    with (Path(os.environ['XDG_RUNTIME_DIR']) / 'desktop-zen.lock').open('a') as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        if not settings.set_boolean('panel', not settings.get_boolean('panel')):
+            raise SystemExit('Could not change the Just Perfection panel setting.')
+        Gio.Settings.sync()
+
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('action', nargs='?', choices=('toggle', 'install'), default='toggle')
+    if parser.parse_args().action == 'install':
+        install()
+    else:
+        toggle()
