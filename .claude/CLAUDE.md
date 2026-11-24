@@ -3,7 +3,11 @@
 
 Never enable screen readers, Orca, speech-dispatcher, accessibility speech, or desktop accessibility settings. Never set `ScreenReaderEnabled`, `screen-reader-enabled`, or `toolkit-accessibility` to true, even temporarily for testing. Never unmask speech services or remove the speech safeguards. This applies to every task, including Neovim textbox integration. Only a new, explicit user request to enable speech can override this rule.
 
-**Heavy compute on this laptop:** prefer boxes.dev; before running anything CPU- or RAM-heavy locally, follow `~/.agents/skills/laptop-compute-caps/SKILL.md` (whole machine at or under 50% CPU and 70% RAM).
+## Compute permission
+
+Remote compute is off by default. Never install or launch boxes.dev or wake any of its machines. Agent 37 requires Elhaam's explicit permission for each specific run, including submitting work to an existing instance, starting one, or resuming one. This applies to delegated work, retries that start another run, and scheduled jobs. Account setup and earlier approvals do not authorize a run.
+
+For heavy local work, follow `~/.agents/skills/laptop-compute-caps/SKILL.md`. Keep whole-machine CPU at or below 50% and RAM at or below 70%.
 
 ## Claude usage
 
