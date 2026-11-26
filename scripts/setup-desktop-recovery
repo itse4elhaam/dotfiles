@@ -47,3 +47,5 @@ shortcut.set_string('binding', '<Super><Alt>r')
 Gio.Settings.sync()
 PY
 systemd-run --user --collect --quiet --unit="desktop-recovery-tray-$(date +%s)" "$script_dir/desktop-recovery" tray
+
+"$script_dir/install-desktop-checkpoint"

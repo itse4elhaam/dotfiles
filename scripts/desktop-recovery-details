@@ -1,0 +1,168 @@
+#!/usr/bin/env python3
+"""Capture local desktop application state and reapply editor sessions after login."""
+import json
+import os
+import runpy
+import shutil
+import tempfile
+import subprocess
+import sys
+import tarfile
+import time
+from pathlib import Path
+
+HOME = Path.home()
+os.umask(0o077)
+mode, directory = sys.argv[1:]
+root = Path(directory).resolve()
+root.mkdir(parents=True, exist_ok=True)
+api = runpy.run_path(str(HOME / '.local/bin/desktop-recovery'))
+
+
+def output(*args):
+    return subprocess.check_output(args, stderr=subprocess.STDOUT, timeout=8, text=True).strip()
+
+
+def remote(sock, expr):
+    return output('nvim', '--server', str(sock), '--remote-expr', expr)
+
+
+def quoted(path):
+    return "'" + str(path).replace("'", "''") + "'"
+
+
+def editor_state(sock, action, path):
+    module = Path(__file__).resolve().with_name('desktop-editor-state.lua')
+    return remote(sock, f'luaeval("dofile(_A[1]).{action}(_A[2])", [{quoted(module)}, {quoted(path)}])')
+
+
+def panes():
+    fmt = '#{pane_pid}\t#{pane_id}\t#{session_name}:#{window_index}.#{pane_index}'
+    result = output('tmux', 'list-panes', '-a', '-F', fmt)
+    return [line.split('\t', 2) for line in result.splitlines()]
+
+
+def editors(rows):
+    owners = {int(pid): target for pid, _, target in rows}
+    for sock in Path(os.environ['XDG_RUNTIME_DIR']).glob('nvim.*.0'):
+        if not sock.is_socket():
+            continue
+        try:
+            pid = int(sock.name.split('.')[1])
+            while pid > 1 and pid not in owners:
+                pid = int(Path(f'/proc/{pid}/stat').read_text().rsplit(')', 1)[1].split()[1])
+            if pid in owners:
+                yield owners[pid], sock
+        except (FileNotFoundError, ValueError):
+            continue
+
+
+def save():
+    browser = HOME / '.config/microsoft-edge/Default/Sessions'
+    files = sorted(browser.glob('Session_*'))
+    if files:
+        data = files[-1].read_bytes()
+        archive = root / 'edge-sessions'
+        archive.mkdir(exist_ok=True)
+        for prefix in ('Session_', 'Tabs_', 'Apps_'):
+            versions = sorted(browser.glob(prefix+'*'))
+            if versions:
+                src = versions[-1]
+                if src == files[-1]:
+                    (archive / src.name).write_bytes(data)
+                else:
+                    shutil.copyfile(src, archive / src.name)
+        tabs = api['edge_sessions'](data, details=True)
+        (root / 'edge-tabs.json').write_text(json.dumps(tabs, ensure_ascii=False, indent=2))
+    if subprocess.run(['tmux', 'has-session'], capture_output=True).returncode:
+        return
+    rows = panes()
+    manifest = {}
+    for index, (target, sock) in enumerate(editors(rows)):
+        expr = """json_encode({'cwd':getcwd(),'file':expand('%:p'),'cursor':getcurpos(),'buffers':map(getbufinfo({'buflisted':1}),{_,b->[b.name,b.changed]})})"""
+        entry = json.loads(remote(sock, expr))
+        path = root / f'editor-{index}.vim'
+        edits = json.loads(editor_state(sock, 'save', path))
+        if edits:
+            file = root / f'editor-{index}-edits.json'
+            file.write_text(json.dumps(edits))
+            entry['edits'] = file.name
+        manifest[target] = dict(entry, session=path.name)
+    for _, pane, _ in rows:
+        with (root / f'pane-{pane[1:]}.txt').open('wb') as stream:
+            subprocess.run(['tmux', 'capture-pane', '-p', '-S', '-', '-t', pane],
+                           stdout=stream, check=True, timeout=8)
+    (root / 'panes.json').write_text(json.dumps(rows))
+    (root / 'editors.json').write_text(json.dumps(manifest, indent=2))
+    (root / 'clients.txt').write_text(output('tmux','list-clients','-F','#{session_name}'))
+    script = HOME / '.tmux/plugins/tmux-resurrect/scripts/save.sh'
+    if script.is_file():
+        # Give the plugin a separate output directory from continuum's timer.
+        # Concurrent saves to its timestamp-based 'last' path can collide.
+        with tempfile.TemporaryDirectory() as temp:
+            env = dict(os.environ, XDG_DATA_HOME=temp)
+            subprocess.run([str(script), 'quiet'], env=env, check=True, timeout=15)
+            generated = Path(temp) / 'tmux/resurrect/last'
+            if not generated.is_file():
+                custom = output('tmux', 'show-option', '-gqv', '@resurrect-dir')
+                fallback = Path(custom).expanduser() if custom else HOME / '.tmux/resurrect'
+                generated = fallback / 'last'
+            shutil.copyfile(generated, root / 'tmux-resurrect.txt')
+
+
+def prepare_tmux():
+    manifest = root / 'tmux-resurrect.txt'
+    if not manifest.is_file() or subprocess.run(['tmux','has-session'], capture_output=True).returncode == 0:
+        return
+    dest = HOME / '.local/share/tmux/resurrect'
+    dest.mkdir(parents=True, exist_ok=True)
+    if (root / 'panes.json').is_file():
+        with tempfile.NamedTemporaryFile(dir=dest, delete=False) as tmp:
+            with tarfile.open(fileobj=tmp, mode='w:gz') as archive:
+                for _, pane, target in json.loads((root / 'panes.json').read_text()):
+                    if '/' not in target and pane.startswith('%') and pane[1:].isdigit():
+                        archive.add(root / f'pane-{pane[1:]}.txt', arcname=f'pane_contents/pane-{target}')
+        Path(tmp.name).replace(dest / 'pane_contents.tar.gz')
+    with tempfile.NamedTemporaryFile(dir=dest, prefix='checkpoint-', delete=False) as f:
+        f.write(manifest.read_bytes())
+    link = dest / ('next-' + str(os.getpid()))
+    link.symlink_to(Path(f.name).name)
+    link.replace(dest / 'last')
+
+
+def restore():
+    if not (root / 'editors.json').exists():
+        return
+    pending = json.loads((root / 'editors.json').read_text())
+    deadline = time.monotonic() + 40
+    expected = {row[2] for row in json.loads((root / 'panes.json').read_text())}
+    while time.monotonic() < deadline:
+        actual = {row[2] for row in panes()}
+        if not pending and expected <= actual:
+            break
+        for target, sock in editors(panes()):
+            if target not in pending:
+                continue
+            entry = pending[target]
+            if remote(sock, "len(filter(getbufinfo(), {_,b -> b.changed}))") != '0':
+                raise RuntimeError(f'Live edits in {target}')
+            path = root / entry['session']
+            remote(sock, "execute('source ' . fnameescape(" + quoted(path) + '))')
+            if entry.get('edits'):
+                editor_state(sock, 'restore', root / entry['edits'])
+            if remote(sock, "expand('%:p')") != entry['file']:
+                raise RuntimeError(f'Editor restore mismatch in {target}')
+            del pending[target]
+        if pending or not expected <= actual:
+            time.sleep(1)
+    if pending:
+        raise RuntimeError(f'Missing editor panes: {list(pending)}')
+    missing = expected - {row[2] for row in panes()}
+    if missing:
+        raise RuntimeError(f'Missing terminal panes: {sorted(missing)}')
+    clients = (root / 'clients.txt').read_text().splitlines()
+    current = output('tmux','list-clients','-F','#{client_name}').splitlines()
+    if len(clients) == len(current) == 1:
+        output('tmux','switch-client','-c',current[0],'-t',clients[0])
+
+{'prepare-tmux': prepare_tmux, 'save': save, 'restore-editors': restore}[mode]()

@@ -59,7 +59,7 @@ def monitors(output):
     return sorted(result, key=lambda m: not m['primary'])
 
 
-def edge_sessions(data):
+def edge_sessions(data, *, details=False):
     """Read Chromium SNSS window and current-tab metadata.
 
     Format: chromium/components/sessions/core/{session_service_commands,
@@ -103,7 +103,8 @@ def edge_sessions(data):
                 characters = struct.unpack_from('<i', payload, pos)[0]
                 if 0 <= characters <= (len(payload) - pos - 4) // 2:
                     title = payload[pos + 4:pos + 4 + characters * 2].decode('utf-16-le', errors='replace')
-            tab(tid)['nav'][index] = title
+            url = payload[16:16 + length].decode('utf-8', errors='replace')
+            tab(tid)['nav'][index] = (title, url)
         elif command in (16, 17) and len(payload) >= 4:
             identifier = struct.unpack_from('<i', payload)[0]
             if command == 16:
@@ -134,8 +135,15 @@ def edge_sessions(data):
             continue
         active = next((t for _, t in members if t['index'] == session['selected']), None)
         title = active['nav'][min(active['nav'], key=lambda i: abs(i - active['selected']))] if active else ''
-        result.append(dict(workspace=session['workspace'], selected_title=title, tabs=len(members),
+        result.append(dict(workspace=session['workspace'], selected_title=title[0] if title else '', tabs=len(members),
                            tab_ids=tuple(sorted(tid for tid, _ in members))))
+        if details:
+            ordered = []
+            for _, member in sorted(members, key=lambda item: item[1]['index']):
+                nav = member['nav']
+                name, url = nav[min(nav, key=lambda i: abs(i - member['selected']))]
+                ordered.append(dict(title=name, url=url, active=member is active))
+            result[-1]['pages'] = ordered
     return result
 
 

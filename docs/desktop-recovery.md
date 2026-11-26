@@ -109,3 +109,33 @@ Disable the tray on login in Startup Applications, or set
 `X-GNOME-Autostart-enabled=false` in
 `~/.config/autostart/startup-workspaces.desktop`. Quit in the tray menu stops it
 for the current login only.
+
+## Automatic recovery after login
+
+Run `scripts/install-desktop-checkpoint` from a GNOME X11 session to install
+or update the automatic service. The full desktop recovery installer includes
+this step. Login starts recovery once the window manager can list workspaces.
+Notifications announce the start and result. A lock and unlock during the
+same session leaves the desktop in place.
+
+A checkpoint runs every 30 seconds after the previous save completes. GNOME
+logout and logind shutdown/reboot both request a final save while apps are
+still open. The shutdown delay is bounded. A power cut or kernel crash uses
+the most recent completed save. Every generation is flushed before it becomes
+current. Four generations are retained under
+`~/.local/state/desktop-recovery/automatic/`. The first incomplete restore
+also preserves its source in `incomplete-restore/` for inspection.
+
+The checkpoint includes window placement, stacking and focus, Edge session
+files and ordered tabs, the last Discord channel when available, tmux layout
+and scrollback files, and Neovim sessions with copies of modified text buffers.
+Recovery uses the apps’ native session behavior for T3 Code, Zoho and WhatsApp.
+App-private drafts, playback positions, shell jobs and other in-memory state
+depend on each app. tmux-resurrect replays terminal scrollback in the
+reopened panes.
+
+Use `desktop-session-checkpoint save` for an immediate checkpoint. Check
+`systemctl --user status desktop-session-{checkpoint,logout-save}.service`
+and `journalctl --user -b -u desktop-session-checkpoint` for startup results.
+The graphical session starts after the user's desktop login. Disk decryption
+alone makes the files available but does not start that session.

@@ -1,0 +1,13 @@
+[Unit]
+Description=Checkpoint the desktop before GNOME logout
+PartOf=graphical-session.target
+After=graphical-session-pre.target
+ConditionEnvironment=XDG_SESSION_TYPE=x11
+
+[Service]
+ExecStart=%h/.local/bin/desktop-session-logout-save
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=graphical-session.target

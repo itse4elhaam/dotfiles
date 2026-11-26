@@ -1,0 +1,325 @@
+#!/usr/bin/python3
+"""Checkpoint the local GNOME X11 session and restore it on the next login."""
+import fcntl
+import json
+import os
+import re
+import runpy
+import shutil
+import subprocess
+import sys
+import tempfile
+import time
+from urllib.parse import parse_qsl, urlsplit
+from pathlib import Path
+
+os.umask(0o077)
+root = Path.home() / '.local/state/desktop-recovery/automatic'
+root.mkdir(mode=0o700, parents=True, exist_ok=True)
+details = Path.home() / '.local/bin/desktop-recovery-details'
+edge = 'microsoft-edge.microsoft-edge'
+commands = {
+    edge: ['microsoft-edge', '--profile-directory=Default', '--restore-last-session'],
+    'discord.discord': ['discord'],
+    'com.t3tools.t3code.com.t3tools.t3code': [str(Path.home() / '.local/bin/t3'), '--foreground'],
+}
+flags = ('maximized_vert', 'maximized_horz', 'fullscreen', 'above', 'below', 'sticky')
+
+
+def read(*args):
+    return subprocess.check_output(args, text=True, errors='replace', timeout=8)
+
+
+def windows():
+    result = []
+    for row in read('wmctrl', '-lx').splitlines():
+        fields = row.split(None, 4)
+        if len(fields) == 5 and fields[4] == 'Discord Updater' and fields[2].lower() == 'discord.discord':
+            continue
+        if len(fields) >= 4 and int(fields[1]) >= 0:
+            result.append(dict(id=fields[0], desk=int(fields[1]), cls=fields[2].lower(),
+                               title=fields[4] if len(fields) == 5 else ''))
+    return result
+
+
+def discord_path(title):
+    if title in ('Friends - Discord', 'Discord'):
+        return '/channels/@me' if title.startswith('Friends') else None
+    log = Path.home() / '.config/discord/logs/renderer_js.log'
+    if not log.exists():
+        return None
+    with log.open('rb') as stream:
+        stream.seek(max(0, log.stat().st_size - 2**20))
+        routes = re.findall(rb'\[Routing/Utils\] transitionTo - Transitioning to (\S+)', stream.read())
+    if routes and re.fullmatch(rb'/channels/(?:@me|\d+)(?:/\d+){1,2}', routes[-1]):
+        return routes[-1].decode()
+    return None
+
+
+def snapshot():
+    wins = windows()
+    if not wins:
+        raise RuntimeError('No application windows')
+    properties = read('xprop', '-root', '_NET_ACTIVE_WINDOW', '_NET_CLIENT_LIST_STACKING')
+    ids = [int(x, 16) for x in re.findall(r'0x[0-9a-f]+', properties)]
+    wins.sort(key=lambda w: ids[1:].index(int(w['id'], 16)) if int(w['id'], 16) in ids[1:] else -1)
+    for w in wins:
+        if w['cls'] == 'discord.discord':
+            w['channel'] = discord_path(w['title'])
+        info = read('xwininfo', '-id', w['id'])
+        w['rect'] = [int(re.search(label + r':\s*(-?\d+)', info)[1]) for label in
+                     ('Absolute upper-left X', 'Absolute upper-left Y', 'Width', 'Height')]
+        props = read('xprop', '-id', w['id'], '_NET_WM_STATE', '_NET_FRAME_EXTENTS')
+        frame = re.search(r'_NET_FRAME_EXTENTS\(CARDINAL\) = (\d+), (\d+), (\d+), (\d+)', props)
+        if frame:
+            w['rect'][0] -= int(frame[1])
+            w['rect'][1] -= int(frame[3])
+        w['minimized'] = '_NET_WM_STATE_HIDDEN' in props and 'Iconic' in read('xprop', '-id', w['id'], 'WM_STATE')
+        w['flags'] = [f for f in flags if '_NET_WM_STATE_' + f.upper() in props]
+        w['active'] = bool(ids and int(w['id'], 16) == ids[0])
+    desks = read('wmctrl', '-d').splitlines()
+    client = subprocess.run(['tmux', 'list-clients', '-F', '#{client_session}'],
+                            capture_output=True, text=True).stdout.splitlines()
+    return dict(windows=wins, desks=len(desks), active_desk=int(next(d.split()[0] for d in desks if d.split()[1] == '*')),
+                tmux=client[0] if client else 'main')
+
+
+def sync_path(path):
+    fd = os.open(path, os.O_RDONLY)
+    try:
+        os.fsync(fd)
+    finally:
+        os.close(fd)
+
+
+def save(periodic=False):
+    with (root / 'save.lock').open('a') as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        if periodic and '= 1' in read('xprop', '-root', '_DESKTOP_CHECKPOINT_ENDING'):
+            return
+        save_locked()
+
+
+def save_locked():
+    state = snapshot()
+    stage = Path(tempfile.mkdtemp(prefix='session-', dir=root))
+    try:
+        (stage / 'layout.json').write_text(json.dumps(state, indent=2))
+        subprocess.run([details, 'save', stage], check=True, timeout=90)
+        if {w['id'] for w in windows()} != {w['id'] for w in state['windows']}:
+            raise RuntimeError('Window list changed during save')
+        for directory, _, files in os.walk(stage, topdown=False):
+            for filename in files:
+                sync_path(Path(directory) / filename)
+            sync_path(directory)
+        pointer = root / '.next'
+        pointer.unlink(missing_ok=True)
+        pointer.symlink_to(stage.name)
+        pointer.replace(root / 'current')
+        sync_path(root)
+    except BaseException:
+        if (root / 'current').resolve() != stage:
+            shutil.rmtree(stage)
+        raise
+    old = sorted(root.glob('session-*'), key=lambda p:p.stat().st_mtime, reverse=True)
+    for p in old[4:]:
+        shutil.rmtree(p)
+
+
+def match(saved, live):
+    pairs = {}
+    for w in saved:
+        exact = [x for x in live if (x['cls'], x['title']) == (w['cls'], w['title']) and x['id'] not in pairs.values()]
+        if len(exact) == 1:
+            pairs[w['id']] = exact[0]['id']
+    for w in saved:
+        if w['id'] in pairs:
+            continue
+        remaining = [x for x in live if x['cls'] == w['cls'] and x['id'] not in pairs.values()]
+        if len(remaining) == 1 and sum(x['cls'] == w['cls'] and x['id'] not in pairs for x in saved) == 1:
+            pairs[w['id']] = remaining[0]['id']
+    return pairs
+
+
+def page_key(url):
+    # YouTube can renumber a saved playlist entry while keeping the same video.
+    parts = urlsplit(url)
+    query = parse_qsl(parts.query, keep_blank_values=True)
+    if parts.hostname in ('www.youtube.com', 'youtube.com') and parts.path == '/watch' and {'v', 'list'} <= dict(query).keys():
+        return repr((parts.netloc, parts.path, [(k, v) for k, v in query if k != 'index'], parts.fragment))
+    return url
+
+
+def tab_signature(sessions):
+    return sorted(tuple((page_key(page['url']), page['active']) for page in session['pages'])
+                  for session in sessions)
+
+
+def prepare_browser(source):
+    """Give a cold Edge process the captured session when its native one differs."""
+    archive = source / 'edge-sessions'
+    if not archive.is_dir() or subprocess.run(['pgrep', '-u', str(os.getuid()), '-x', 'msedge'],
+                                               capture_output=True).returncode != 1:
+        return
+    directory = Path.home() / '.config/microsoft-edge/Default/Sessions'
+    directory.mkdir(parents=True, exist_ok=True)
+    parse = runpy.run_path(str(Path.home() / '.local/bin/desktop-recovery'))['edge_sessions']
+    original = sorted(archive.glob('Session_*'))
+    if not original or not parse(original[-1].read_bytes()):
+        return
+    native = sorted(directory.glob('Session_*'))
+    if native:
+        try:
+            if tab_signature(parse(native[-1].read_bytes(), details=True)) == tab_signature(
+                    json.loads((source / 'edge-tabs.json').read_text())):
+                return
+        except (ValueError, OSError):
+            pass
+    # Chromium orders session files by microseconds since 1601. Keep its
+    # previous generations available and publish only complete new files.
+    stamp = time.time_ns() // 1000 + 11644473600000000
+    for group in ('Apps', 'Tabs', 'Session'):
+        candidates = sorted(archive.glob(group + '_*'))
+        if candidates:
+            with tempfile.NamedTemporaryFile(dir=directory, delete=False) as tmp:
+                tmp.write(candidates[-1].read_bytes())
+                tmp.flush()
+                os.fsync(tmp.fileno())
+            Path(tmp.name).replace(directory / f'{group}_{stamp}')
+
+
+def verify_browser(source):
+    file = source / 'edge-tabs.json'
+    if not file.exists():
+        return
+    expected = tab_signature(json.loads(file.read_text()))
+    parse = runpy.run_path(str(Path.home() / '.local/bin/desktop-recovery'))['edge_sessions']
+    directory = Path.home() / '.config/microsoft-edge/Default/Sessions'
+    for _ in range(20):
+        try:
+            files = sorted(directory.glob('Session_*'))
+            if files and tab_signature(parse(files[-1].read_bytes(), details=True)) == expected:
+                return
+        except (OSError, ValueError):
+            pass  # Edge rotates these files during login.
+        time.sleep(1)
+    raise RuntimeError('Edge saved tab URLs, order, or selected tabs differ from the checkpoint')
+
+
+def restore(source):
+    state = json.loads((source / 'layout.json').read_text())
+    saved = state['windows']
+    if len(read('wmctrl', '-d').splitlines()) < state['desks']:
+        read('wmctrl', '-n', str(state['desks']))
+    subprocess.run([details, 'prepare-tmux', source], check=True, timeout=30)
+    for cls in sorted(set(w['cls'] for w in saved), key=lambda cls: cls != edge):
+        if any(x['cls'] == cls for x in windows()):
+            continue
+        cmd = commands.get(cls)
+        if cls == edge:
+            prepare_browser(source)
+        if cls == 'discord.discord':
+            channel = next((w.get('channel') for w in saved if w['cls'] == cls), None)
+            if channel and re.fullmatch(r'/channels/(?:@me|\d+)(?:/\d+){0,2}', channel):
+                cmd = ['discord', 'discord://-' + channel]
+        if not cmd and not cls.startswith('crx__') and 'ghostty' not in cls:
+            from gi.repository import Gio
+            app_class = cls.rsplit('.', 1)[-1]
+            apps = [app for app in Gio.AppInfo.get_all() if isinstance(app, Gio.DesktopAppInfo)
+                    and ((app.get_startup_wm_class() or '').lower() == app_class
+                         or app.get_id().lower().removesuffix('.desktop') == app_class)]
+            if len(apps) == 1:
+                cmd = ['gtk-launch', apps[0].get_id()]
+        if cls.startswith('crx__') and cls.endswith('.microsoft-edge'):
+            cmd = ['microsoft-edge', '--profile-directory=Default', '--app-id=' + cls[5:].split('.')[0]]
+        if 'ghostty' in cls:
+            cmd = ['ghostty', '-e', 'tmux', 'new-session', '-A', '-s', 'main']
+            if (source / 'panes.json').is_file():
+                cmd += [';', 'set-option', '-g', '@resurrect-capture-pane-contents', 'on']
+        if cmd:
+            subprocess.run(['systemd-run', '--user', '--collect', '--', *cmd], check=False)
+            if cls == edge:
+                for _ in range(15):
+                    if sum(w['cls'] == edge for w in windows()) >= sum(w['cls'] == edge for w in saved):
+                        time.sleep(1)
+                        break
+                    time.sleep(1)
+    for _ in range(120):
+        pairs = match(saved, windows())
+        if len(pairs) == len(saved):
+            break
+        time.sleep(1)
+    for w in saved:
+        target = pairs.get(w['id'])
+        if not target:
+            continue
+        read('wmctrl', '-ir', target, '-t', str(w['desk']))
+        for f in flags:
+            read('wmctrl', '-ir', target, '-b', 'remove,' + f)
+        read('wmctrl', '-ir', target, '-e', '0,' + ','.join(map(str, w['rect'])))
+        for f in w['flags']:
+            read('wmctrl', '-ir', target, '-b', 'add,' + f)
+        if w.get('minimized'):
+            read('xdotool', 'windowminimize', target)
+        else:
+            read('xdotool', 'windowraise', target)
+    read('wmctrl', '-s', str(state['active_desk']))
+    for w in saved:
+        if w['active'] and w['id'] in pairs:
+            read('wmctrl', '-ia', pairs[w['id']])
+    subprocess.run([details, 'restore-editors', source], check=True, timeout=120)
+    result = {w['id']:w for w in windows()}
+    incomplete = [w['cls'] for w in saved if result.get(pairs.get(w['id']), {}).get('desk') != w['desk']]
+    if not incomplete and any(w['cls'] == edge for w in saved):
+        verify_browser(source)
+    if incomplete:
+        raise RuntimeError('Incomplete window placement: ' + ', '.join(incomplete))
+
+
+def notify(title, message):
+    try:
+        subprocess.run(['notify-send', '--app-name=Desktop recovery', '--expire-time=6000', title, message],
+                       check=False, timeout=3)
+    except (OSError, subprocess.TimeoutExpired):
+        pass
+
+
+if __name__ == '__main__':
+    if sys.argv[1:] == ['save']:
+        save()
+    elif sys.argv[1:] == ['run']:
+        for _ in range(120):
+            probe = subprocess.run(['wmctrl', '-d'], capture_output=True)
+            if probe.returncode == 0 and probe.stdout.strip():
+                break
+            time.sleep(1)
+        else:
+            raise RuntimeError('Window manager did not become ready')
+        current = root / 'current'
+        # The session's X server owns this marker and clears it at logout.
+        marker = '_DESKTOP_CHECKPOINT_SESSION_READY'
+        if current.exists() and '= 1' not in read('xprop', '-root', marker):
+            source = current.resolve()
+            notify('Restoring your desktop', 'Opening your apps, browser tabs and terminal sessions…')
+            try:
+                restore(source)
+            except Exception as exc:
+                # Keep a complete recovery source outside the rolling retention
+                # set. Resume checkpointing so new work survives a second crash.
+                fallback = root / 'incomplete-restore'
+                if not fallback.exists():
+                    staging = Path(tempfile.mkdtemp(prefix='fallback-', dir=root))
+                    shutil.copytree(source, staging, dirs_exist_ok=True, copy_function=os.link)
+                    staging.rename(fallback)
+                    sync_path(root)
+                print(f'Restore incomplete: {exc}', file=sys.stderr, flush=True)
+                notify('Desktop partly restored', 'The original checkpoint is available in the recovery folder.')
+            else:
+                notify('Desktop ready', 'Your saved workspace layout has been restored.')
+        read('xprop', '-root', '-f', marker, '32c', '-set', marker, '1')
+        while True:
+            time.sleep(30)
+            try:
+                save(periodic=True)
+            except Exception as exc:
+                print('Checkpoint skipped:', exc, file=sys.stderr, flush=True)

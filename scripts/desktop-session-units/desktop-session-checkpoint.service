@@ -1,0 +1,15 @@
+[Unit]
+Description=Restore and checkpoint the GNOME X11 desktop
+PartOf=graphical-session.target
+After=graphical-session-pre.target
+ConditionEnvironment=XDG_SESSION_TYPE=x11
+
+[Service]
+Type=simple
+ExecStart=%h/.local/bin/desktop-session-checkpoint run
+TimeoutStopSec=5
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=graphical-session.target

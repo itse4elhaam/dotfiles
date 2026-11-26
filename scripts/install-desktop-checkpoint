@@ -1,0 +1,23 @@
+#!/bin/bash
+set -euo pipefail
+scripts=$(dirname "$(readlink -f "$0")")
+for cmd in wmctrl xprop xwininfo xdotool tmux nvim systemctl notify-send; do command -v "$cmd" >/dev/null; done
+/usr/bin/python3 -c 'from gi.repository import GLib, Gio'
+bin="$HOME/.local/bin"
+units="$HOME/.config/systemd/user"
+mkdir -p "$bin" "$units"
+for tool in desktop-recovery desktop-recovery-details desktop-session-checkpoint desktop-session-logout-save; do
+    ln -sfn "$scripts/$tool" "$bin/$tool"
+done
+for unit in desktop-session-checkpoint desktop-session-logout-save; do
+    ln -sfn "$scripts/desktop-session-units/$unit.service" "$units/$unit.service"
+done
+systemctl --user daemon-reload
+systemctl --user enable desktop-session-{checkpoint,logout-save}.service
+# Enroll a running desktop before starting its login restore loop.
+if [[ "$(xprop -root _DESKTOP_CHECKPOINT_SESSION_READY)" != *'= 1'* ]] &&
+   [[ ! -e "$HOME/.local/state/desktop-recovery/automatic/current" ]]; then
+    "$bin/desktop-session-checkpoint" save
+    xprop -root -f _DESKTOP_CHECKPOINT_SESSION_READY 32c -set _DESKTOP_CHECKPOINT_SESSION_READY 1
+fi
+systemctl --user restart desktop-session-{checkpoint,logout-save}.service

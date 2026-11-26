@@ -1,0 +1,101 @@
+#!/usr/bin/python3
+"""Take the final checkpoint while GNOME clients and their displays still exist."""
+import os
+import signal
+import subprocess
+import sys
+from pathlib import Path
+
+from gi.repository import Gio, GLib
+
+session = Gio.bus_get_sync(Gio.BusType.SESSION)
+system = Gio.bus_get_sync(Gio.BusType.SYSTEM)
+gnome = 'org.gnome.SessionManager'
+client = gnome + '.ClientPrivate'
+login = 'org.freedesktop.login1'
+manager = login + '.Manager'
+login_path = '/org/freedesktop/login1'
+loop = GLib.MainLoop()
+checkpoint = Path.home() / '.local/bin/desktop-session-checkpoint'
+marker = '_DESKTOP_CHECKPOINT_ENDING'
+saved = False
+
+
+def final_save():
+    global saved
+    if saved:
+        return
+    ready = subprocess.check_output(['xprop', '-root', '_DESKTOP_CHECKPOINT_SESSION_READY'], text=True)
+    if '= 1' not in ready:
+        return
+    subprocess.run(['xprop', '-root', '-f', marker, '32c', '-set', marker, '1'], check=True)
+    try:
+        # The checkpoint starts helpers of its own. Keep the whole attempt
+        # within logind's delay, including when the process is blocked on I/O.
+        with subprocess.Popen([checkpoint, 'save'], start_new_session=True) as child:
+            try:
+                code = child.wait(timeout=4)
+            except subprocess.TimeoutExpired:
+                try:
+                    os.killpg(child.pid, signal.SIGKILL)
+                except ProcessLookupError:
+                    pass
+                raise
+            if code:
+                raise subprocess.CalledProcessError(code, child.args)
+        saved = True
+        print('Final checkpoint committed', flush=True)
+    except (OSError, subprocess.SubprocessError) as exc:
+        print(f'Final checkpoint skipped: {exc}', file=sys.stderr, flush=True)
+
+
+def resume_saves():
+    global saved
+    saved = False
+    subprocess.run(['xprop', '-root', '-remove', marker], check=False)
+
+
+def session_event(conn, sender, obj, iface, name, args):
+    if name == 'Stop':
+        loop.quit()
+    elif name == 'CancelEndSession':
+        resume_saves()
+    elif name in ('QueryEndSession', 'EndSession'):
+        try:
+            if name == 'QueryEndSession':
+                final_save()
+        finally:
+            session.call_sync(gnome, obj, client, 'EndSessionResponse',
+                              GLib.Variant('(bs)', (True, '')), None, 0, 2000, None)
+
+
+def delay_shutdown():
+    value, descriptors = system.call_with_unix_fd_list_sync(
+        login, login_path, manager, 'Inhibit',
+        GLib.Variant('(ssss)', ('shutdown', 'Desktop recovery', 'Save the current desktop', 'delay')),
+        GLib.VariantType.new('(h)'), 0, 3000, None, None)
+    return descriptors.get(value.unpack()[0])
+
+
+def shutdown_event(conn, sender, obj, iface, name, args):
+    global inhibitor
+    if args.unpack()[0]:
+        try:
+            final_save()
+        finally:
+            if inhibitor is not None:
+                os.close(inhibitor)
+                inhibitor = None
+    elif inhibitor is None:
+        resume_saves()
+        inhibitor = delay_shutdown()
+
+
+path, = session.call_sync(gnome, '/org/gnome/SessionManager', gnome, 'RegisterClient',
+                          GLib.Variant('(ss)', ('desktop-session-logout-save', '')),
+                          None, 0, 5000, None).unpack()
+session.signal_subscribe(gnome, client, None, path, None, 0, session_event)
+system.signal_subscribe(login, manager, 'PrepareForShutdown', login_path, None, 0, shutdown_event)
+inhibitor = delay_shutdown()
+print('Listening for GNOME logout and logind shutdown', flush=True)
+loop.run()

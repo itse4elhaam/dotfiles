@@ -20,6 +20,7 @@ keybind = ctrl+shift+u=copy_url_to_clipboard
 window-decoration = false
 fullscreen = true
 
+font-size = 15
 font-thicken = false
 font-thicken-strength = 255
 font-synthetic-style =
