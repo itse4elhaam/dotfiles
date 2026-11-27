@@ -47,7 +47,9 @@ class Recording:
         self.clipboard_owner = app.x.get_selection_owner(app.selection.atom)
         try:
             window = app.x.create_resource_object("window", target[0])
-            self.browser = bool(target[0] and is_browser_class(window.get_wm_class()))
+            wm_class = window.get_wm_class() if target[0] else None
+            self.app_name = wm_class[-1] if wm_class else f"application {self.client[1]}"
+            self.browser = is_browser_class(wm_class)
         except error.BadWindow:
             self.browser = False
             self.unsafe = True
@@ -162,14 +164,14 @@ class Dictation:
                                  "ISO_Level3_Shift", "Meta_L", "Meta_R")} - self.chord - {0}
         self.image = os.path.expanduser(os.environ.get(
             "T3_DICTATION_APPIMAGE", "~/Applications/T3-Code-Nightly-x86_64.AppImage"))
-        self.overlay = Overlay(self.copy_recovery)
+        self.paused_clients = {}
+        self.overlay = Overlay(self.copy_recovery, self.paused_clients, self.resume_client)
         self.glow = RecordingGlow()
         self.recording = None
         self.worker = None
         self.idle_since = time.monotonic()
         self.pending_backup = None
         self.expire_pending = None
-        self.paused_clients = {}
         self.lock_generation = 0
         self.paste_press = None
         self.paste_serial = 0
@@ -440,25 +442,21 @@ class Dictation:
     def recover(self, text, incomplete=False):
         client = self.recording.client
         self.end("")
-        self.overlay.recover(text, incomplete, self.paused_clients.get(client))
+        self.overlay.recover(text, incomplete, client)
 
     def copy_recovery(self, text):
         if self.expire_pending:
             self.expire_pending()
-        if self.selection.outstanding:
+        if self.paused_clients:
             self.clipboard_generation += 1
             timestamp = GdkX11.x11_get_server_time(self.overlay.get_window())
-            self.selection.copy(text, timestamp)
+            self.selection.copy(text, timestamp, self.paused_clients)
         else:
             self.clipboard.set_text(text, -1)
 
-    def pause_client(self, client):
-        def resume():
-            self.paused_clients.pop(client, None)
-            self.selection.guarded_reads.discard(client)
-            self.selection.outstanding.discard(client)
-        self.paused_clients[client] = resume
-        return resume
+    def resume_client(self, client):
+        self.paused_clients.pop(client, None)
+        self.selection.guarded_reads.discard(client)
 
     def commit(self, text):
         if self.recording.cancelled:
@@ -509,9 +507,9 @@ class Dictation:
                 if not read:
                     # The original paste can still read. Only an explicit Resume
                     # permits another automatic delivery to this X11 client.
-                    resume = self.pause_client(client)
+                    self.paused_clients[client] = rec.app_name
                     if self.lock_generation == lock_generation:
-                        self.overlay.recover(text, resume=resume, show=self.recording is None)
+                        self.overlay.recover(text, client=client, show=self.recording is None)
             return False
 
         def on_read():

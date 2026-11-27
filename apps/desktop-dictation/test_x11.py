@@ -351,13 +351,12 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
     assert entry.get_text() == text
     app.overlay.copy_recovery()
     secondary_read(b"", X.CurrentTime)
-    secondary_read(text.encode(), X.CurrentTime)
-    # Copy consumed the recovery card. Resume via the next paused hold.
-    hold("Alt_L", "Super_L")
-    keys("keyup", "Alt_L", "keyup", "Super_L")
-    until(lambda: app.overlay.recovery == text)
+    secondary_read(b"", X.CurrentTime)
+    other_read(text.encode())
+    assert app.overlay.resume.get_mapped() and not app.overlay.copy_button.get_visible()
     app.overlay.resume.clicked()
-    app.overlay.dismiss_recovery()
+    assert not app.overlay.get_visible()
+    secondary_read(text.encode(), X.CurrentTime)
 
     # Both fields belong to one X client. A late reader from the first
     # field must never consume the second transcript when the first expires.
@@ -395,16 +394,17 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
     assert app.overlay.recovery == "Second transcript"
     app.overlay.copy_recovery()
     other_read(b"Second transcript")
-    _, key_time = delayed.pop()
-    secondary_read(b"", key_time)
-    until(lambda: not app.selection.outstanding)
+    secondary_read(b"", X.CurrentTime)
+    secondary_read(b"", X.CurrentTime)
+    entry, key_time = delayed.pop()
+    entry.set_text(entry.get_text() + secondary_read(b"", key_time).decode())
+    app.overlay.resume.clicked()
     assert not first.get_text() and not second.get_text()
     keys("key", "ctrl+v")
     until(lambda: second.get_text() == "Second transcript")
     second.set_text("")
     assert app.overlay.recovery == "Ignored transcript"
-    app.overlay.resume.clicked()
-    assert not app.paused_clients
+    assert not app.overlay.resume.get_visible() and not app.paused_clients
     app.overlay.dismiss_recovery()
     # A fresh copy before expiry belongs to the external owner. When a later
     # paste targets another X client, the paused client can still read its copy.
@@ -443,7 +443,6 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
         assert app.selection.client_id(reader.id) == ("connection", x.display.info.resource_id_base)
     finally:
         app.selection.xres = xres
-    reader.destroy()
     x.sync()
     until(lambda: app.overlay.recovery is not None)
     app.overlay.resume.clicked()
@@ -466,9 +465,10 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
     # An empty selection and an intervening owner cannot tell us whether
     # the first shortcut was consumed. Copy must guard either recovery card.
     for intervening_copy in (False, True):
-        app.clipboard.set_text("Discard", -1)
-        app.clipboard.clear()
-        until(lambda: not app.x.get_selection_owner(app.selection.atom))
+        app.clipboard.set_text("Clipboard before A", -1)
+        if not intervening_copy:
+            app.clipboard.clear()
+            until(lambda: not app.x.get_selection_owner(app.selection.atom))
         first.set_text("")
         first.grab_focus()
         handler = first.connect("paste-clipboard", defer_paste)
@@ -480,18 +480,40 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
         audio.with_suffix(".txt").write_text("Recovered B")
         hold("Super_L", "Alt_L")
         keys("keyup", "Alt_L", "keyup", "Super_L")
+        if intervening_copy:
+            assert app.pending_backup is not None
+            app.clipboard.set_text("External copy", -1)
+            Gdk.Display.get_default().sync()
+            owner = app.x.get_selection_owner(app.selection.atom)
+            assert owner and owner != app.selection.window
         until(lambda: app.overlay.recovery == "Recovered B" and app.recording is None)
         if intervening_copy:
-            app.clipboard.set_text("External copy", -1)
-            until(lambda: app.x.get_selection_owner(app.selection.atom))
+            assert app.x.get_selection_owner(app.selection.atom) == owner
+            other_read(b"External copy")
         app.overlay.copy_recovery()
-        delayed.pop()[0].emit("paste-clipboard")
-        until(lambda: not app.selection.outstanding)
+        assert not app.clipboard.wait_for_text()
+        assert not app.clipboard.wait_for_text()
+        other_read(b"Recovered B")
+        # Wait for the GTK field's own deferred conversion before releasing the guard.
+        conversions = []
+        serve = app.selection.serve
+        def observe_paste(request):
+            serve(request)
+            if request.target in app.selection.formats:
+                conversions.append(request.target)
+        app.selection.serve = observe_paste
+        try:
+            delayed.pop()[0].emit("paste-clipboard")
+            until(lambda: bool(conversions))
+        finally:
+            app.selection.serve = serve
         assert not first.get_text()
+        app.overlay.resume.clicked()
         keys("key", "ctrl+v")
         until(lambda: second.get_text() == "Recovered B")
+        assert not first.get_text()
         second.set_text("")
-        app.overlay.resume.clicked()
+        assert not app.overlay.resume.get_visible()
         app.overlay.dismiss_recovery()
 
     app.clipboard.set_text("Restored compound text", -1)
@@ -518,8 +540,10 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
         data = app.clipboard.wait_for_contents(compound)
         return data.get_data_type().name(), data.get_format(), bytes(data.get_data() or b"")
     assert compound_read() == ("COMPOUND_TEXT", 8, b"")
-    assert compound_read() == ("COMPOUND_TEXT", 8, b"Restored compound text")
+    assert compound_read() == ("COMPOUND_TEXT", 8, b"")
     app.overlay.resume.clicked()
+    assert compound_read() == ("COMPOUND_TEXT", 8, b"Restored compound text")
+    reader.destroy()
     while app.overlay.recovery is not None:
         app.overlay.dismiss_recovery()
 
@@ -587,7 +611,7 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
                            request.property, request.time))
         serve(request)
     app.selection.serve = observe
-    app.selection.copy("Event context", X.CurrentTime)
+    app.selection.copy("Event context", X.CurrentTime, app.paused_clients)
     observed = []
     second.connect("paste-clipboard", lambda *_: observed.append(app.clipboard.wait_for_text()))
     keys("key", "ctrl+v")

@@ -56,9 +56,7 @@ class TextSelection:
         self.saved = None
         self.recipient = None
         self.other_clients = {}
-        # Outstanding shortcuts survive ownership changes. Only suppress reads
-        # while serving a restored selection or an explicitly guarded copy.
-        self.outstanding = set()
+        # Processes whose delayed shortcut could read the selection we serve.
         self.guarded_reads = set()
         self.restore = None
         self.text = ""
@@ -94,12 +92,12 @@ class TextSelection:
         self.time = timestamp
         return True
 
-    def copy(self, text, timestamp):
+    def copy(self, text, timestamp, paused_clients):
         self.window.set_selection_owner(self.atom, X.CurrentTime)
         self.saved = None
         self.text = text
         self.time = timestamp
-        self.guarded_reads = self.outstanding.copy()
+        self.guarded_reads = set(paused_clients)
         self.x.flush()
 
     def empty_text_format(self, target, saved):
@@ -120,7 +118,7 @@ class TextSelection:
         delivering = recipient and request.time != X.CurrentTime and request.time == self.press_time
         # An unidentified second connection could belong to the target. Keep
         # the previous clipboard private until a distinct process is proven.
-        unknown_reader = self.restore is not None and client[0] != "process"
+        unknown_reader = client[0] != "process" and (self.restore is not None or bool(self.guarded_reads))
         if self.restore and not recipient and not unknown_reader:
             saved = self.other_clients
         guard = client in self.guarded_reads or unknown_reader or (recipient and not delivering)
@@ -132,13 +130,9 @@ class TextSelection:
         elif target == self.timestamp:
             request.requestor.change_property(prop, Xatom.INTEGER, 32, [self.time])
         elif guard and (empty_format := self.empty_text_format(target, saved)):
-            # Unattributed active reads stay empty until expiry. A restored
-            # selection or recovery Copy suppresses one advertised text read.
+            # A clipboard read cannot identify the field or retire a delayed shortcut.
             type_atom, bits = empty_format
             request.requestor.change_property(prop, type_atom, bits, b"")
-            if client in self.guarded_reads:
-                self.guarded_reads.discard(client)
-                self.outstanding.discard(client)
         elif saved is not None:
             if target in saved:
                 type_atom, bits, data = saved[target]
@@ -166,8 +160,6 @@ class TextSelection:
         self.recipient = None
         self.other_clients = {}
         self.text = ""
-        if late_client is not None:
-            self.outstanding.add(late_client)
         self.x.grab_server()
         try:
             if self.x.get_selection_owner(self.atom) == self.window:

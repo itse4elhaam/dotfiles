@@ -18,7 +18,7 @@ from gi.repository import Gdk, GdkPixbuf, GLib, Gtk, Pango, PangoCairo, PangoFc
 class Overlay(Gtk.Window):
     """A focus-free transcription card using T3's Zen / Tokyo Drift Forest palette."""
 
-    def __init__(self, copy_text):
+    def __init__(self, copy_text, paused_clients, resume_client):
         super().__init__(type=Gtk.WindowType.POPUP)
         # T3 ships Inter as a webfont. Make the same variable face available
         # to this GTK process, including the intermediate weights.
@@ -28,6 +28,8 @@ class Overlay(Gtk.Window):
         font = Path(__file__).with_name("fonts") / "Inter-latin-variable.ttf"
         if fontconfig.FcConfigAppFontAddFile(fontconfig.FcConfigGetCurrent(), os.fsencode(font)):
             PangoFc.FontMap.config_changed(PangoCairo.FontMap.get_default())
+        self.paused_clients = paused_clients
+        self.resume_client = resume_client
         self.copy_text = copy_text
         self.set_accept_focus(False)
         self.set_type_hint(Gdk.WindowTypeHint.NOTIFICATION)
@@ -66,7 +68,7 @@ class Overlay(Gtk.Window):
         self.actions.set_no_show_all(True)
         self.resume = Gtk.Button.new_with_label("Resume")
         self.resume.set_focus_on_click(False)
-        self.resume.set_tooltip_text("Resume automatic paste for future recordings in this application")
+        self.resume.set_tooltip_text("Allow clipboard reads and automatic paste in this application")
         self.resume.connect("clicked", self.resume_paste)
         self.actions.add(self.resume)
         for title, callback in (("Copy", self.copy_recovery), ("×", self.dismiss_recovery)):
@@ -74,6 +76,8 @@ class Overlay(Gtk.Window):
             button.set_focus_on_click(False)
             button.set_tooltip_text("Copy transcript" if title == "Copy" else "Dismiss")
             button.connect("clicked", callback)
+            if title == "Copy":
+                self.copy_button = button
             self.actions.add(button)
             button.show()
         head.pack_end(self.actions, False, False, 0)
@@ -152,8 +156,11 @@ class Overlay(Gtk.Window):
         self.get_window().input_shape_combine_region(region, 0, 0)
 
     def dismiss_recovery(self, *_):
-        if self.recovery is not None:
+        if self.pending and self.actions.get_visible():
             self.pending.pop()
+        self.next_recovery()
+
+    def next_recovery(self):
         if self.pending:
             self.show_recovery()
             return
@@ -207,41 +214,46 @@ class Overlay(Gtk.Window):
         self.hint.hide()
         self.escape.hide()
 
-    def recover(self, text, incomplete=False, resume=None, show=True):
-        self.pending.append((text, incomplete, resume))
+    def recover(self, text, incomplete=False, client=None, show=True):
+        self.pending.append((text, incomplete, client))
         if show:
             self.show_recovery()
 
     def show_recovery(self):
         self.dismiss_on_release = False
-        text, incomplete, resume = self.pending[-1]
+        text, incomplete, client = self.pending[-1]
+        paused = client in self.paused_clients
         self.serial += 1
         self.listening = False
         self.recovery = text
-        status = "Auto-paste paused" if resume else "Ready to copy"
+        status = "Auto-paste paused" if paused else "Ready to copy"
         if incomplete:
             status = "Partial transcript"
         if len(self.pending) > 1:
             status += f" · {len(self.pending)} left"
+        if text is None:
+            status = "Copied · ready in other apps"
         self.status.set_text(status)
         self.indicator.set_text("◇")
         self.clock.hide()
         self.escape.hide()
         self.hint.hide()
-        self.label.set_text(text)
+        self.label.set_text(text if text is not None else
+                            f"Resume to paste in {self.paused_clients[client]}.")
+        self.copy_button.set_visible(text is not None)
         self.actions.show()
-        self.resume.set_visible(resume is not None)
+        self.resume.set_visible(paused)
         self.show()
         self.set_opacity(1)
         self.clickable(True)
 
     def resume_paste(self, *_):
-        resume = self.pending[-1][2]
-        if resume:
-            resume()
-            self.pending = [(text, incomplete, None if action is resume else action)
-                            for text, incomplete, action in self.pending]
-            self.show_recovery()
+        client = self.pending[-1][2]
+        if client in self.paused_clients:
+            self.resume_client(client)
+            self.pending = [card for card in self.pending
+                            if card[0] is not None or card[2] != client]
+            self.next_recovery()
 
     def sent(self, text):
         self.serial += 1
@@ -268,9 +280,15 @@ class Overlay(Gtk.Window):
 
     def copy_recovery(self, *_):
         text = self.recovery
-        self.dismiss_recovery()
-        if text:
-            self.copy_text(text)
+        if text is None:
+            return
+        self.pending.pop()
+        self.copy_text(text)
+        # Copy may itself expire an earlier paste and queue its transcript.
+        # Keep all transcript cards, then offer Resume for each paused app.
+        self.pending = [card for card in self.pending if card[0] is not None]
+        self.pending.extend((None, False, client) for client in self.paused_clients)
+        self.next_recovery()
 
     def present_at(self, window):
         self.hide_card()
