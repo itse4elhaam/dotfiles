@@ -13,7 +13,7 @@ def executable(path, source):
     path.chmod(0o700)
 
 
-def exercise(directory, real):
+def exercise(directory, real, other):
     os.environ.update(XDG_SESSION_TYPE="x11", GDK_BACKEND="x11", NO_AT_BRIDGE="1")
     os.environ["PATH"] = str(directory) + os.pathsep + os.environ["PATH"]
     audio = directory / "fixture.pcm"
@@ -213,13 +213,48 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
         x.sync()
     app.overlay.dismiss_recovery()
 
-    # Both fields belong to one X client. A late reader from the first
-    # field must never consume the second transcript when the first expires.
+    # Like Zed/arboard, the focused GTK window and its selection reader
+    # belong to one process but use different X connections.
     first.grab_focus()
+    reader = x.screen().root.create_window(0, 0, 1, 1, 0, 0, X.InputOnly, X.CopyFromParent)
+    prop = x.intern_atom("DICTATION_TEST_PASTE")
+    utf8 = x.intern_atom("UTF8_STRING")
     delayed = []
     def defer_paste(entry):
         entry.stop_emission_by_name("paste-clipboard")
         delayed.append(entry)
+
+    handler = first.connect("paste-clipboard", defer_paste)
+    hold("Alt_L", "Super_L")
+    keys("keyup", "Alt_L", "keyup", "Super_L")
+    until(lambda: bool(delayed))
+    first.disconnect(handler)
+    delayed.pop()
+    recipient = x.create_resource_object("window", int(other.stdout.readline()))
+    def other_read(expected):
+        recipient.delete_property(prop)
+        x.sync()
+        other.stdin.write("read\n")
+        other.stdin.flush()
+        until(lambda: recipient.get_full_property(prop, utf8) is not None)
+        assert recipient.get_full_property(prop, utf8).value == expected
+
+    other_read(b"Newer clipboard")
+    assert app.pending_backup is not None
+    def secondary_read(expected):
+        reader.delete_property(prop)
+        reader.convert_selection(app.selection.atom, utf8, prop, X.CurrentTime)
+        x.flush()
+        until(lambda: reader.get_full_property(prop, utf8) is not None)
+        assert reader.get_full_property(prop, utf8).value == expected
+
+    secondary_read(text.encode())
+    until(lambda: app.pending_backup is None)
+    assert app.clipboard.wait_for_text() == "Newer clipboard"
+
+    # Both fields belong to one X client. A late reader from the first
+    # field must never consume the second transcript when the first expires.
+    first.grab_focus()
     ignored = first.connect("paste-clipboard", defer_paste)
     generation = app.clipboard_generation
     app.clipboard.set_text("Original before two holds", -1)
@@ -229,15 +264,7 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
     keys("keyup", "Alt_L", "keyup", "Super_L")
     until(lambda: bool(delayed))
     first.disconnect(ignored)
-    # Clipboard requests on an unrelated X connection still see the user's
-    # clipboard, even before the first target consumes its paste.
-    outsider = x.screen().root.create_window(0, 0, 1, 1, 0, 0, X.InputOnly, X.CopyFromParent)
-    prop = x.intern_atom("DICTATION_TEST_PASTE")
-    utf8 = x.intern_atom("UTF8_STRING")
-    outsider.convert_selection(app.selection.atom, utf8, prop, X.CurrentTime)
-    x.flush()
-    until(lambda: outsider.get_full_property(prop, utf8) is not None)
-    assert outsider.get_full_property(prop, utf8).value == b"Original before two holds"
+    other_read(b"Original before two holds")
     second.grab_focus()
     audio.with_suffix(".txt").write_text("Second transcript")
     hold("Super_L", "Alt_L")
@@ -254,13 +281,9 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
     app.overlay.dismiss_recovery()
     assert app.overlay.recovery == "Second transcript"
     app.overlay.copy_recovery()
-    outsider.delete_property(prop)
-    outsider.convert_selection(app.selection.atom, utf8, prop, X.CurrentTime)
-    x.flush()
-    until(lambda: outsider.get_full_property(prop, utf8) is not None)
-    assert outsider.get_full_property(prop, utf8).value == b"Second transcript"
-    outsider.destroy()
-    delayed.pop().emit("paste-clipboard")
+    other_read(b"Second transcript")
+    delayed.pop()
+    secondary_read(b"")
     until(lambda: not app.selection.outstanding)
     assert not first.get_text() and not second.get_text()
     keys("key", "ctrl+v")
@@ -284,8 +307,6 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
     assert app.pending_backup is not None
     until(lambda: app.pending_backup is None and app.overlay.resume.is_visible())
 
-    recipient = x.screen().root.create_window(0, 0, 8, 8, 0, 0, X.InputOnly, X.CopyFromParent)
-    recipient.map()
     x.screen().root.change_property(app.active_atom, Xatom.WINDOW, 32, [recipient.id])
     recipient.set_input_focus(X.RevertToParent, X.CurrentTime)
     x.sync()
@@ -295,15 +316,19 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
     until(lambda: app.pending_backup is not None)
     delayed.pop().emit("paste-clipboard")
     until(lambda: first.get_text() == "Copied during pending paste")
-    recipient.convert_selection(app.selection.atom, utf8, prop, X.CurrentTime)
-    x.flush()
-    until(lambda: recipient.get_full_property(prop, utf8) is not None)
-    assert recipient.get_full_property(prop, utf8).value == b"Other client transcript"
+    other_read(b"Other client transcript")
     until(lambda: app.pending_backup is None)
     assert app.clipboard.wait_for_text() == "Copied during pending paste"
     x.screen().root.change_property(app.active_atom, Xatom.WINDOW, 32, [xid])
     x.create_resource_object("window", xid).set_input_focus(X.RevertToParent, X.CurrentTime)
-    recipient.destroy()
+    xres = app.selection.xres
+    app.selection.xres = None
+    try:
+        assert app.selection.client_id(reader.id) != app.selection.client_id(xid)
+        assert app.selection.client_id(reader.id) == ("connection", x.display.info.resource_id_base)
+    finally:
+        app.selection.xres = xres
+    reader.destroy()
     x.sync()
     until(lambda: app.overlay.recovery is not None)
     app.overlay.resume.clicked()
@@ -422,7 +447,9 @@ if __name__ == "__main__":
                 number = display_number.readline().strip()
             assert number.isdigit()
             os.environ["DISPLAY"] = ":" + number
-            exercise(Path(tmp), "--real-model" in sys.argv[1:])
+            with subprocess.Popen([sys.executable, Path(__file__).with_name("fixture_x11_client.py")],
+                                  stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True) as other:
+                exercise(Path(tmp), "--real-model" in sys.argv[1:], other)
         finally:
             server.terminate()
             server.wait()

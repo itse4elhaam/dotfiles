@@ -1,12 +1,46 @@
 """Serve the clipboard on the X connection used to guard and dispatch a paste."""
-from Xlib import X, Xatom
-from Xlib.protocol import request as protocol_request
+from pathlib import Path
+
+from Xlib import X, Xatom, error
+from Xlib.protocol import request as protocol_request, rq
 from Xlib.protocol.event import SelectionNotify
+
+
+# python-xlib does not ship bindings for X-Resource. Issue the two XRes
+# requests on the selection owner's connection, which can hold a server grab.
+class XResVersion(rq.ReplyRequest):
+    _request = rq.Struct(rq.Card8("opcode"), rq.Opcode(0), rq.RequestLength(),
+                         rq.Card8("major"), rq.Card8("minor"), rq.Pad(2))
+    _reply = rq.Struct(rq.Pad(2), rq.Card16("sequence_number"), rq.Pad(4),
+                       rq.Card16("major"), rq.Card16("minor"), rq.Pad(20))
+
+
+class QueryClientIds(rq.ReplyRequest):
+    _request = rq.Struct(rq.Card8("opcode"), rq.Opcode(4), rq.RequestLength(),
+                         rq.Card32("count"), rq.Card32("client"), rq.Card32("mask"))
+    _reply = rq.Struct(rq.Pad(2), rq.Card16("sequence_number"), rq.ReplyLength(),
+                       rq.Card32("count"), rq.Pad(20), rq.List("words", rq.Card32Obj))
+
+
+LOCAL_CLIENT_PID_MASK = 2
+
+
+def xres_opcode(x):
+    extension = x.query_extension("X-Resource")
+    if extension:
+        try:
+            version = XResVersion(display=x.display, opcode=extension.major_opcode, major=1, minor=2)
+            if (version.major, version.minor) >= (1, 2):
+                return extension.major_opcode
+        except error.XError:
+            pass
+    return None
 
 
 class TextSelection:
     def __init__(self, x):
         self.x = x
+        self.xres = xres_opcode(x)
         self.atom = x.intern_atom("CLIPBOARD")
         self.window = x.screen().root.create_window(
             0, 0, 1, 1, 0, 0, X.InputOnly, X.CopyFromParent)
@@ -27,7 +61,21 @@ class TextSelection:
         self.time = 0
 
     def client_id(self, window_id):
-        return window_id & ~self.x.display.info.resource_id_mask
+        base = window_id & ~self.x.display.info.resource_id_mask
+        if self.xres and base:
+            try:
+                ids = QueryClientIds(display=self.x.display, opcode=self.xres, count=1,
+                                     client=window_id, mask=LOCAL_CLIENT_PID_MASK)
+                # One ClientIdValue: connection base, mask, byte length, PID.
+                if ids.count == 1 and list(ids.words[:3]) == [base, LOCAL_CLIENT_PID_MASK, 4] and len(ids.words) == 4:
+                    pid = ids.words[3]
+                    # A paused paste can outlive the process. Include its Linux
+                    # start time (stat field 22; comm may contain parentheses).
+                    stat = Path(f"/proc/{pid}/stat").read_bytes()
+                    return ("process", pid, int(stat.rsplit(b")", 1)[1].split()[19]))
+            except (error.XError, OSError, IndexError, ValueError):
+                pass
+        return ("connection", base)
 
     def claim(self, text, timestamp, recipient, backup, on_read):
         self.window.set_selection_owner(self.atom, timestamp)

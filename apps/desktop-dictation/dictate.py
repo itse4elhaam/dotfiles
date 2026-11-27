@@ -41,9 +41,10 @@ class Recording:
         self.last_partial = ""
         self.unsafe = False
         self.target = app.focus()
+        self.client = app.selection.client_id(self.target[0])
         self.clipboard_generation = app.clipboard_generation
         self.clipboard_owner = app.x.get_selection_owner(app.selection.atom)
-        if app.selection.client_id(self.target[0]) in app.paused_clients:
+        if self.client in app.paused_clients:
             self.backup = None
         elif app.pending_backup is not None and self.clipboard_owner == app.selection.window:
             # Keep serving the first paste until its client reads it or it expires.
@@ -406,7 +407,7 @@ class Dictation:
         return self.root.query_pointer().mask & (X.ShiftMask | X.ControlMask | X.Mod1Mask | X.Mod4Mask | X.Mod5Mask)
 
     def recover(self, text, incomplete=False):
-        client = self.selection.client_id(self.recording.target[0])
+        client = self.recording.client
         self.end("")
         self.overlay.recover(text, incomplete, self.paused_clients.get(client))
 
@@ -436,7 +437,7 @@ class Dictation:
             self.end("No speech heard")
             return
         rec = self.recording
-        client = self.selection.client_id(rec.target[0])
+        client = rec.client
         if not rec.released:
             self.end("Speech engine stopped before release")
             return
@@ -489,7 +490,8 @@ class Dictation:
             safe = (client not in self.paused_clients and rec.backup is not None and rec.backup.ready
                     and not self.x.pending_events()
                     and not rec.unsafe and rec.target == self.focus()
-                    and rec.target[0] and rec.target[1] not in (X.NONE, X.PointerRoot)
+                    and rec.target[0] and client == self.selection.client_id(rec.target[0])
+                    and rec.target[1] not in (X.NONE, X.PointerRoot)
                     and rec.clipboard_generation == self.clipboard_generation
                     and rec.clipboard_owner == self.x.get_selection_owner(self.selection.atom)
                     and not self.modifiers_down())
