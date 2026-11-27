@@ -26,11 +26,13 @@ def exercise(directory, real):
         audio.write_bytes(b"\x00\x12" * 16000)
         worker = directory / "recognizer"
         executable(worker, """
-import json, sys, time
+import json, sys, time, os
+from pathlib import Path
 for line in sys.stdin.buffer:
     if line == b":finish\\n":
         time.sleep(.25)
-        print(json.dumps({"type":"final", "text":"Finished words."}), flush=True)
+        fixture = Path(os.environ["DICTATION_FIXTURE"]).with_suffix(".txt")
+        print(json.dumps({"type":"final", "text":fixture.read_text() if fixture.exists() else "Finished words."}), flush=True)
     elif line != b":start\\n":
         print(json.dumps({"type":"partial", "text":"Live words"}), flush=True)
 """)
@@ -119,6 +121,7 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
     assert app.clipboard.wait_for_text() == "Existing clipboard"
     app.overlay.copy_recovery()
     assert app.clipboard.wait_for_text() == text
+    app.clipboard.set_text("Late Tab sentinel", -1)
     # Input after the early event drain but before the final server grab.
     hold("Super_L", "Alt_L")
     grab = app.x.grab_server
@@ -129,7 +132,7 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
     keys("keyup", "Super_L", "keyup", "Alt_L")
     until(lambda: app.overlay.recovery is not None)
     app.x.grab_server = grab
-    assert app.clipboard.wait_for_text() == text and first.get_text() == text and not second.get_text()
+    assert app.clipboard.wait_for_text() == "Late Tab sentinel" and first.get_text() == text and not second.get_text()
     app.overlay.dismiss_recovery()
 
     # XI 2.1 must report input while another client has grabbed the keyboard.
@@ -145,6 +148,43 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
     until(lambda: app.overlay.recovery is not None)
     assert not second.get_text() and first.get_text() == text
     app.overlay.dismiss_recovery()
+    # Even without intervening input, a grab can divert the synthetic paste.
+    popup = x.screen().root.create_window(0, 0, 8, 8, 0, 0, X.InputOnly, X.CopyFromParent)
+    popup.map()
+    x.sync()
+    hold("Alt_L", "Super_L")
+    keys("keyup", "Alt_L", "keyup", "Super_L")
+    until(lambda: app.recording.released)
+    assert popup.grab_keyboard(False, X.GrabModeAsync, X.GrabModeAsync, X.CurrentTime) == X.GrabSuccess
+    try:
+        until(lambda: app.overlay.recovery is not None)
+        assert app.clipboard.wait_for_text() == "Late Tab sentinel" and not second.get_text()
+    finally:
+        x.ungrab_keyboard(X.CurrentTime)
+        popup.destroy()
+        x.sync()
+    app.overlay.dismiss_recovery()
+
+    # A new hold supersedes a paste that no application consumed.
+    first.grab_focus()
+    ignored = first.connect("paste-clipboard", lambda entry: entry.stop_emission_by_name("paste-clipboard"))
+    generation = app.clipboard_generation
+    app.clipboard.set_text("Original before two holds", -1)
+    until(lambda: app.clipboard_generation > generation)
+    audio.with_suffix(".txt").write_text("Ignored transcript")
+    hold("Super_L", "Alt_L")
+    keys("keyup", "Alt_L", "keyup", "Super_L")
+    until(lambda: app.pending_restore is not None)
+    first.disconnect(ignored)
+    second.grab_focus()
+    audio.with_suffix(".txt").write_text("Second transcript")
+    hold("Super_L", "Alt_L")
+    keys("keyup", "Alt_L", "keyup", "Super_L")
+    until(lambda: second.get_text() == "Second transcript" and app.pending_restore is None)
+    deadline = time.monotonic() + 1.9
+    until(lambda: time.monotonic() >= deadline)
+    assert app.clipboard.wait_for_text() == "Original before two holds"
+    second.set_text("")
     hold("Alt_L", "Super_L")
     app.worker.kill()
     until(lambda: app.overlay.recovery == "Live words")
@@ -152,9 +192,12 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
     keys("keyup", "Alt_L", "keyup", "Super_L")
     until(lambda: not app.held)
     hold("Alt_L", "Super_L")
+    warm_worker = app.worker
     keys("key", "Escape", "keyup", "Super_L", "keyup", "Alt_L")
     until(lambda: app.recording is None)
     assert not second.get_text() and app.overlay.label.get_text() == "Cancelled"
+    assert app.worker is warm_worker and warm_worker.poll() is None
+    app.stop_worker()
 
 
 if __name__ == "__main__":

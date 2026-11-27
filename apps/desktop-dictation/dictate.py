@@ -138,6 +138,7 @@ class Dictation:
         self.recording = None
         self.worker = None
         self.idle_since = time.monotonic()
+        self.pending_restore = None
         self.paste_serial = 0
         self.selection = TextSelection(self.x)
         self.clipboard = Gtk.Clipboard.get(Gdk.SELECTION_CLIPBOARD)
@@ -207,8 +208,10 @@ class Dictation:
                 self.overlay.dismiss_recovery()
                 self.stop_worker()
 
-    def clipboard_changed(self, *_):
-        self.clipboard_generation += 1
+    def clipboard_changed(self, clipboard, event):
+        owner = event.owner
+        if owner and owner.get_xid() != self.selection.window.id:
+            self.clipboard_generation += 1
 
     def watch_input(self, mask):
         self.root.xinput_select_events([(xinput.AllMasterDevices, mask)])
@@ -226,6 +229,8 @@ class Dictation:
         if self.recording:
             self.overlay.label.set_text("Finishing previous recording · hold again when ready")
             return
+        if self.pending_restore:
+            self.pending_restore()
         active, _ = self.focus()
         window = GdkX11.X11Window.foreign_new_for_display(Gdk.Display.get_default(), active) if active else None
         self.overlay.present_at(window)
@@ -342,6 +347,15 @@ class Dictation:
         self.watch_input(0)
         self.overlay.message(message, 2200)
 
+    def keyboard_available(self):
+        # Called under our server grab. No client can acquire a new keyboard
+        # grab between this probe and the queued paste events.
+        status = self.root.grab_keyboard(False, X.GrabModeAsync, X.GrabModeAsync, X.CurrentTime)
+        if status != X.GrabSuccess:
+            return False
+        self.x.ungrab_keyboard(X.CurrentTime)
+        return True
+
     def modifiers_down(self):
         return self.root.query_pointer().mask & (X.ShiftMask | X.ControlMask | X.Mod1Mask | X.Mod4Mask | X.Mod5Mask)
 
@@ -379,6 +393,7 @@ class Dictation:
             nonlocal restored
             if serial == self.paste_serial and not restored:
                 restored = True
+                self.pending_restore = None
                 self.selection.put_back(rec.backup)
             return False
         def expire():
@@ -400,7 +415,7 @@ class Dictation:
                     and rec.clipboard_generation == self.clipboard_generation
                     and rec.clipboard_owner == self.x.get_selection_owner(self.selection.atom)
                     and not self.modifiers_down())
-            if safe:
+            if safe and self.keyboard_available():
                 window = self.x.create_resource_object("window", rec.target[0])
                 classes = " ".join(window.get_wm_class() or ()).lower()
                 mods = [XK.XK_Control_L]
@@ -408,6 +423,7 @@ class Dictation:
                     mods.append(XK.XK_Shift_L)
                 keys = [self.x.keysym_to_keycode(sym) for sym in [*mods, XK.XK_v]]
                 if self.selection.claim(text, timestamp, on_read):
+                    self.pending_restore = restore
                     self.paste_serial = serial
                     for key in keys:
                         xtest.fake_input(self.x, X.KeyPress, key)
