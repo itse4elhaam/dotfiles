@@ -18,7 +18,10 @@ class TextSelection:
         self.saved = None
         self.recipient = None
         self.other_clients = {}
-        self.expired_reads = set()
+        # Outstanding shortcuts survive ownership changes. Only suppress reads
+        # while serving a restored selection or an explicitly guarded copy.
+        self.outstanding = set()
+        self.guarded_reads = set()
         self.restore = None
         self.text = ""
         self.time = 0
@@ -38,6 +41,14 @@ class TextSelection:
         self.time = timestamp
         return True
 
+    def copy(self, text, timestamp):
+        self.window.set_selection_owner(self.atom, X.CurrentTime)
+        self.saved = None
+        self.text = text
+        self.time = timestamp
+        self.guarded_reads = self.outstanding.copy()
+        self.x.flush()
+
     def serve(self, request):
         prop = request.property or request.target
         target = request.target
@@ -53,11 +64,12 @@ class TextSelection:
                                               [self.targets, self.timestamp, *(saved if saved is not None else self.formats)])
         elif target == self.timestamp:
             request.requestor.change_property(prop, Xatom.INTEGER, 32, [self.time])
-        elif client in self.expired_reads and target in self.formats:
+        elif client in self.guarded_reads and target in self.formats:
             # Complete one late text read without inserting unrelated clipboard
             # data into the field. Other clients still get the restored formats.
             request.requestor.change_property(prop, target, 8, b"")
-            self.expired_reads.discard(client)
+            self.guarded_reads.discard(client)
+            self.outstanding.discard(client)
         elif saved is not None:
             if target in saved:
                 type_atom, bits, data = saved[target]
@@ -84,13 +96,15 @@ class TextSelection:
         self.recipient = None
         self.other_clients = {}
         self.text = ""
+        if late_client is not None:
+            self.outstanding.add(late_client)
         self.x.grab_server()
         try:
             if self.x.get_selection_owner(self.atom) == self.window:
                 self._restore_owned(backup)
                 # Only our restored selection can receive this delayed request.
                 if backup.values and late_client is not None:
-                    self.expired_reads.add(late_client)
+                    self.guarded_reads.add(late_client)
             else:
                 self.saved = None
         finally:

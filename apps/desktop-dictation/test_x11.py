@@ -134,7 +134,9 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
     until(lambda: app.overlay.recovery is not None)
     assert second.is_focus() and not second.get_text() and first.get_text() == text
     assert app.clipboard.wait_for_text() == "Existing clipboard"
+    native_owner = app.x.get_selection_owner(app.selection.atom)
     app.overlay.copy_recovery()
+    assert app.x.get_selection_owner(app.selection.atom) == native_owner
     assert app.clipboard.wait_for_text() == text
     app.clipboard.set_text("Late Tab sentinel", -1)
     # Input after the early event drain but before the final server grab.
@@ -221,7 +223,6 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
     x.flush()
     until(lambda: outsider.get_full_property(prop, utf8) is not None)
     assert outsider.get_full_property(prop, utf8).value == b"Original before two holds"
-    outsider.destroy()
     second.grab_focus()
     audio.with_suffix(".txt").write_text("Second transcript")
     hold("Super_L", "Alt_L")
@@ -235,14 +236,21 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
     keys("keyup", "Super_L", "keyup", "Alt_L")
     until(lambda: app.overlay.recovery == "Third transcript")
     first.set_text("")
-    delayed.pop().emit("paste-clipboard")
-    until(lambda: not app.selection.expired_reads)
-    assert not first.get_text() and not second.get_text()
-    assert app.clipboard.wait_for_text() == "Original before two holds"
     app.overlay.dismiss_recovery()
     assert app.overlay.recovery == "Second transcript"
     app.overlay.copy_recovery()
-    assert app.clipboard.wait_for_text() == "Second transcript"
+    outsider.delete_property(prop)
+    outsider.convert_selection(app.selection.atom, utf8, prop, X.CurrentTime)
+    x.flush()
+    until(lambda: outsider.get_full_property(prop, utf8) is not None)
+    assert outsider.get_full_property(prop, utf8).value == b"Second transcript"
+    outsider.destroy()
+    delayed.pop().emit("paste-clipboard")
+    until(lambda: not app.selection.outstanding)
+    assert not first.get_text() and not second.get_text()
+    keys("key", "ctrl+v")
+    until(lambda: second.get_text() == "Second transcript")
+    second.set_text("")
     assert app.overlay.recovery == "Ignored transcript"
     app.overlay.resume.clicked()
     assert not app.paused_clients
@@ -286,6 +294,37 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
     app.overlay.resume.clicked()
     assert not app.paused_clients
     app.overlay.dismiss_recovery()
+
+    # An empty selection and an intervening owner cannot tell us whether
+    # the first shortcut was consumed. Copy must guard either recovery card.
+    for intervening_copy in (False, True):
+        app.clipboard.set_text("Discard", -1)
+        app.clipboard.clear()
+        until(lambda: not app.x.get_selection_owner(app.selection.atom))
+        first.set_text("")
+        first.grab_focus()
+        handler = first.connect("paste-clipboard", defer_paste)
+        hold("Super_L", "Alt_L")
+        keys("keyup", "Alt_L", "keyup", "Super_L")
+        until(lambda: bool(delayed))
+        first.disconnect(handler)
+        second.grab_focus()
+        audio.with_suffix(".txt").write_text("Recovered B")
+        hold("Super_L", "Alt_L")
+        keys("keyup", "Alt_L", "keyup", "Super_L")
+        until(lambda: app.overlay.recovery == "Recovered B" and app.recording is None)
+        if intervening_copy:
+            app.clipboard.set_text("External copy", -1)
+            until(lambda: app.x.get_selection_owner(app.selection.atom))
+        app.overlay.copy_recovery()
+        delayed.pop().emit("paste-clipboard")
+        until(lambda: not app.selection.outstanding)
+        assert not first.get_text()
+        keys("key", "ctrl+v")
+        until(lambda: second.get_text() == "Recovered B")
+        second.set_text("")
+        app.overlay.resume.clicked()
+        app.overlay.dismiss_recovery()
 
     app.clipboard.set_text("Discard before empty fixture", -1)
     app.clipboard.clear()

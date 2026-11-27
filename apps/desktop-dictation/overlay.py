@@ -14,8 +14,9 @@ from gi.repository import Gdk, GdkPixbuf, GLib, Gtk, Pango
 class Overlay(Gtk.Window):
     """A focus-free transcription card using T3's Zen / Tokyo Drift Forest palette."""
 
-    def __init__(self):
+    def __init__(self, copy_text):
         super().__init__(type=Gtk.WindowType.POPUP)
+        self.copy_text = copy_text
         self.set_accept_focus(False)
         self.set_type_hint(Gdk.WindowTypeHint.NOTIFICATION)
         self.set_app_paintable(True)
@@ -248,9 +249,10 @@ class Overlay(Gtk.Window):
         GLib.timeout_add(700, begin_fade)
 
     def copy_recovery(self, *_):
-        if self.recovery:
-            Gtk.Clipboard.get(Gdk.SELECTION_CLIPBOARD).set_text(self.recovery, -1)
+        text = self.recovery
         self.dismiss_recovery()
+        if text:
+            self.copy_text(text)
 
     def present_at(self, window):
         self.hide_card()

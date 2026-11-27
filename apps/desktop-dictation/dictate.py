@@ -151,11 +151,12 @@ class Dictation:
                                  "ISO_Level3_Shift", "Meta_L", "Meta_R")} - self.chord - {0}
         self.image = os.path.expanduser(os.environ.get(
             "T3_DICTATION_APPIMAGE", "~/Applications/T3-Code-Nightly-x86_64.AppImage"))
-        self.overlay = Overlay()
+        self.overlay = Overlay(self.copy_recovery)
         self.recording = None
         self.worker = None
         self.idle_since = time.monotonic()
         self.pending_backup = None
+        self.expire_pending = None
         self.paused_clients = {}
         self.lock_generation = 0
         self.paste_serial = 0
@@ -267,8 +268,9 @@ class Dictation:
             if isinstance(event, xfixes.SelectionNotify):
                 if event.owner.id not in (X.NONE, self.selection.window.id):
                     self.clipboard_generation += 1
-                if event.owner.id != self.selection.window.id:
-                    self.selection.expired_reads.clear()
+                if (event.owner.id != self.selection.window.id and
+                        self.x.get_selection_owner(self.selection.atom) != self.selection.window):
+                    self.selection.guarded_reads.clear()
             elif event.type == X.SelectionRequest:
                 self.selection.serve(event)
             elif event.type == X.SelectionClear:
@@ -388,10 +390,21 @@ class Dictation:
         self.end("")
         self.overlay.recover(text, incomplete, self.paused_clients.get(client))
 
+    def copy_recovery(self, text):
+        if self.expire_pending:
+            self.expire_pending()
+        if self.selection.outstanding:
+            self.clipboard_generation += 1
+            timestamp = GdkX11.x11_get_server_time(self.overlay.get_window())
+            self.selection.copy(text, timestamp)
+        else:
+            self.clipboard.set_text(text, -1)
+
     def pause_client(self, client):
         def resume():
             self.paused_clients.pop(client, None)
-            self.selection.expired_reads.discard(client)
+            self.selection.guarded_reads.discard(client)
+            self.selection.outstanding.discard(client)
         self.paused_clients[client] = resume
         return resume
 
@@ -431,6 +444,7 @@ class Dictation:
             nonlocal restored
             if serial == self.paste_serial and not restored:
                 restored = True
+                self.expire_pending = None
                 self.pending_backup = None
                 self.selection.put_back(rec.backup, late_client)
             return False
@@ -464,6 +478,7 @@ class Dictation:
                 shortcut = paste_shortcut(window.get_wm_class())
                 keys = [self.x.keysym_to_keycode(sym) for sym in shortcut]
                 if keys and self.selection.claim(text, timestamp, client, rec.backup, on_read):
+                    self.expire_pending = expire
                     self.pending_backup = rec.backup
                     self.paste_serial = serial
                     for key in keys:
