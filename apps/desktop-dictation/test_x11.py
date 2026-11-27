@@ -46,8 +46,8 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
         sys.stdout.flush()
         time.sleep(.04)
 """)
-    from dictate import Dictation, Gdk, Gtk
-    from Xlib import X, Xatom, display
+    from dictate import Dictation, Gdk, Gtk, paste_shortcut
+    from Xlib import X, XK, Xatom, display
     x = display.Display()
     window, box = Gtk.Window(), Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
     first, second = Gtk.Entry(), Gtk.Entry()
@@ -113,6 +113,21 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
         app.stop_worker()
         return
     assert text == "Finished words."
+    assert paste_shortcut(("gnome-terminal-server", "Gnome-terminal")) == (XK.XK_Control_L, XK.XK_Shift_L, XK.XK_v)
+    target = x.create_resource_object("window", xid)
+    original_class = target.get_wm_class()
+    serial = app.paste_serial
+    for wm_class in (("terminal", "XTerm"), ("uxterm", "UXTerm"), ("urxvt", "URxvt")):
+        target.set_wm_class(*wm_class)
+        x.sync()
+        hold("Alt_L", "Super_L")
+        keys("keyup", "Alt_L", "keyup", "Super_L")
+        until(lambda: app.overlay.recovery == text)
+        assert app.paste_serial == serial and first.get_text() == text
+        assert app.clipboard.wait_for_text() == "Original text"
+        app.overlay.dismiss_recovery()
+    target.set_wm_class(*original_class)
+    x.sync()
     app.clipboard.set_text("Existing clipboard", -1)
     hold("Alt_L", "Super_L")
     keys("keyup", "Alt_L", "keyup", "Super_L", "key", "Tab")

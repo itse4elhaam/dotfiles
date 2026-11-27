@@ -12,6 +12,8 @@ A second hold can record while the first field is reading its paste. If the appl
 
 Applications can move their own caret or switch internal fields without notifying X11. Keep the caret in place until the overlay finishes. Auto-paste uses Ctrl+V in GUI applications and Ctrl+Shift+V in common terminal emulators. The recording limit is five minutes.
 
+In xterm and urxvt, choose **Copy** in the overlay, then paste with your terminal’s CLIPBOARD binding. In xterm, Shift+Insert reads the selection configured by `selectToClipboard`, which defaults to PRIMARY. In urxvt, Ctrl+Meta+V reads CLIPBOARD, but each terminal instance can choose which modifier acts as Meta. Dictation sends no paste keys to these terminals. [xterm manual](https://invisible-island.net/xterm/manpage/xterm.html#VT100-Widget-Resources:selectToClipboard) · [urxvt manual](https://manpages.debian.org/bookworm/rxvt-unicode/urxvt.1.en.html#THE_SELECTION)
+
 Set `T3_DICTATION_APPIMAGE=/absolute/path/to/T3.AppImage` in `~/.config/desktop-dictation.env` if T3 moves. Restart with `systemctl --user restart desktop-dictation`. For diagnostics use `journalctl --user -u desktop-dictation`. Disable with `systemctl --user disable --now desktop-dictation`.
 
 Run `/usr/bin/python3 apps/desktop-dictation/test_x11.py` with Xvfb and xdotool on PATH. Add `--real-model` for recorded English audio through the bundled worker. The test starts its own X server and supplies microphone fixtures.

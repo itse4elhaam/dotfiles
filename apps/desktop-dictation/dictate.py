@@ -20,6 +20,16 @@ from Xlib import X, XK, display, error
 from Xlib.ext import xfixes, xinput, xtest
 
 
+def paste_shortcut(wm_class):
+    names = tuple(name.lower() for name in (wm_class or ()))
+    if any(name in ("xterm", "uxterm", "rxvt", "urxvt", "urxvtc", "rxvt-unicode") for name in names):
+        return ()
+    terminals = ("terminal", "kitty", "alacritty", "ghostty", "wezterm", "tilix", "konsole", "terminator", "foot")
+    if any(terminal in name for name in names for terminal in terminals):
+        return (XK.XK_Control_L, XK.XK_Shift_L, XK.XK_v)
+    return (XK.XK_Control_L, XK.XK_v)
+
+
 class Recording:
     def __init__(self, app):
         self.app = app
@@ -450,12 +460,9 @@ class Dictation:
                     and not self.modifiers_down())
             if safe and self.keyboard_available():
                 window = self.x.create_resource_object("window", rec.target[0])
-                classes = " ".join(window.get_wm_class() or ()).lower()
-                mods = [XK.XK_Control_L]
-                if any(name in classes for name in ("terminal", "kitty", "alacritty", "ghostty", "wezterm", "tilix", "konsole", "terminator", "foot")):
-                    mods.append(XK.XK_Shift_L)
-                keys = [self.x.keysym_to_keycode(sym) for sym in [*mods, XK.XK_v]]
-                if self.selection.claim(text, timestamp, client, rec.backup, on_read):
+                shortcut = paste_shortcut(window.get_wm_class())
+                keys = [self.x.keysym_to_keycode(sym) for sym in shortcut]
+                if keys and self.selection.claim(text, timestamp, client, rec.backup, on_read):
                     self.pending_backup = rec.backup
                     self.paste_serial = serial
                     for key in keys:
