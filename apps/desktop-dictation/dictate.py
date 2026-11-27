@@ -32,7 +32,7 @@ def paste_shortcut(wm_class):
 
 
 class Recording:
-    def __init__(self, app):
+    def __init__(self, app, target):
         self.app = app
         self.started = time.monotonic()
         self.released = None
@@ -40,7 +40,7 @@ class Recording:
         self.got_final = False
         self.last_partial = ""
         self.unsafe = False
-        self.target = app.focus()
+        self.target = target
         self.client = app.selection.client_id(self.target[0])
         self.clipboard_generation = app.clipboard_generation
         self.clipboard_owner = app.x.get_selection_owner(app.selection.atom)
@@ -253,12 +253,13 @@ class Dictation:
         if self.recording:
             self.overlay.reject_hold()
             return
-        active, _ = self.focus()
+        target = self.focus()
+        active, _ = target
         window = GdkX11.X11Window.foreign_new_for_display(Gdk.Display.get_default(), active) if active else None
         self.overlay.present_at(window)
         try:
             self.watch_input(xinput.RawButtonPressMask | xinput.RawKeyPressMask)
-            self.recording = Recording(self)
+            self.recording = Recording(self, target)
             recording = self.recording
             self.glow.track(window)
             GLib.timeout_add(90, lambda: self.recording is recording and self.tick())

@@ -88,12 +88,13 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
     hold("Super_L", "Alt_L")
     until(app.glow.get_mapped)
     from Xlib.ext import shape
+    Gdk.Display.get_default().sync()
     light = x.create_resource_object("window", app.glow.get_window().get_xid())
     assert not light.shape_get_rectangles(shape.SK.Input).rectangles
     _, _, glow_w, glow_h, _ = app.glow.bounds
     rim = light.shape_get_rectangles(shape.SK.Bounding).rectangles
     assert rim and not any(r.x <= glow_w // 2 < r.x + r.width and
-                           r.y <= glow_h // 2 < r.y + r.height for r in rim)
+                           r.y <= glow_h // 2 < r.y + r.height for r in rim), (app.glow.bounds, rim)
     assert app.focus() == app.recording.target
     if not real:
         window.move(40, 35)

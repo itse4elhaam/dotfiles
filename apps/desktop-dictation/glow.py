@@ -57,9 +57,8 @@ class RecordingGlow(Gtk.Window):
             region = cairo.Region(cairo.RectangleInt(0, 0, width, height))
             if width > 2 * rim and height > rim + bottom:
                 region.subtract(cairo.RectangleInt(rim, rim, width - 2 * rim, height - rim - bottom))
-            native = self.get_window()
-            native.shape_combine_region(region, 0, 0)
-            native.input_shape_combine_region(cairo.Region(), 0, 0)
+            self.shape_combine_region(region)
+            self.input_shape_combine_region(cairo.Region())
             self.queue_draw()
         return True
 
