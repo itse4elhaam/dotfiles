@@ -26,6 +26,7 @@ class Overlay(Gtk.Window):
         self.forest = GdkPixbuf.Pixbuf.new_from_file(str(Path(__file__).with_name("forest.jpg")))
         self.levels = deque([0.] * 90, maxlen=90)
         self.serial = 0
+        self.dismiss_on_release = False
         self.recovery = None
         self.pending = []
         self.started = 0
@@ -74,6 +75,9 @@ class Overlay(Gtk.Window):
         self.wave.connect("draw", self.draw_wave)
         body.pack_start(head, False, False, 0)
         body.pack_start(self.label, True, True, 0)
+        self.hold_notice = Gtk.Label(label="Mic off for this hold · release and press again", name="status", xalign=0)
+        self.hold_notice.set_no_show_all(True)
+        body.pack_end(self.hold_notice, False, False, 0)
         body.pack_end(self.wave, False, False, 0)
         self.add(body)
         style = Gtk.CssProvider()
@@ -131,15 +135,45 @@ class Overlay(Gtk.Window):
     def dismiss_recovery(self, *_):
         if self.recovery is not None:
             self.pending.pop()
-        self.hide_card()
         if self.pending:
             self.show_recovery()
+            return
+        if self.hold_notice.get_visible():
+            self.actions.hide()
+            self.clickable(False)
+            self.recovery = None
+            self.label.set_text("")
+            self.status.set_text("Dictation")
+        self.dismiss_result()
 
     def clear_recoveries(self):
+        self.hold_notice.hide()
         self.pending.clear()
         self.hide_card()
 
+    def reject_hold(self):
+        self.wave.hide()
+        self.hold_notice.show()
+        self.set_opacity(1)
+        self.show()
+
+    def release_hold(self):
+        if self.hold_notice.get_visible():
+            self.hold_notice.hide()
+            self.wave.show()
+            if self.dismiss_on_release:
+                self.dismiss_result()
+
+    def dismiss_result(self):
+        if self.hold_notice.get_visible():
+            self.dismiss_on_release = True
+        elif self.pending:
+            self.show_recovery()
+        else:
+            self.hide_card()
+
     def hide_card(self):
+        self.dismiss_on_release = False
         self.serial += 1
         self.recovery = None
         self.actions.hide()
@@ -160,6 +194,7 @@ class Overlay(Gtk.Window):
             self.show_recovery()
 
     def show_recovery(self):
+        self.dismiss_on_release = False
         text, incomplete, resume = self.pending[-1]
         self.serial += 1
         self.listening = False
@@ -190,6 +225,8 @@ class Overlay(Gtk.Window):
             self.show_recovery()
 
     def sent(self, text):
+        self.serial += 1
+        self.dismiss_on_release = False
         self.status.set_text("Released")
         self.indicator.set_text("✓")
         self.label.set_text(text)
@@ -197,12 +234,13 @@ class Overlay(Gtk.Window):
         def fade():
             if self.serial != serial:
                 return False
+            if self.hold_notice.get_visible():
+                self.dismiss_result()
+                return False
             opacity = max(0, self.get_opacity() - .16)
             self.set_opacity(opacity)
             if not opacity:
-                self.hide()
-                if self.pending:
-                    self.show_recovery()
+                self.dismiss_result()
             return opacity > 0
         def begin_fade():
             GLib.timeout_add(16, fade)
@@ -248,6 +286,7 @@ class Overlay(Gtk.Window):
         GLib.timeout_add(16, rise)
 
     def message(self, text, duration):
+        self.dismiss_on_release = False
         self.serial += 1
         serial = self.serial
         self.listening = False
@@ -260,9 +299,7 @@ class Overlay(Gtk.Window):
         self.label.set_text(text)
         def dismiss():
             if self.serial == serial:
-                self.hide()
-                if self.pending:
-                    self.show_recovery()
+                self.dismiss_result()
             return False
         GLib.timeout_add(duration, dismiss)
 

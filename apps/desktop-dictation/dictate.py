@@ -246,7 +246,7 @@ class Dictation:
         if self.locked:
             return
         if self.recording:
-            self.overlay.label.set_text("Finishing previous recording · hold again when ready")
+            self.overlay.reject_hold()
             return
         active, _ = self.focus()
         window = GdkX11.X11Window.foreign_new_for_display(Gdk.Display.get_default(), active) if active else None
@@ -307,6 +307,7 @@ class Dictation:
     def check_release(self, keys=None):
         if self.held and not self.chord_down(keys):
             self.held = False
+            self.overlay.release_hold()
             if self.recording and self.recording.released is None:
                 self.recording.release()
                 self.overlay.finish()

@@ -316,6 +316,38 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
     assert not second.get_text()
     keys("keyup", "Alt_L", "keyup", "Super_L")
     until(lambda: not app.held)
+    app.overlay.dismiss_recovery()
+
+    # A hold refused during finalization stays visibly mic-off until release,
+    # including after recovery or the normal no-speech dismissal timer.
+    for result in ("Earlier hold transcript", ""):
+        audio.with_suffix(".txt").write_text(result)
+        hold("Alt_L", "Super_L")
+        previous = app.recording
+        keys("keyup", "Super_L")
+        until(lambda: previous.released is not None)
+        keys("keydown", "Super_L")
+        notice = app.overlay.hold_notice
+        until(notice.get_mapped)
+        assert app.recording is previous and app.overlay.label.get_text() == "Live words"
+        assert "release and press again" in notice.get_text()
+        until(lambda: app.recording is None)
+        if result:
+            assert app.overlay.recovery == result and app.overlay.actions.get_mapped()
+        else:
+            deadline = time.monotonic() + 2.4
+            until(lambda: time.monotonic() >= deadline)
+        assert app.overlay.label.get_text() == (result or "No speech heard")
+        assert app.held and notice.get_mapped() and app.recording is None
+        assert window.get_focus() is second and app.focus() == previous.target
+        keys("keyup", "Super_L", "keyup", "Alt_L")
+        until(lambda: not app.held)
+        assert not notice.get_visible()
+        if result:
+            assert app.overlay.recovery == result and app.overlay.get_visible()
+            app.overlay.dismiss_recovery()
+        else:
+            assert not app.overlay.get_visible()
     hold("Alt_L", "Super_L")
     warm_worker = app.worker
     keys("key", "Escape", "keyup", "Super_L", "keyup", "Alt_L")
