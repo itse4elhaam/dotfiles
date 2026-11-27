@@ -17,7 +17,7 @@ from selection import ClipboardBackup, TextSelection
 from overlay import Gdk, GLib, Gtk, Overlay
 from gi.repository import GdkX11, Gio
 from Xlib import X, XK, display, error
-from Xlib.ext import xinput, xtest
+from Xlib.ext import xfixes, xinput, xtest
 
 
 class Recording:
@@ -32,7 +32,12 @@ class Recording:
         self.target = app.focus()
         self.clipboard_generation = app.clipboard_generation
         self.clipboard_owner = app.x.get_selection_owner(app.selection.atom)
-        self.backup = ClipboardBackup(app.clipboard, app.x, self.clipboard_owner)
+        if app.pending_backup is not None and self.clipboard_owner == app.selection.window:
+            # Keep serving the first paste until its client reads it or it expires.
+            self.backup = app.pending_backup
+            self.clipboard_owner = app.selection.window if self.backup.values else X.NONE
+        else:
+            self.backup = ClipboardBackup(app.clipboard, app.x, self.clipboard_owner)
         self.cancelled = False
         self.audio = queue.Queue(maxsize=7500)  # Five minutes at 40 ms per block.
         self.worker = self.mic = None
@@ -138,12 +143,16 @@ class Dictation:
         self.recording = None
         self.worker = None
         self.idle_since = time.monotonic()
-        self.pending_restore = None
+        self.pending_backup = None
         self.paste_serial = 0
         self.selection = TextSelection(self.x)
         self.clipboard = Gtk.Clipboard.get(Gdk.SELECTION_CLIPBOARD)
         self.clipboard_generation = 0
-        self.clipboard.connect("owner-change", self.clipboard_changed)
+        self.x.xfixes_query_version()
+        self.x.xfixes_select_selection_input(
+            self.selection.window, self.selection.atom,
+            xfixes.XFixesSetSelectionOwnerNotifyMask | xfixes.XFixesSelectionWindowDestroyNotifyMask
+            | xfixes.XFixesSelectionClientCloseNotifyMask)
         self.locked = False
         saver = Gio.DBusProxy.new_for_bus_sync(
             Gio.BusType.SESSION, Gio.DBusProxyFlags.DO_NOT_AUTO_START, None,
@@ -208,11 +217,6 @@ class Dictation:
                 self.overlay.dismiss_recovery()
                 self.stop_worker()
 
-    def clipboard_changed(self, clipboard, event):
-        owner = event.owner
-        if owner and owner.get_xid() != self.selection.window.id:
-            self.clipboard_generation += 1
-
     def watch_input(self, mask):
         self.root.xinput_select_events([(xinput.AllMasterDevices, mask)])
         self.x.flush()
@@ -229,8 +233,6 @@ class Dictation:
         if self.recording:
             self.overlay.label.set_text("Finishing previous recording · hold again when ready")
             return
-        if self.pending_restore:
-            self.pending_restore()
         active, _ = self.focus()
         window = GdkX11.X11Window.foreign_new_for_display(Gdk.Display.get_default(), active) if active else None
         self.overlay.present_at(window)
@@ -246,7 +248,11 @@ class Dictation:
     def events(self, *_):
         while self.x.pending_events():
             event = self.x.next_event()
-            if event.type == X.SelectionRequest:
+            # These events and the final grab are ordered on the same connection.
+            if isinstance(event, xfixes.SelectionNotify):
+                if event.owner.id not in (X.NONE, self.selection.window.id):
+                    self.clipboard_generation += 1
+            elif event.type == X.SelectionRequest:
                 self.selection.serve(event)
             elif event.type == X.SelectionClear:
                 if self.x.get_selection_owner(self.selection.atom) != self.selection.window:
@@ -374,8 +380,9 @@ class Dictation:
         if not rec.released:
             self.end("Speech engine stopped before release")
             return
-        if (not rec.unsafe and rec.released and time.monotonic() - rec.released < 2
-                and self.root.query_pointer().mask & (X.Mod1Mask | X.Mod4Mask)):
+        awaiting_modifier = (not rec.unsafe and time.monotonic() - rec.released < 2
+                             and self.root.query_pointer().mask & (X.Mod1Mask | X.Mod4Mask))
+        if self.pending_backup is not None or awaiting_modifier:
             def after_release():
                 if self.recording is rec:
                     self.commit(text)
@@ -393,7 +400,7 @@ class Dictation:
             nonlocal restored
             if serial == self.paste_serial and not restored:
                 restored = True
-                self.pending_restore = None
+                self.pending_backup = None
                 self.selection.put_back(rec.backup)
             return False
         def expire():
@@ -423,7 +430,7 @@ class Dictation:
                     mods.append(XK.XK_Shift_L)
                 keys = [self.x.keysym_to_keycode(sym) for sym in [*mods, XK.XK_v]]
                 if self.selection.claim(text, timestamp, on_read):
-                    self.pending_restore = restore
+                    self.pending_backup = rec.backup
                     self.paste_serial = serial
                     for key in keys:
                         xtest.fake_input(self.x, X.KeyPress, key)

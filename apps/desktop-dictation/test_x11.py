@@ -135,6 +135,22 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
     assert app.clipboard.wait_for_text() == "Late Tab sentinel" and first.get_text() == text and not second.get_text()
     app.overlay.dismiss_recovery()
 
+    # GTK reuses its owner window for a fresh copy just before the final guard.
+    hold("Super_L", "Alt_L")
+    previous_owner = app.x.get_selection_owner(app.selection.atom)
+    def copy_then_grab():
+        app.clipboard.set_text("Newer clipboard", -1)
+        Gdk.Display.get_default().sync()
+        assert app.x.get_selection_owner(app.selection.atom) == previous_owner
+        grab()
+    app.x.grab_server = copy_then_grab
+    keys("keyup", "Super_L", "keyup", "Alt_L")
+    until(lambda: app.overlay.recovery is not None)
+    app.x.grab_server = grab
+    assert app.clipboard.wait_for_text() == "Newer clipboard"
+    assert first.get_text() == text and not second.get_text()
+    app.overlay.dismiss_recovery()
+
     # XI 2.1 must report input while another client has grabbed the keyboard.
     hold("Alt_L", "Super_L")
     keys("keyup", "Alt_L", "keyup", "Super_L")
@@ -158,7 +174,7 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
     assert popup.grab_keyboard(False, X.GrabModeAsync, X.GrabModeAsync, X.CurrentTime) == X.GrabSuccess
     try:
         until(lambda: app.overlay.recovery is not None)
-        assert app.clipboard.wait_for_text() == "Late Tab sentinel" and not second.get_text()
+        assert app.clipboard.wait_for_text() == "Newer clipboard" and not second.get_text()
     finally:
         x.ungrab_keyboard(X.CurrentTime)
         popup.destroy()
@@ -174,16 +190,43 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
     audio.with_suffix(".txt").write_text("Ignored transcript")
     hold("Super_L", "Alt_L")
     keys("keyup", "Alt_L", "keyup", "Super_L")
-    until(lambda: app.pending_restore is not None)
+    until(lambda: app.pending_backup is not None)
     first.disconnect(ignored)
     second.grab_focus()
     audio.with_suffix(".txt").write_text("Second transcript")
     hold("Super_L", "Alt_L")
     keys("keyup", "Alt_L", "keyup", "Super_L")
-    until(lambda: second.get_text() == "Second transcript" and app.pending_restore is None)
+    until(lambda: second.get_text() == "Second transcript" and app.pending_backup is None)
     deadline = time.monotonic() + 1.9
     until(lambda: time.monotonic() >= deadline)
     assert app.clipboard.wait_for_text() == "Original before two holds"
+    second.set_text("")
+    app.clipboard.set_text("Discard before empty fixture", -1)
+    app.clipboard.clear()
+    until(lambda: not app.x.get_selection_owner(app.selection.atom))
+    # A field can accept Ctrl+V and defer reading the selection until the next hold.
+    first.set_text("")
+    first.grab_focus()
+    delayed = []
+    def defer_paste(entry):
+        entry.stop_emission_by_name("paste-clipboard")
+        delayed.append(entry)
+    handler = first.connect("paste-clipboard", defer_paste)
+    audio.with_suffix(".txt").write_text("First delayed transcript")
+    hold("Super_L", "Alt_L")
+    keys("keyup", "Super_L", "keyup", "Alt_L")
+    until(lambda: bool(delayed))
+    first.disconnect(handler)
+    second.grab_focus()
+    audio.with_suffix(".txt").write_text("Second delayed transcript")
+    hold("Super_L", "Alt_L")
+    keys("keyup", "Alt_L", "keyup", "Super_L")
+    until(lambda: app.recording is not None and app.recording.got_final)
+    assert not second.get_text()
+    delayed.pop().emit("paste-clipboard")
+    until(lambda: second.get_text() == "Second delayed transcript" and app.pending_backup is None)
+    assert first.get_text() == "First delayed transcript"
+    assert not app.clipboard.wait_for_text()
     second.set_text("")
     hold("Alt_L", "Super_L")
     app.worker.kill()
