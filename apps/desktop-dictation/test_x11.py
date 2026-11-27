@@ -116,6 +116,8 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
     print(f"Inserted after {time.monotonic() - release:.2f}s: {text}", flush=True)
     until(lambda: app.selection.saved is not None)
     assert app.clipboard.wait_for_text() == "Original text"
+    assert app.overlay.recovery == text
+    app.overlay.dismiss_recovery()
     if real:
         assert "front" in text.lower()
         # A short second utterance can end before the first native partial.
@@ -230,9 +232,8 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
     until(lambda: app.overlay.recovery is not None)
     assert second.is_focus() and not second.get_text() and first.get_text() == text
     assert app.clipboard.wait_for_text() == "Existing clipboard"
-    native_owner = app.x.get_selection_owner(app.selection.atom)
     app.overlay.copy_recovery()
-    assert app.x.get_selection_owner(app.selection.atom) == native_owner
+    assert app.x.get_selection_owner(app.selection.atom) == app.selection.window
     assert app.clipboard.wait_for_text() == text
     app.clipboard.set_text("Late Tab sentinel", -1)
     # Input after the early event drain but before the final server grab.
@@ -335,6 +336,9 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
     until(lambda: app.pending_backup is None)
     assert app.clipboard.wait_for_text() == "Newer clipboard"
 
+    assert app.overlay.recovery == text
+    app.overlay.dismiss_recovery()
+
     # arboard-style readers use CurrentTime even inside the V handler.
     # Exercise the value the field would actually insert, including recovery.
     generation = app.clipboard_generation
@@ -434,6 +438,8 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
     other_read(b"Other client transcript", "key-time")
     until(lambda: app.pending_backup is None)
     assert app.clipboard.wait_for_text() == "Copied during pending paste"
+    assert app.overlay.recovery == "Other client transcript"
+    app.overlay.dismiss_recovery()
     x.screen().root.change_property(app.active_atom, Xatom.WINDOW, 32, [xid])
     x.create_resource_object("window", xid).set_input_focus(X.RevertToParent, X.CurrentTime)
     xres = app.selection.xres
@@ -547,13 +553,15 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
     while app.overlay.recovery is not None:
         app.overlay.dismiss_recovery()
 
-    # Consecutive event-stamped GTK pastes proceed without recovery.
+    # Consecutive GTK pastes retain only the latest acknowledged card.
     for entry, transcript in ((first, "Direct A"), (second, "Direct B")):
         entry.grab_focus()
         audio.with_suffix(".txt").write_text(transcript)
         hold("Alt_L", "Super_L")
         keys("keyup", "Super_L", "keyup", "Alt_L")
         until(lambda: entry.get_text() == transcript and app.pending_backup is None)
+    assert app.overlay.pending == [("Direct B", False, None)]
+    app.overlay.dismiss_recovery()
     second.set_text("")
     hold("Alt_L", "Super_L")
     app.worker.kill()
@@ -611,13 +619,64 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
                            request.property, request.time))
         serve(request)
     app.selection.serve = observe
-    app.selection.copy("Event context", X.CurrentTime, app.paused_clients)
+    generation = app.clipboard_generation
+    app.clipboard.set_text("Before GTK handler", -1)
+    until(lambda: app.clipboard_generation > generation)
     observed = []
-    second.connect("paste-clipboard", lambda *_: observed.append(app.clipboard.wait_for_text()))
-    keys("key", "ctrl+v")
-    until(lambda: second.get_text() == "Event context")
-    assert observed == ["Event context"] and len(fields) == 2
-    assert fields[0] == fields[1] and fields[0][-1] != X.CurrentTime, fields
+    def inspect_before_paste(entry):
+        observed.append(app.clipboard.wait_for_text())
+        # Ensure the later reads really do run after the idle restoration.
+        until(lambda: app.pending_backup is None)
+        plain = Gdk.Atom.intern("STRING", False)
+        observed.append(bytes(app.clipboard.wait_for_contents(plain).get_data()).decode())
+    handler = second.connect("paste-clipboard", inspect_before_paste)
+    audio.with_suffix(".txt").write_text("Intended field text")
+    hold("Alt_L", "Super_L")
+    keys("keyup", "Super_L", "keyup", "Alt_L")
+    until(lambda: second.get_text() == "Intended field text")
+    second.disconnect(handler)
+    gesture = fields[-3:]
+    assert observed == ["Intended field text"] * 2
+    assert gesture[0] == gesture[2] and gesture[0][-1] != X.CurrentTime, gesture
+    assert gesture[1][-1] == gesture[0][-1] and gesture[1][2] != gesture[0][2], gesture
+    assert app.overlay.recovery == "Intended field text"
+    assert app.clipboard.wait_for_text() == "Before GTK handler"
+    other_read(b"Before GTK handler")
+    # A newer acknowledged paste must not revive A, even when replayed by
+    # the same process on another connection.
+    reader = x.screen().root.create_window(0, 0, 1, 1, 0, 0, X.InputOnly, X.CopyFromParent)
+    audio.with_suffix(".txt").write_text("Later transcript")
+    second.set_text("")
+    hold("Alt_L", "Super_L")
+    keys("keyup", "Super_L", "keyup", "Alt_L")
+    until(lambda: second.get_text() == "Later transcript")
+    secondary_read(b"", gesture[0][-1])
+    assert app.clipboard.wait_for_text() == "Before GTK handler"
+    # Lock while the latest conversion still has replayable text.
+    from gi.repository import GLib
+    current_time = app.selection.replay[0]
+    app.lock_changed(None, None, "ActiveChanged", GLib.Variant("(b)", (True,)))
+    assert app.selection.replay is None and not app.overlay.pending
+    secondary_read(b"", current_time)
+    other_read(b"Before GTK handler")
+    app.lock_changed(None, None, "ActiveChanged", GLib.Variant("(b)", (False,)))
+
+    # A wrapped server timestamp is indistinguishable from an old request.
+    # Simulate just the repeated XI2 timestamp on the dispatched shortcut.
+    handler = second.connect("paste-clipboard", defer_paste)
+    audio.with_suffix(".txt").write_text("Wrapped event")
+    hold("Alt_L", "Super_L")
+    keys("keyup", "Super_L", "keyup", "Alt_L")
+    until(lambda: bool(delayed))
+    second.disconnect(handler)
+    entry, _ = delayed.pop()
+    app.selection.press_time = gesture[0][-1]
+    entry.set_text(secondary_read(b"", gesture[0][-1]).decode())
+    assert app.pending_backup is not None
+    until(lambda: app.overlay.recovery == "Wrapped event")
+    assert not entry.get_text()
+    other_read(b"Before GTK handler")
+    app.stop_worker()
 
 
 if __name__ == "__main__":

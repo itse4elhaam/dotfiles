@@ -245,6 +245,9 @@ class Dictation:
                 self.lock_generation += 1
                 if self.recording:
                     self.end("Cancelled")
+                if self.expire_pending:
+                    self.expire_pending()
+                self.selection.replay = None
                 self.overlay.clear_recoveries()
                 self.stop_worker()
 
@@ -447,7 +450,7 @@ class Dictation:
     def copy_recovery(self, text):
         if self.expire_pending:
             self.expire_pending()
-        if self.paused_clients:
+        if self.paused_clients or self.selection.confirmed:
             self.clipboard_generation += 1
             timestamp = GdkX11.x11_get_server_time(self.overlay.get_window())
             self.selection.copy(text, timestamp, self.paused_clients)
@@ -502,6 +505,8 @@ class Dictation:
                 self.selection.put_back(rec.backup, late_client)
             return False
         def expire():
+            if serial == self.paste_serial:
+                self.selection.replay = None
             if serial == self.paste_serial and not restored:
                 restore(client if not read else None)
                 if not read:
@@ -515,6 +520,7 @@ class Dictation:
         def on_read():
             nonlocal read
             read = True
+            self.overlay.recover_confirmed(text, show=self.recording is None)
             GLib.idle_add(restore)
         self.x.grab_server()
         try:

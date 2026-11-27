@@ -44,6 +44,7 @@ class Overlay(Gtk.Window):
         self.dismiss_on_release = False
         self.recovery = None
         self.pending = []
+        self.confirmed_card = None
         self.started = 0
         self.listening = False
         self.set_name("dictation")
@@ -157,7 +158,8 @@ class Overlay(Gtk.Window):
 
     def dismiss_recovery(self, *_):
         if self.pending and self.actions.get_visible():
-            self.pending.pop()
+            if self.pending.pop() is self.confirmed_card:
+                self.confirmed_card = None
         self.next_recovery()
 
     def next_recovery(self):
@@ -175,6 +177,8 @@ class Overlay(Gtk.Window):
     def clear_recoveries(self):
         self.hold_notice.hide()
         self.pending.clear()
+        self.confirmed_card = None
+        self.label.set_text("")
         self.hide_card()
 
     def reject_hold(self):
@@ -216,6 +220,15 @@ class Overlay(Gtk.Window):
 
     def recover(self, text, incomplete=False, client=None, show=True):
         self.pending.append((text, incomplete, client))
+        if show:
+            self.show_recovery()
+
+    def recover_confirmed(self, text, show):
+        # A conversion acknowledges the shortcut, not insertion into a field.
+        if self.confirmed_card is not None:
+            self.pending = [card for card in self.pending if card is not self.confirmed_card]
+        self.confirmed_card = (text, False, None)
+        self.pending.append(self.confirmed_card)
         if show:
             self.show_recovery()
 
@@ -282,7 +295,8 @@ class Overlay(Gtk.Window):
         text = self.recovery
         if text is None:
             return
-        self.pending.pop()
+        if self.pending.pop() is self.confirmed_card:
+            self.confirmed_card = None
         self.copy_text(text)
         # Copy may itself expire an earlier paste and queue its transcript.
         # Keep all transcript cards, then offer Resume for each paused app.

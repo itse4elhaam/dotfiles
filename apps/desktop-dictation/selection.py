@@ -23,6 +23,7 @@ class QueryClientIds(rq.ReplyRequest):
 
 
 LOCAL_CLIENT_PID_MASK = 2
+MAX_CONFIRMED_EVENTS = 65536
 
 
 def xres_opcode(x):
@@ -52,6 +53,8 @@ class TextSelection:
         self.text_atom = x.intern_atom("TEXT")
         self.utf8 = x.intern_atom("UTF8_STRING")
         self.compound = x.intern_atom("COMPOUND_TEXT")
+        self.confirmed = {}  # X11 timestamp -> process identity, never transcript bytes
+        self.replay = None
         self.press_time = None
         self.saved = None
         self.recipient = None
@@ -80,6 +83,11 @@ class TextSelection:
         return ("connection", base)
 
     def claim(self, text, timestamp, recipient, backup, on_read):
+        # Keep exact tombstones even across clock wrap. At capacity use Copy
+        # until restart instead of forgetting a potentially queued conversion.
+        if len(self.confirmed) >= MAX_CONFIRMED_EVENTS:
+            return False
+        self.replay = None
         self.window.set_selection_owner(self.atom, timestamp)
         if self.x.get_selection_owner(self.atom) != self.window:
             return False
@@ -93,6 +101,7 @@ class TextSelection:
         return True
 
     def copy(self, text, timestamp, paused_clients):
+        self.replay = None
         self.window.set_selection_owner(self.atom, X.CurrentTime)
         self.saved = None
         self.text = text
@@ -122,6 +131,17 @@ class TextSelection:
         if self.restore and not recipient and not unknown_reader:
             saved = self.other_clients
         guard = client in self.guarded_reads or unknown_reader or (recipient and not delivering)
+        # A single GTK handler may request the same selection repeatedly.
+        # Consult acknowledged timestamps before a newer claim or backup.
+        previous = self.confirmed.get(request.time)
+        repeated = previous is not None and (previous == client or client[0] != "process" or delivering)
+        value_text = self.text
+        if repeated:
+            delivering = False
+            saved = None
+            guard = False
+            value_text = (self.replay[1] if previous == client and self.replay
+                          and request.time == self.replay[0] else "")
         if request.selection != self.atom:
             prop = X.NONE
         elif target == self.targets:
@@ -143,7 +163,7 @@ class TextSelection:
             else:
                 prop = X.NONE
         elif target in self.formats:
-            value = self.text.encode(self.formats[target], errors="replace")
+            value = value_text.encode(self.formats[target], errors="replace")
             type_atom = self.utf8 if target == self.text_atom else target
             request.requestor.change_property(prop, type_atom, 8, value)
         else:
@@ -153,6 +173,8 @@ class TextSelection:
             target=target, property=prop))
         self.x.flush()
         if delivering and not guard and prop and target in self.formats:
+            self.confirmed[request.time] = client
+            self.replay = (request.time, self.text)
             self.restore()
 
     def put_back(self, backup, late_client=None):
