@@ -2,7 +2,7 @@
 set -euo pipefail
 here="$(cd "$(dirname "$0")" && pwd)"
 install -d "$HOME/.local/share/desktop-dictation" "$HOME/.config/systemd/user"
-for file in dictate.py overlay.py selection.py forest.jpg transcribe.cjs; do
+for file in dictate.py overlay.py glow.py selection.py forest.jpg transcribe.cjs; do
     install -m 644 "$here/$file" "$HOME/.local/share/desktop-dictation/$file"
 done
 unit="desktop-dictation.service"

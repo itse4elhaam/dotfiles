@@ -15,6 +15,7 @@ from pathlib import Path
 
 from selection import ClipboardBackup, TextSelection
 from overlay import Gdk, GLib, Gtk, Overlay
+from glow import RecordingGlow
 from gi.repository import GdkX11, Gio
 from Xlib import X, XK, display, error
 from Xlib.ext import xfixes, xinput, xtest
@@ -80,7 +81,7 @@ class Recording:
                 aligned = len(data) & ~1
                 self.audio.put_nowait(data[:aligned])
                 if aligned:
-                    self.post(self.app.overlay.level, audioop.rms(data[:aligned], 2))
+                    self.post(self.app.audio_level, audioop.rms(data[:aligned], 2))
                 carry = data[aligned:]
             if self.released is None:
                 self.post(self.app.failure, "Microphone disconnected")
@@ -125,6 +126,7 @@ class Recording:
 
     def release(self):
         self.released = time.monotonic()
+        self.app.glow.stop()
         self.mic.terminate()
 
     def close(self):
@@ -152,6 +154,7 @@ class Dictation:
         self.image = os.path.expanduser(os.environ.get(
             "T3_DICTATION_APPIMAGE", "~/Applications/T3-Code-Nightly-x86_64.AppImage"))
         self.overlay = Overlay(self.copy_recovery)
+        self.glow = RecordingGlow()
         self.recording = None
         self.worker = None
         self.idle_since = time.monotonic()
@@ -256,6 +259,7 @@ class Dictation:
             self.watch_input(xinput.RawButtonPressMask | xinput.RawKeyPressMask)
             self.recording = Recording(self)
             recording = self.recording
+            self.glow.track(window)
             GLib.timeout_add(90, lambda: self.recording is recording and self.tick())
         except OSError as exc:
             print(exc, file=sys.stderr)
@@ -336,14 +340,29 @@ class Dictation:
         if rec:
             if self.focus() != rec.target:
                 rec.unsafe = True
+            if rec.unsafe and self.glow.target:
+                self.glow.stop()
+            elif self.glow.get_visible():
+                self.glow.place()
             now = time.monotonic()
             if rec.released and now - rec.released > 30 + (rec.released - rec.started) / 2:
                 self.failure("Speech engine timed out")
             elif not rec.released and now - rec.started > 300:
                 rec.release()
                 rec.unsafe = True
+                self.overlay.finish()
                 self.overlay.label.set_text("Five-minute limit · finishing…")
         return True
+
+    def audio_level(self, rms):
+        self.overlay.level(rms)
+        rec = self.recording
+        if rec.released is None and not rec.unsafe and self.glow.target:
+            if not self.glow.get_visible() and self.focus() != rec.target:
+                rec.unsafe = True
+                self.glow.stop()
+                return
+            self.glow.level(self.overlay.levels[-1])
 
     def cancel(self):
         rec = self.recording
@@ -366,6 +385,7 @@ class Dictation:
             self.overlay.label.set_text(text.strip())
 
     def end(self, message):
+        self.glow.stop()
         self.idle_since = time.monotonic()
         rec, self.recording = self.recording, None
         if rec:

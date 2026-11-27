@@ -86,11 +86,26 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
     until(lambda: app.clipboard_generation > 0)
     start = time.monotonic()
     hold("Super_L", "Alt_L")
+    until(app.glow.get_mapped)
+    from Xlib.ext import shape
+    light = x.create_resource_object("window", app.glow.get_window().get_xid())
+    assert not light.shape_get_rectangles(shape.SK.Input).rectangles
+    _, _, glow_w, glow_h, _ = app.glow.bounds
+    rim = light.shape_get_rectangles(shape.SK.Bounding).rectangles
+    assert rim and not any(r.x <= glow_w // 2 < r.x + r.width and
+                           r.y <= glow_h // 2 < r.y + r.height for r in rim)
+    assert app.focus() == app.recording.target
+    if not real:
+        window.move(40, 35)
+        window.resize(320, 140)
+        until(lambda: app.glow.bounds[:4] == (40, 35, 320, 140))
+        assert app.focus() == app.recording.target
     print(f"First partial at {time.monotonic() - start:.2f}s: {app.overlay.label.get_text()}", flush=True)
     keys("click", "4")
     release = time.monotonic()
     keys("keyup", "Super_L")
     until(lambda: app.recording.released is not None)
+    assert not app.glow.get_visible()
     assert not first.get_text()
     keys("keyup", "Alt_L")
     until(lambda: bool(first.get_text()), 12)
