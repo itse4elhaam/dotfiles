@@ -32,7 +32,9 @@ class Recording:
         self.target = app.focus()
         self.clipboard_generation = app.clipboard_generation
         self.clipboard_owner = app.x.get_selection_owner(app.selection.atom)
-        if app.pending_backup is not None and self.clipboard_owner == app.selection.window:
+        if app.selection.client_id(self.target[0]) in app.paused_clients:
+            self.backup = None
+        elif app.pending_backup is not None and self.clipboard_owner == app.selection.window:
             # Keep serving the first paste until its client reads it or it expires.
             self.backup = app.pending_backup
             self.clipboard_owner = app.selection.window if self.backup.values else X.NONE
@@ -144,6 +146,8 @@ class Dictation:
         self.worker = None
         self.idle_since = time.monotonic()
         self.pending_backup = None
+        self.paused_clients = {}
+        self.lock_generation = 0
         self.paste_serial = 0
         self.selection = TextSelection(self.x)
         self.clipboard = Gtk.Clipboard.get(Gdk.SELECTION_CLIPBOARD)
@@ -212,9 +216,10 @@ class Dictation:
         if name == "ActiveChanged":
             self.locked, = params.unpack()
             if self.locked:
+                self.lock_generation += 1
                 if self.recording:
                     self.end("Cancelled")
-                self.overlay.dismiss_recovery()
+                self.overlay.clear_recoveries()
                 self.stop_worker()
 
     def watch_input(self, mask):
@@ -252,6 +257,7 @@ class Dictation:
             if isinstance(event, xfixes.SelectionNotify):
                 if event.owner.id not in (X.NONE, self.selection.window.id):
                     self.clipboard_generation += 1
+                    self.selection.expired_reads.clear()
             elif event.type == X.SelectionRequest:
                 self.selection.serve(event)
             elif event.type == X.SelectionClear:
@@ -366,8 +372,17 @@ class Dictation:
         return self.root.query_pointer().mask & (X.ShiftMask | X.ControlMask | X.Mod1Mask | X.Mod4Mask | X.Mod5Mask)
 
     def recover(self, text, incomplete=False):
+        client = self.selection.client_id(self.recording.target[0])
         self.end("")
-        self.overlay.recover(text, incomplete)
+        self.overlay.recover(text, incomplete, self.paused_clients.get(client))
+
+    def pause_client(self, client):
+        def resume():
+            self.paused_clients.pop(client, None)
+            self.selection.expired_reads.discard(client)
+        self.paused_clients[client] = resume
+        self.selection.expired_reads.add(client)
+        return resume
 
     def commit(self, text):
         if self.recording.cancelled:
@@ -377,12 +392,15 @@ class Dictation:
             self.end("No speech heard")
             return
         rec = self.recording
+        client = self.selection.client_id(rec.target[0])
         if not rec.released:
             self.end("Speech engine stopped before release")
             return
         awaiting_modifier = (not rec.unsafe and time.monotonic() - rec.released < 2
                              and self.root.query_pointer().mask & (X.Mod1Mask | X.Mod4Mask))
         if self.pending_backup is not None or awaiting_modifier:
+            if self.pending_backup is not None:
+                self.overlay.status.set_text("Waiting for previous paste")
             def after_release():
                 if self.recording is rec:
                     self.commit(text)
@@ -396,6 +414,8 @@ class Dictation:
         pasted = False
         serial = self.paste_serial + 1
         restored = False
+        read = False
+        lock_generation = self.lock_generation
         def restore():
             nonlocal restored
             if serial == self.paste_serial and not restored:
@@ -406,18 +426,24 @@ class Dictation:
         def expire():
             if serial == self.paste_serial and not restored:
                 restore()
-                if self.recording is None and self.overlay.serial == completion_serial:
-                    self.overlay.recover(text)
+                if not read:
+                    # The original paste can still read. Only an explicit Resume
+                    # permits another automatic delivery to this X11 client.
+                    resume = self.pause_client(client)
+                    if self.lock_generation == lock_generation:
+                        self.overlay.recover(text, resume=resume, show=self.recording is None)
             return False
 
-        def on_read(requestor):
-            mask = self.x.display.info.resource_id_mask
-            if requestor & ~mask == rec.target[0] & ~mask:
-                GLib.idle_add(restore)
+        def on_read():
+            nonlocal read
+            read = True
+            GLib.idle_add(restore)
         self.x.grab_server()
         try:
             self.x.sync()
-            safe = (rec.backup.ready and not self.x.pending_events() and not rec.unsafe and rec.target == self.focus()
+            safe = (client not in self.paused_clients and rec.backup is not None and rec.backup.ready
+                    and not self.x.pending_events()
+                    and not rec.unsafe and rec.target == self.focus()
                     and rec.target[0] and rec.target[1] not in (X.NONE, X.PointerRoot)
                     and rec.clipboard_generation == self.clipboard_generation
                     and rec.clipboard_owner == self.x.get_selection_owner(self.selection.atom)
@@ -429,7 +455,7 @@ class Dictation:
                 if any(name in classes for name in ("terminal", "kitty", "alacritty", "ghostty", "wezterm", "tilix", "konsole", "terminator", "foot")):
                     mods.append(XK.XK_Shift_L)
                 keys = [self.x.keysym_to_keycode(sym) for sym in [*mods, XK.XK_v]]
-                if self.selection.claim(text, timestamp, on_read):
+                if self.selection.claim(text, timestamp, client, rec.backup, on_read):
                     self.pending_backup = rec.backup
                     self.paste_serial = serial
                     for key in keys:
@@ -445,7 +471,6 @@ class Dictation:
         if pasted:
             self.end("Transcript ready")
             self.overlay.sent(text)
-            completion_serial = self.overlay.serial
             GLib.timeout_add(1800, expire)
         else:
             self.recover(text)

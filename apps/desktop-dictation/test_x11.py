@@ -181,36 +181,63 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
         x.sync()
     app.overlay.dismiss_recovery()
 
-    # A new hold supersedes a paste that no application consumed.
+    # Both fields belong to one X client. A late reader from the first
+    # field must never consume the second transcript when the first expires.
     first.grab_focus()
-    ignored = first.connect("paste-clipboard", lambda entry: entry.stop_emission_by_name("paste-clipboard"))
+    delayed = []
+    def defer_paste(entry):
+        entry.stop_emission_by_name("paste-clipboard")
+        delayed.append(entry)
+    ignored = first.connect("paste-clipboard", defer_paste)
     generation = app.clipboard_generation
     app.clipboard.set_text("Original before two holds", -1)
     until(lambda: app.clipboard_generation > generation)
     audio.with_suffix(".txt").write_text("Ignored transcript")
     hold("Super_L", "Alt_L")
     keys("keyup", "Alt_L", "keyup", "Super_L")
-    until(lambda: app.pending_backup is not None)
+    until(lambda: bool(delayed))
     first.disconnect(ignored)
+    # Clipboard requests on an unrelated X connection still see the user's
+    # clipboard, even before the first target consumes its paste.
+    outsider = x.screen().root.create_window(0, 0, 1, 1, 0, 0, X.InputOnly, X.CopyFromParent)
+    prop = x.intern_atom("DICTATION_TEST_PASTE")
+    utf8 = x.intern_atom("UTF8_STRING")
+    outsider.convert_selection(app.selection.atom, utf8, prop, X.CurrentTime)
+    x.flush()
+    until(lambda: outsider.get_full_property(prop, utf8) is not None)
+    assert outsider.get_full_property(prop, utf8).value == b"Original before two holds"
+    outsider.destroy()
     second.grab_focus()
     audio.with_suffix(".txt").write_text("Second transcript")
     hold("Super_L", "Alt_L")
     keys("keyup", "Alt_L", "keyup", "Super_L")
-    until(lambda: second.get_text() == "Second transcript" and app.pending_backup is None)
-    deadline = time.monotonic() + 1.9
-    until(lambda: time.monotonic() >= deadline)
+    until(lambda: app.pending_backup is None and app.overlay.recovery == "Second transcript")
+    assert app.overlay.resume.is_visible()
+    # A hold started *after* expiry also uses Copy, even when another field
+    # in the same client still has a deferred paste request.
+    audio.with_suffix(".txt").write_text("Third transcript")
+    hold("Alt_L", "Super_L")
+    keys("keyup", "Super_L", "keyup", "Alt_L")
+    until(lambda: app.overlay.recovery == "Third transcript")
+    first.set_text("")
+    delayed.pop().emit("paste-clipboard")
+    until(lambda: not app.selection.expired_reads)
+    assert not first.get_text() and not second.get_text()
     assert app.clipboard.wait_for_text() == "Original before two holds"
-    second.set_text("")
+    app.overlay.dismiss_recovery()
+    assert app.overlay.recovery == "Second transcript"
+    app.overlay.copy_recovery()
+    assert app.clipboard.wait_for_text() == "Second transcript"
+    assert app.overlay.recovery == "Ignored transcript"
+    app.overlay.resume.clicked()
+    assert not app.paused_clients
+    app.overlay.dismiss_recovery()
     app.clipboard.set_text("Discard before empty fixture", -1)
     app.clipboard.clear()
     until(lambda: not app.x.get_selection_owner(app.selection.atom))
     # A field can accept Ctrl+V and defer reading the selection until the next hold.
     first.set_text("")
     first.grab_focus()
-    delayed = []
-    def defer_paste(entry):
-        entry.stop_emission_by_name("paste-clipboard")
-        delayed.append(entry)
     handler = first.connect("paste-clipboard", defer_paste)
     audio.with_suffix(".txt").write_text("First delayed transcript")
     hold("Super_L", "Alt_L")

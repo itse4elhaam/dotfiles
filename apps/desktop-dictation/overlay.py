@@ -27,6 +27,7 @@ class Overlay(Gtk.Window):
         self.levels = deque([0.] * 90, maxlen=90)
         self.serial = 0
         self.recovery = None
+        self.pending = []
         self.started = 0
         self.listening = False
         self.set_name("dictation")
@@ -49,6 +50,11 @@ class Overlay(Gtk.Window):
         head.pack_end(self.escape, False, False, 0)
         self.actions = Gtk.Box(spacing=6)
         self.actions.set_no_show_all(True)
+        self.resume = Gtk.Button.new_with_label("Resume")
+        self.resume.set_focus_on_click(False)
+        self.resume.set_tooltip_text("Resume automatic paste for future recordings in this application")
+        self.resume.connect("clicked", self.resume_paste)
+        self.actions.add(self.resume)
         for title, callback in (("Copy", self.copy_recovery), ("×", self.dismiss_recovery)):
             button = Gtk.Button.new_with_label(title)
             button.set_focus_on_click(False)
@@ -123,6 +129,17 @@ class Overlay(Gtk.Window):
         self.get_window().input_shape_combine_region(region, 0, 0)
 
     def dismiss_recovery(self, *_):
+        if self.recovery is not None:
+            self.pending.pop()
+        self.hide_card()
+        if self.pending:
+            self.show_recovery()
+
+    def clear_recoveries(self):
+        self.pending.clear()
+        self.hide_card()
+
+    def hide_card(self):
         self.serial += 1
         self.recovery = None
         self.actions.hide()
@@ -137,20 +154,40 @@ class Overlay(Gtk.Window):
         self.hint.hide()
         self.escape.hide()
 
-    def recover(self, text, incomplete=False):
+    def recover(self, text, incomplete=False, resume=None, show=True):
+        self.pending.append((text, incomplete, resume))
+        if show:
+            self.show_recovery()
+
+    def show_recovery(self):
+        text, incomplete, resume = self.pending[-1]
         self.serial += 1
         self.listening = False
         self.recovery = text
-        self.status.set_text("Partial transcript" if incomplete else "Ready to copy")
+        status = "Auto-paste paused" if resume else "Ready to copy"
+        if incomplete:
+            status = "Partial transcript"
+        if len(self.pending) > 1:
+            status += f" · {len(self.pending)} left"
+        self.status.set_text(status)
         self.indicator.set_text("◇")
         self.clock.hide()
         self.escape.hide()
         self.hint.hide()
         self.label.set_text(text)
         self.actions.show()
+        self.resume.set_visible(resume is not None)
         self.show()
         self.set_opacity(1)
         self.clickable(True)
+
+    def resume_paste(self, *_):
+        resume = self.pending[-1][2]
+        if resume:
+            resume()
+            self.pending = [(text, incomplete, None if action is resume else action)
+                            for text, incomplete, action in self.pending]
+            self.show_recovery()
 
     def sent(self, text):
         self.status.set_text("Released")
@@ -164,6 +201,8 @@ class Overlay(Gtk.Window):
             self.set_opacity(opacity)
             if not opacity:
                 self.hide()
+                if self.pending:
+                    self.show_recovery()
             return opacity > 0
         def begin_fade():
             GLib.timeout_add(16, fade)
@@ -176,7 +215,7 @@ class Overlay(Gtk.Window):
         self.dismiss_recovery()
 
     def present_at(self, window):
-        self.dismiss_recovery()
+        self.hide_card()
         self.started = time.monotonic()
         self.listening = True
         self.status.set_text("Listening")
@@ -222,6 +261,8 @@ class Overlay(Gtk.Window):
         def dismiss():
             if self.serial == serial:
                 self.hide()
+                if self.pending:
+                    self.show_recovery()
             return False
         GLib.timeout_add(duration, dismiss)
 

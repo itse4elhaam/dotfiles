@@ -16,15 +16,23 @@ class TextSelection:
             ("UTF8_STRING", "utf-8"), ("text/plain;charset=utf-8", "utf-8"),
             ("text/plain", "utf-8"), ("TEXT", "utf-8"), ("STRING", "latin-1"))}
         self.saved = None
+        self.recipient = None
+        self.other_clients = {}
+        self.expired_reads = set()
         self.restore = None
         self.text = ""
         self.time = 0
 
-    def claim(self, text, timestamp, on_read):
+    def client_id(self, window_id):
+        return window_id & ~self.x.display.info.resource_id_mask
+
+    def claim(self, text, timestamp, recipient, backup, on_read):
         self.window.set_selection_owner(self.atom, timestamp)
         if self.x.get_selection_owner(self.atom) != self.window:
             return False
         self.saved = None
+        self.recipient = recipient
+        self.other_clients = backup.values
         self.restore = on_read
         self.text = text
         self.time = timestamp
@@ -33,16 +41,26 @@ class TextSelection:
     def serve(self, request):
         prop = request.property or request.target
         target = request.target
+        client = self.client_id(request.requestor.id)
+        saved = self.saved
+        delivering = self.restore is not None and client == self.recipient
+        if self.restore and not delivering:
+            saved = self.other_clients
         if request.selection != self.atom:
             prop = X.NONE
         elif target == self.targets:
             request.requestor.change_property(prop, Xatom.ATOM, 32,
-                                              [self.targets, self.timestamp, *(self.saved if self.saved is not None else self.formats)])
+                                              [self.targets, self.timestamp, *(saved if saved is not None else self.formats)])
         elif target == self.timestamp:
             request.requestor.change_property(prop, Xatom.INTEGER, 32, [self.time])
-        elif self.saved is not None:
-            if target in self.saved:
-                type_atom, bits, data = self.saved[target]
+        elif client in self.expired_reads and target in self.formats:
+            # Complete one late text read without inserting unrelated clipboard
+            # data into the field. Other clients still get the restored formats.
+            request.requestor.change_property(prop, target, 8, b"")
+            self.expired_reads.discard(client)
+        elif saved is not None:
+            if target in saved:
+                type_atom, bits, data = saved[target]
                 block = 128 * 1024
                 request.requestor.change_property(prop, type_atom, bits, data[:block])
                 for offset in range(block, len(data), block):
@@ -58,11 +76,13 @@ class TextSelection:
             time=request.time, requestor=request.requestor, selection=request.selection,
             target=target, property=prop))
         self.x.flush()
-        if self.restore and prop and target in self.formats:
-            self.restore(request.requestor.id)
+        if delivering and prop and target in self.formats:
+            self.restore()
 
     def put_back(self, backup):
         self.restore = None
+        self.recipient = None
+        self.other_clients = {}
         self.text = ""
         self.x.grab_server()
         try:
