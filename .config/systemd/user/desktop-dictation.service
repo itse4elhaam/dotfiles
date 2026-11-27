@@ -1,0 +1,16 @@
+[Unit]
+Description=Push-to-talk desktop dictation with T3 Parakeet
+PartOf=graphical-session.target
+After=graphical-session-pre.target
+ConditionEnvironment=XDG_SESSION_TYPE=x11
+
+[Service]
+Type=simple
+EnvironmentFile=-%h/.config/desktop-dictation.env
+ExecStart=/usr/bin/python3 %h/.local/share/desktop-dictation/dictate.py
+Nice=10
+MemoryMax=3G
+MemorySwapMax=0
+
+[Install]
+WantedBy=graphical-session.target
