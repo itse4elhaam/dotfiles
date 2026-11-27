@@ -132,6 +132,69 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
         return
     assert text == "Finished words."
     assert paste_shortcut(("gnome-terminal-server", "Gnome-terminal")) == (XK.XK_Control_L, XK.XK_Shift_L, XK.XK_v)
+    if "--chrome" in sys.argv:
+        page = directory / "editor.html"
+        page.write_text("""<title>Dictation fixture</title>
+            <input autofocus oninput="document.title=this.value">
+            <div contenteditable oninput="document.title=this.innerText"></div>""")
+        sentence = "Hello, T3! Let's send 42 words (OK?)."
+        audio.with_suffix(".txt").write_text(sentence)
+        chrome = subprocess.Popen(["google-chrome", "--ozone-platform=x11",
+            "--user-data-dir=" + str(directory / "chrome-profile"), "--no-first-run",
+            "--no-default-browser-check", "--disable-background-networking", "--disable-sync",
+            "--disable-extensions", "--disable-gpu", "--password-store=basic",
+            "--app=" + page.as_uri()], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        try:
+            def field():
+                return subprocess.run(["xdotool", "search", "--onlyvisible", "--name", "Dictation fixture"],
+                                      capture_output=True, text=True).stdout.strip()
+            until(field, 20)
+            browser = x.create_resource_object("window", int(field().splitlines()[0]))
+            x.screen().root.change_property(app.active_atom, Xatom.WINDOW, 32, [browser.id])
+            browser.set_input_focus(X.RevertToParent, X.CurrentTime)
+            x.sync()
+            def title():
+                prop = browser.get_full_property(x.intern_atom("_NET_WM_NAME"), X.AnyPropertyType)
+                return prop.value.decode() if prop else ""
+            owner = x.get_selection_owner(app.selection.atom)
+            original_serial = app.paste_serial
+            for element in ("input", "contenteditable"):
+                if element == "contenteditable":
+                    keys("key", "Tab", "key", "Caps_Lock")
+                    sentence = "Second field: Caps Lock works, too!"
+                    audio.with_suffix(".txt").write_text(sentence)
+                hold("Super_L", "Alt_L")
+                keys("keyup", "Alt_L", "keyup", "Super_L")
+                until(lambda: app.recording is None)
+                until(lambda: sentence == title(), 8)
+                assert x.get_selection_owner(app.selection.atom) == owner
+                assert app.clipboard.wait_for_text() == "Original text"
+                print(browser.get_wm_class(), element, title(), flush=True)
+            # Exercise the installed T3 class and a layout with directly
+            # representable Unicode on the same private Chromium renderer.
+            keys("key", "Caps_Lock", "key", "ctrl+a")
+            browser.set_wm_class("com.t3tools.t3code", "com.t3tools.T3Code")
+            x.sync()
+            subprocess.run(["setxkbmap", "de"], check=True)
+            sentence = "Grüße aus Köln!"
+            audio.with_suffix(".txt").write_text(sentence)
+            hold("Alt_L", "Super_L")
+            keys("keyup", "Super_L", "keyup", "Alt_L")
+            until(lambda: title() == sentence, 8)
+            print(browser.get_wm_class(), "German layout", title(), flush=True)
+            for unsupported in ("Prefix then newline\n", "Prefix then tab\t", "Prefix then emoji 🐈", "x" * 257):
+                audio.with_suffix(".txt").write_text(unsupported)
+                hold("Super_L", "Alt_L")
+                keys("keyup", "Super_L", "keyup", "Alt_L")
+                until(lambda: app.overlay.recovery == unsupported)
+                assert title() == sentence
+                assert app.paste_serial == original_serial
+                assert x.get_selection_owner(app.selection.atom) == owner
+        finally:
+            chrome.terminate()
+            chrome.wait(timeout=10)
+            app.stop_worker()
+        return
     target = x.create_resource_object("window", xid)
     original_class = target.get_wm_class()
     serial = app.paste_serial
