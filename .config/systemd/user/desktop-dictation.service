@@ -9,6 +9,8 @@ Type=simple
 EnvironmentFile=-%h/.config/desktop-dictation.env
 ExecStart=/usr/bin/python3 %h/.local/share/desktop-dictation/dictate.py
 Nice=10
+Restart=on-failure
+RestartSec=2
 MemoryMax=3G
 MemorySwapMax=0
 

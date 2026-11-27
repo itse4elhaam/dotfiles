@@ -1,10 +1,12 @@
 #!/usr/bin/python3
 """Hold a key to dictate into the focused X11 application."""
 import audioop
+import base64
 import json
 import os
 import queue
 import signal
+import struct
 import subprocess
 import sys
 import threading
@@ -12,19 +14,22 @@ import time
 from pathlib import Path
 
 from overlay import Gdk, GLib, Gtk, Overlay
-from gi.repository import GdkX11
+from gi.repository import GdkX11, Gio
 from Xlib import X, XK, display, error
 from Xlib.ext import xinput, xtest
 
 
 class Recording:
-    def __init__(self, app, image):
+    def __init__(self, app):
         self.app = app
         self.started = time.monotonic()
         self.released = None
         self.finished = False
+        self.got_final = False
+        self.last_partial = ""
         self.unsafe = False
         self.target = app.focus()
+        self.clipboard_generation = app.clipboard_generation
         self.audio = queue.Queue(maxsize=7500)  # Five minutes at 40 ms per block.
         self.worker = self.mic = None
         try:
@@ -32,10 +37,7 @@ class Recording:
                 "parec", "--raw", "--format=s16le", "--rate=16000", "--channels=1",
                 "--latency-msec=40", "--process-time-msec=20",
             ], stdout=subprocess.PIPE)
-            self.worker = subprocess.Popen(
-                [image, str(Path(__file__).resolve().with_name("transcribe.cjs"))],
-                stdin=subprocess.PIPE, stdout=subprocess.PIPE, start_new_session=True,
-                env={**os.environ, "ELECTRON_RUN_AS_NODE": "1", "OMP_NUM_THREADS": "2"})
+            self.worker = app.get_worker()
         except OSError:
             self.close()
             raise
@@ -60,9 +62,9 @@ class Recording:
                     self.post(self.app.overlay.level, audioop.rms(data[:aligned], 2))
                 carry = data[aligned:]
             if self.released is None:
-                self.post(self.app.end, "Microphone disconnected")
+                self.post(self.app.failure, "Microphone disconnected")
         except queue.Full:
-            self.post(self.app.end, "Recording buffer full")
+            self.post(self.app.failure, "Recording buffer full")
         finally:
             self.mic.stdout.close()
             self.mic.wait()
@@ -73,33 +75,32 @@ class Recording:
 
     def feed(self):
         try:
-            with self.worker.stdin as pipe:
-                while not self.finished:
-                    data = self.audio.get()
-                    if data is None:
-                        break
-                    pipe.write(data)
+            pipe = self.worker.stdin
+            pipe.write(b":start\n")
+            while not self.finished:
+                data = self.audio.get()
+                if data is None:
+                    pipe.write(b":finish\n")
                     pipe.flush()
+                    break
+                pipe.write(base64.b64encode(data) + b"\n")
+                pipe.flush()
         except (BrokenPipeError, OSError):
             pass
 
     def read_result(self):
-        final = None
         try:
-            with self.worker.stdout as pipe:
-                for line in pipe:
-                    event = json.loads(line)
-                    if event["type"] == "partial":
-                        self.post(self.app.partial, event["text"])
-                    elif event["type"] == "final":
-                        final = event["text"]
-        except (ValueError, KeyError):
-            self.post(self.app.end, "Speech engine returned an invalid result")
-        status = self.worker.wait()
-        if status or final is None:
-            self.post(self.app.end, "Speech engine unavailable · check service log")
-        else:
-            self.post(self.app.commit, final)
+            for line in self.worker.stdout:
+                event = json.loads(line)
+                if event["type"] == "partial":
+                    self.post(self.app.partial, event["text"])
+                elif event["type"] == "final":
+                    self.got_final = True
+                    self.post(self.app.commit, event["text"])
+                    return
+        except (ValueError, KeyError, OSError):
+            pass
+        self.post(self.app.failure, "Speech engine unavailable · check service log")
 
     def release(self):
         self.released = time.monotonic()
@@ -109,11 +110,9 @@ class Recording:
         self.finished = True
         if self.mic and self.mic.poll() is None:
             self.mic.terminate()
-        if self.worker and self.worker.poll() is None:
-            try:
-                os.killpg(self.worker.pid, signal.SIGKILL)
-            except ProcessLookupError:
-                pass
+            self.mic.wait()
+        if self.worker and not self.got_final:
+            self.app.stop_worker()
 
 
 class Dictation:
@@ -121,34 +120,85 @@ class Dictation:
         self.x = display.Display()
         self.root = self.x.screen().root
         self.active_atom = self.x.intern_atom("_NET_ACTIVE_WINDOW")
-        self.key = os.environ.get("DICTATION_KEY", "F9")
-        self.code = self.x.keysym_to_keycode(XK.string_to_keysym(self.key))
-        if not self.code:
-            raise ValueError("Unknown DICTATION_KEY: " + self.key)
+        def keycode(name):
+            return self.x.keysym_to_keycode(XK.string_to_keysym(name))
+        self.alt = keycode("Alt_L")
+        self.supers = {keycode("Super_L"), keycode("Super_R")} - {0}
+        self.chord = self.supers | {self.alt}
+        self.other_modifiers = {keycode(name) for name in
+                                ("Alt_R", "Shift_L", "Shift_R", "Control_L", "Control_R",
+                                 "ISO_Level3_Shift", "Meta_L", "Meta_R")} - self.chord - {0}
         self.image = os.path.expanduser(os.environ.get(
             "T3_DICTATION_APPIMAGE", "~/Applications/T3-Code-Nightly-x86_64.AppImage"))
         self.overlay = Overlay()
         self.recording = None
+        self.worker = None
+        self.idle_since = time.monotonic()
+        self.clipboard = Gtk.Clipboard.get(Gdk.SELECTION_CLIPBOARD)
+        self.clipboard_generation = 0
+        self.clipboard.connect("owner-change", self.clipboard_changed)
+        self.locked = False
+        saver = Gio.DBusProxy.new_for_bus_sync(
+            Gio.BusType.SESSION, Gio.DBusProxyFlags.DO_NOT_AUTO_START, None,
+            "org.gnome.ScreenSaver", "/org/gnome/ScreenSaver", "org.gnome.ScreenSaver", None)
+        self.saver = saver
+        saver.connect("g-signal", self.lock_changed)
+        if saver.get_name_owner():
+            self.locked, = saver.call_sync("GetActive", None, Gio.DBusCallFlags.NONE, 1000, None).unpack()
         self.held = False
         self.escape = self.x.keysym_to_keycode(XK.XK_Escape)
-        # Reserve only the chosen unmodified key, including lock-key variants.
+        # Accept either press order and lock-key variants.
         lock_masks = {0, X.LockMask}
         num = self.x.keysym_to_keycode(XK.XK_Num_Lock)
         for index, codes in enumerate(self.x.get_modifier_mapping()):
             if num in codes:
                 lock_masks |= {mask | (1 << index) for mask in lock_masks}
         errors = []
-        for mask in lock_masks:
-            self.root.grab_key(self.code, mask, False, X.GrabModeAsync, X.GrabModeAsync,
-                               onerror=lambda exc, _: errors.append(exc) or True)
+        grabs = [(self.alt, X.Mod4Mask), *((code, X.Mod1Mask) for code in self.supers)]
+        for code, modifier in grabs:
+            for mask in lock_masks:
+                self.root.grab_key(code, modifier | mask, False, X.GrabModeAsync, X.GrabModeAsync,
+                                   onerror=lambda exc, _: errors.append(exc) or True)
         self.x.sync()
         if errors:
-            raise RuntimeError(f"{self.key} is already reserved")
+            raise RuntimeError("Super + Left Alt is already reserved")
         self.x.xinput_query_version()
         self.xi = self.x.query_extension("XInputExtension").major_opcode
-        self.release_pending = False
         GLib.io_add_watch(self.x.fileno(), GLib.IO_IN, self.events)
-        GLib.timeout_add(60, self.tick)
+        GLib.timeout_add(30, self.tick)
+
+    def get_worker(self):
+        if self.worker is None or self.worker.poll() is not None:
+            if not os.access(self.image, os.X_OK):
+                raise FileNotFoundError(self.image)
+            cpu_list = ",".join(map(str, sorted(os.sched_getaffinity(0))[:2]))
+            self.worker = subprocess.Popen(
+                ["taskset", "--cpu-list", cpu_list, self.image,
+                 str(Path(__file__).resolve().with_name("transcribe.cjs"))],
+                stdin=subprocess.PIPE, stdout=subprocess.PIPE, start_new_session=True,
+                env={**os.environ, "ELECTRON_RUN_AS_NODE": "1", "OMP_NUM_THREADS": "2"})
+        return self.worker
+
+    def stop_worker(self):
+        worker, self.worker = self.worker, None
+        if worker and worker.poll() is None:
+            try:
+                os.killpg(worker.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+            worker.wait()
+
+    def lock_changed(self, proxy, sender, name, params):
+        if name == "ActiveChanged":
+            self.locked, = params.unpack()
+            if self.locked:
+                if self.recording:
+                    self.end("Cancelled")
+                self.overlay.dismiss_recovery()
+                self.stop_worker()
+
+    def clipboard_changed(self, *_):
+        self.clipboard_generation += 1
 
     def watch_input(self, mask):
         self.root.xinput_select_events([(xinput.AllMasterDevices, mask)])
@@ -161,15 +211,17 @@ class Dictation:
                 getattr(focused, "id", focused))
 
     def start(self):
+        if self.locked:
+            return
         if self.recording:
-            self.recording.unsafe = True
+            self.overlay.label.set_text("Finishing previous recording · hold again when ready")
             return
         active, _ = self.focus()
         window = GdkX11.X11Window.foreign_new_for_display(Gdk.Display.get_default(), active) if active else None
         self.overlay.present_at(window)
         try:
-            self.watch_input(xinput.RawButtonPressMask)
-            self.recording = Recording(self, self.image)
+            self.watch_input(xinput.RawButtonPressMask | xinput.RawKeyPressMask)
+            self.recording = Recording(self)
         except OSError as exc:
             print(exc, file=sys.stderr)
             self.end("Could not start microphone or T3 speech engine")
@@ -177,79 +229,135 @@ class Dictation:
     def events(self, *_):
         while self.x.pending_events():
             event = self.x.next_event()
-            if event.type == X.KeyPress and event.detail == self.code:
-                if not self.held:
+            if event.type == X.KeyPress and event.detail in self.chord:
+                if not self.held and self.chord_down():
                     self.held = True
                     self.start()
-                self.release_pending = False
-            elif event.type == X.KeyRelease and event.detail == self.code:
-                self.release_pending = True
+            elif event.type == X.KeyRelease and event.detail in self.chord:
+                self.check_release()
             elif self.recording:
                 if event.type == X.KeyPress and event.detail == self.escape:
                     self.end("Cancelled")
-                elif (event.type == X.KeyPress or
-                      (getattr(event, "extension", None) == self.xi and
-                       getattr(event, "evtype", None) in (xinput.RawButtonPress, xinput.RawKeyPress))):
+                elif event.type == X.KeyPress:
                     self.recording.unsafe = True
-        if self.release_pending:
-            # X autorepeat may send a release/press pair for a key still held.
-            self.release_pending = False
-            if not self.x.query_keymap()[self.code // 8] & (1 << (self.code % 8)):
-                self.held = False
-                if self.recording and self.recording.released is None:
-                    self.recording.release()
-                    self.watch_input(xinput.RawButtonPressMask | xinput.RawKeyPressMask)
-                    self.overlay.label.set_text("Finishing…")
+                elif getattr(event, "extension", None) == self.xi:
+                    if event.evtype == xinput.RawButtonPress:
+                        self.recording.unsafe = True
+                    elif event.evtype == xinput.RawKeyPress:
+                        # XI2 raw detail is a CARD32 at byte 16 of the wire event.
+                        code = struct.unpack_from("=I", event.data, 6)[0]
+                        if code == self.escape and self.held:
+                            self.end("Cancelled")
+                        elif code not in self.chord:
+                            self.recording.unsafe = True
         return True
+
+    def chord_down(self, keys=None):
+        if keys is None:
+            keys = self.x.query_keymap()
+        def down(code):
+            return keys[code // 8] & (1 << (code % 8))
+        return down(self.alt) and any(down(code) for code in self.supers)
+
+    def check_release(self, keys=None):
+        if self.held and not self.chord_down(keys):
+            self.held = False
+            if self.recording and self.recording.released is None:
+                self.recording.release()
+                self.overlay.label.set_text("Finishing…")
 
     def tick(self):
         self.events()
+        # Mutter can own the initial Super grab. The physical modifier state
+        # still identifies the gesture when no core KeyPress reaches our grab.
+        keys = self.x.query_keymap()
+        if (not self.held and self.chord_down(keys) and
+                not any(keys[c // 8] & (1 << (c % 8)) for c in self.other_modifiers)):
+            self.held = True
+            self.start()
+        if self.recording and self.held and keys[self.escape // 8] & (1 << (self.escape % 8)):
+            self.end("Cancelled")
+        self.check_release(keys)
         rec = self.recording
         if rec:
             if self.focus() != rec.target:
                 rec.unsafe = True
             now = time.monotonic()
-            if rec.released and now - rec.released > 30:
-                self.end("Speech engine timed out")
+            if rec.released and now - rec.released > 30 + (rec.released - rec.started) / 2:
+                self.failure("Speech engine timed out")
             elif not rec.released and now - rec.started > 300:
                 rec.release()
                 rec.unsafe = True
                 self.overlay.label.set_text("Five-minute limit · finishing…")
+        elif self.worker and time.monotonic() - self.idle_since >= 900:
+            self.stop_worker()
         return True
 
+    def failure(self, message):
+        if self.recording.last_partial:
+            self.recover(self.recording.last_partial, incomplete=True)
+        else:
+            self.end(message)
+
     def partial(self, text):
-        if not self.recording.released:
-            self.overlay.label.set_text(text.strip() or "Listening…")
+        if text.strip():
+            self.recording.last_partial = text.strip()
+            self.overlay.label.set_text(text.strip())
 
     def end(self, message):
+        self.idle_since = time.monotonic()
         rec, self.recording = self.recording, None
         if rec:
             rec.close()
         self.watch_input(0)
         self.overlay.message(message, 2200)
 
+    def modifiers_down(self):
+        return self.root.query_pointer().mask & (X.ShiftMask | X.ControlMask | X.Mod1Mask | X.Mod4Mask | X.Mod5Mask)
+
+    def recover(self, text, incomplete=False):
+        self.end("")
+        self.overlay.recover(text, incomplete)
+
     def commit(self, text):
         if not text:
             self.end("No speech heard")
             return
-        # GTK owns the selection. The transcript is also available for manual paste.
-        clipboard = Gtk.Clipboard.get(Gdk.SELECTION_CLIPBOARD)
-        clipboard.set_text(text, -1)
-        Gdk.Display.get_default().sync()
         rec = self.recording
+        if not rec.released:
+            self.end("Speech engine stopped before release")
+            return
+        if (not rec.unsafe and rec.released and time.monotonic() - rec.released < 2
+                and self.root.query_pointer().mask & (X.Mod1Mask | X.Mod4Mask)):
+            def after_release():
+                if self.recording is rec:
+                    self.commit(text)
+                return False
+            GLib.timeout_add(35, after_release)
+            return
         self.events()
+        if self.recording is not rec:
+            return
+        if (rec.unsafe or rec.target != self.focus() or not rec.target[0]
+                or rec.target[1] in (X.NONE, X.PointerRoot)
+                or rec.clipboard_generation != self.clipboard_generation
+                or self.modifiers_down()):
+            self.recover(text)
+            return
+        self.clipboard.set_text(text, -1)
+        Gdk.Display.get_default().sync()
         self.x.grab_server()
         try:
             self.x.sync()
             if (self.x.pending_events() or self.recording is not rec or rec.unsafe or rec.target != self.focus()
                     or not rec.target[0] or rec.target[1] in (X.NONE, X.PointerRoot)
-                    or self.root.query_pointer().mask & (X.ShiftMask | X.ControlMask | X.Mod1Mask | X.Mod4Mask)):
+                    or self.modifiers_down()):
                 message = "Focus changed · transcript copied"
             else:
                 window = self.x.create_resource_object("window", rec.target[0])
                 classes = " ".join(window.get_wm_class() or ()).lower()
                 mods = [XK.XK_Control_L]
-                if any(name in classes for name in ("terminal", "kitty", "alacritty", "ghostty", "wezterm", "tilix")):
+                if any(name in classes for name in ("terminal", "kitty", "alacritty", "ghostty", "wezterm", "tilix", "konsole", "terminator", "foot")):
                     mods.append(XK.XK_Shift_L)
                 keys = [self.x.keysym_to_keycode(sym) for sym in [*mods, XK.XK_v]]
                 for key in keys:
@@ -274,4 +382,5 @@ if __name__ == "__main__":
     finally:
         if app.recording:
             app.recording.close()
+        app.stop_worker()
         app.x.close()
