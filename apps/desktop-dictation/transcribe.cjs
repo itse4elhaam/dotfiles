@@ -24,7 +24,8 @@ function clean(text, settings) {
   }
   // A narrow spoken repair: "set it to 42, sorry, 24" becomes "set it to 24".
   // Leave units, quoted language and ambiguous sentence-level apologies alone.
-  text = text.replace(/(?<!\S)([0-9]+(?:\.[0-9]+)?),\s*(?:sorry|I mean|make that),\s*([0-9]+(?:\.[0-9]+)?)(?![\p{L}\p{N}_])/giu, "$2");
+  text = text.replace(/(?<!\S)([0-9]+(?:\.[0-9]+)?),\s*(?:I mean|make that),\s*([0-9]+(?:\.[0-9]+)?)(?![\p{L}\p{N}_])/giu, "$2");
+  text = text.replace(/(\b(?:set|make|change) (?:it|that)(?: to)? )([0-9]+(?:\.[0-9]+)?),\s*sorry,\s*([0-9]+(?:\.[0-9]+)?)(?![\p{L}\p{N}_])/giu, "$1$3");
   return text.replace(/[^\S\r\n]+/g, " ").trim();
 }
 

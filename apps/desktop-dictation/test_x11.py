@@ -77,12 +77,15 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
     def hold(a, b):
         keys("keydown", a, "keydown", b)
         until(lambda: app.recording is not None)
-        until(lambda: app.overlay.label.get_text() != "Listening…", 12)
+        until(lambda: app.overlay.label.get_text() != "Speak now…", 12)
         assert max(app.overlay.levels) > 0
 
+    app.clipboard.set_text("Original text", -1)
+    until(lambda: app.clipboard_generation > 0)
     start = time.monotonic()
     hold("Super_L", "Alt_L")
     print(f"First partial at {time.monotonic() - start:.2f}s: {app.overlay.label.get_text()}", flush=True)
+    keys("click", "4")
     release = time.monotonic()
     keys("keyup", "Super_L")
     until(lambda: app.recording.released is not None)
@@ -91,6 +94,8 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
     until(lambda: bool(first.get_text()), 12)
     text = first.get_text()
     print(f"Inserted after {time.monotonic() - release:.2f}s: {text}", flush=True)
+    until(lambda: app.selection.saved is not None)
+    assert app.clipboard.wait_for_text() == "Original text"
     if real:
         assert "front" in text.lower()
         # A short second utterance can end before the first native partial.
@@ -114,6 +119,32 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
     assert app.clipboard.wait_for_text() == "Existing clipboard"
     app.overlay.copy_recovery()
     assert app.clipboard.wait_for_text() == text
+    # Input after the early event drain but before the final server grab.
+    hold("Super_L", "Alt_L")
+    grab = app.x.grab_server
+    def tab_then_grab():
+        keys("key", "Tab")
+        grab()
+    app.x.grab_server = tab_then_grab
+    keys("keyup", "Super_L", "keyup", "Alt_L")
+    until(lambda: app.overlay.recovery is not None)
+    app.x.grab_server = grab
+    assert app.clipboard.wait_for_text() == text and first.get_text() == text and not second.get_text()
+    app.overlay.dismiss_recovery()
+
+    # XI 2.1 must report input while another client has grabbed the keyboard.
+    hold("Alt_L", "Super_L")
+    keys("keyup", "Alt_L", "keyup", "Super_L")
+    until(lambda: app.recording.released)
+    grabbed = x.create_resource_object("window", xid)
+    assert grabbed.grab_keyboard(False, X.GrabModeAsync, X.GrabModeAsync, X.CurrentTime) == X.GrabSuccess
+    keys("key", "Tab")
+    second.grab_focus()
+    x.ungrab_keyboard(X.CurrentTime)
+    x.sync()
+    until(lambda: app.overlay.recovery is not None)
+    assert not second.get_text() and first.get_text() == text
+    app.overlay.dismiss_recovery()
     hold("Alt_L", "Super_L")
     app.worker.kill()
     until(lambda: app.overlay.recovery == "Live words")

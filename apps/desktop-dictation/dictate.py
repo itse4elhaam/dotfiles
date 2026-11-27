@@ -13,6 +13,7 @@ import threading
 import time
 from pathlib import Path
 
+from selection import ClipboardBackup, TextSelection
 from overlay import Gdk, GLib, Gtk, Overlay
 from gi.repository import GdkX11, Gio
 from Xlib import X, XK, display, error
@@ -30,6 +31,9 @@ class Recording:
         self.unsafe = False
         self.target = app.focus()
         self.clipboard_generation = app.clipboard_generation
+        self.clipboard_owner = app.x.get_selection_owner(app.selection.atom)
+        self.backup = ClipboardBackup(app.clipboard, app.x, self.clipboard_owner)
+        self.cancelled = False
         self.audio = queue.Queue(maxsize=7500)  # Five minutes at 40 ms per block.
         self.worker = self.mic = None
         try:
@@ -134,6 +138,8 @@ class Dictation:
         self.recording = None
         self.worker = None
         self.idle_since = time.monotonic()
+        self.paste_serial = 0
+        self.selection = TextSelection(self.x)
         self.clipboard = Gtk.Clipboard.get(Gdk.SELECTION_CLIPBOARD)
         self.clipboard_generation = 0
         self.clipboard.connect("owner-change", self.clipboard_changed)
@@ -162,10 +168,14 @@ class Dictation:
         self.x.sync()
         if errors:
             raise RuntimeError("Super + Left Alt is already reserved")
-        self.x.xinput_query_version()
         self.xi = self.x.query_extension("XInputExtension").major_opcode
+        version = xinput.XIQueryVersion(display=self.x.display, opcode=self.xi, major_version=2, minor_version=1)
+        if (version.major_version, version.minor_version) < (2, 1):
+            raise RuntimeError("Desktop dictation needs XInput 2.1 for focus protection")
         GLib.io_add_watch(self.x.fileno(), GLib.IO_IN, self.events)
-        GLib.timeout_add(30, self.tick)
+        self.keymap = Gdk.Keymap.get_for_display(Gdk.Display.get_default())
+        self.keymap.connect("state-changed", self.modifiers_changed)
+        GLib.timeout_add_seconds(5, self.maintenance)
 
     def get_worker(self):
         if self.worker is None or self.worker.poll() is not None:
@@ -222,6 +232,8 @@ class Dictation:
         try:
             self.watch_input(xinput.RawButtonPressMask | xinput.RawKeyPressMask)
             self.recording = Recording(self)
+            recording = self.recording
+            GLib.timeout_add(90, lambda: self.recording is recording and self.tick())
         except OSError as exc:
             print(exc, file=sys.stderr)
             self.end("Could not start microphone or T3 speech engine")
@@ -229,25 +241,30 @@ class Dictation:
     def events(self, *_):
         while self.x.pending_events():
             event = self.x.next_event()
-            if event.type == X.KeyPress and event.detail in self.chord:
-                if not self.held and self.chord_down():
-                    self.held = True
-                    self.start()
+            if event.type == X.SelectionRequest:
+                self.selection.serve(event)
+            elif event.type == X.SelectionClear:
+                if self.x.get_selection_owner(self.selection.atom) != self.selection.window:
+                    self.selection.text = ""
+                    self.selection.saved = None
+            elif event.type == X.KeyPress and event.detail in self.chord:
+                self.modifiers_changed()
             elif event.type == X.KeyRelease and event.detail in self.chord:
                 self.check_release()
             elif self.recording:
                 if event.type == X.KeyPress and event.detail == self.escape:
-                    self.end("Cancelled")
+                    self.cancel()
                 elif event.type == X.KeyPress:
                     self.recording.unsafe = True
                 elif getattr(event, "extension", None) == self.xi:
                     if event.evtype == xinput.RawButtonPress:
-                        self.recording.unsafe = True
+                        if struct.unpack_from("=I", event.data, 6)[0] not in (4, 5, 6, 7):
+                            self.recording.unsafe = True
                     elif event.evtype == xinput.RawKeyPress:
                         # XI2 raw detail is a CARD32 at byte 16 of the wire event.
                         code = struct.unpack_from("=I", event.data, 6)[0]
                         if code == self.escape and self.held:
-                            self.end("Cancelled")
+                            self.cancel()
                         elif code not in self.chord:
                             self.recording.unsafe = True
         return True
@@ -264,20 +281,26 @@ class Dictation:
             self.held = False
             if self.recording and self.recording.released is None:
                 self.recording.release()
-                self.overlay.label.set_text("Finishing…")
+                self.overlay.finish()
 
-    def tick(self):
+    def maintenance(self):
         self.events()
-        # Mutter can own the initial Super grab. The physical modifier state
-        # still identifies the gesture when no core KeyPress reaches our grab.
+        if not self.recording and self.worker and time.monotonic() - self.idle_since >= 900:
+            self.stop_worker()
+        return True
+
+    def modifiers_changed(self, *_):
+        # GDK receives XKB modifier changes even during Mutter's Super grab.
+        # Idle dictation therefore needs neither keystroke monitoring nor polling.
         keys = self.x.query_keymap()
         if (not self.held and self.chord_down(keys) and
                 not any(keys[c // 8] & (1 << (c % 8)) for c in self.other_modifiers)):
             self.held = True
             self.start()
-        if self.recording and self.held and keys[self.escape // 8] & (1 << (self.escape % 8)):
-            self.end("Cancelled")
         self.check_release(keys)
+
+    def tick(self):
+        self.events()
         rec = self.recording
         if rec:
             if self.focus() != rec.target:
@@ -289,18 +312,25 @@ class Dictation:
                 rec.release()
                 rec.unsafe = True
                 self.overlay.label.set_text("Five-minute limit · finishing…")
-        elif self.worker and time.monotonic() - self.idle_since >= 900:
-            self.stop_worker()
         return True
 
+    def cancel(self):
+        rec = self.recording
+        rec.cancelled = True
+        if not rec.released:
+            rec.release()
+        self.overlay.message("Cancelled", 550)
+
     def failure(self, message):
-        if self.recording.last_partial:
+        if self.recording.cancelled:
+            self.end("Cancelled")
+        elif self.recording.last_partial:
             self.recover(self.recording.last_partial, incomplete=True)
         else:
             self.end(message)
 
     def partial(self, text):
-        if text.strip():
+        if not self.recording.cancelled and text.strip():
             self.recording.last_partial = text.strip()
             self.overlay.label.set_text(text.strip())
 
@@ -320,6 +350,9 @@ class Dictation:
         self.overlay.recover(text, incomplete)
 
     def commit(self, text):
+        if self.recording.cancelled:
+            self.end("Cancelled")
+            return
         if not text:
             self.end("No speech heard")
             return
@@ -338,39 +371,61 @@ class Dictation:
         self.events()
         if self.recording is not rec:
             return
-        if (rec.unsafe or rec.target != self.focus() or not rec.target[0]
-                or rec.target[1] in (X.NONE, X.PointerRoot)
-                or rec.clipboard_generation != self.clipboard_generation
-                or self.modifiers_down()):
-            self.recover(text)
-            return
-        self.clipboard.set_text(text, -1)
-        Gdk.Display.get_default().sync()
+        timestamp = GdkX11.x11_get_server_time(self.overlay.get_window())
+        pasted = False
+        serial = self.paste_serial + 1
+        restored = False
+        def restore():
+            nonlocal restored
+            if serial == self.paste_serial and not restored:
+                restored = True
+                self.selection.put_back(rec.backup)
+            return False
+        def expire():
+            if serial == self.paste_serial and not restored:
+                restore()
+                if self.recording is None and self.overlay.serial == completion_serial:
+                    self.overlay.recover(text)
+            return False
+
+        def on_read(requestor):
+            mask = self.x.display.info.resource_id_mask
+            if requestor & ~mask == rec.target[0] & ~mask:
+                GLib.idle_add(restore)
         self.x.grab_server()
         try:
             self.x.sync()
-            if (self.x.pending_events() or self.recording is not rec or rec.unsafe or rec.target != self.focus()
-                    or not rec.target[0] or rec.target[1] in (X.NONE, X.PointerRoot)
-                    or self.modifiers_down()):
-                message = "Focus changed · transcript copied"
-            else:
+            safe = (rec.backup.ready and not self.x.pending_events() and not rec.unsafe and rec.target == self.focus()
+                    and rec.target[0] and rec.target[1] not in (X.NONE, X.PointerRoot)
+                    and rec.clipboard_generation == self.clipboard_generation
+                    and rec.clipboard_owner == self.x.get_selection_owner(self.selection.atom)
+                    and not self.modifiers_down())
+            if safe:
                 window = self.x.create_resource_object("window", rec.target[0])
                 classes = " ".join(window.get_wm_class() or ()).lower()
                 mods = [XK.XK_Control_L]
                 if any(name in classes for name in ("terminal", "kitty", "alacritty", "ghostty", "wezterm", "tilix", "konsole", "terminator", "foot")):
                     mods.append(XK.XK_Shift_L)
                 keys = [self.x.keysym_to_keycode(sym) for sym in [*mods, XK.XK_v]]
-                for key in keys:
-                    xtest.fake_input(self.x, X.KeyPress, key)
-                for key in reversed(keys):
-                    xtest.fake_input(self.x, X.KeyRelease, key)
-                message = "Transcript ready"
+                if self.selection.claim(text, timestamp, on_read):
+                    self.paste_serial = serial
+                    for key in keys:
+                        xtest.fake_input(self.x, X.KeyPress, key)
+                    for key in reversed(keys):
+                        xtest.fake_input(self.x, X.KeyRelease, key)
+                    pasted = True
         except error.XError:
-            message = "Field closed · transcript copied"
+            pass
         finally:
             self.x.ungrab_server()
             self.x.flush()
-        self.end(message)
+        if pasted:
+            self.end("Transcript ready")
+            self.overlay.sent(text)
+            completion_serial = self.overlay.serial
+            GLib.timeout_add(1800, expire)
+        else:
+            self.recover(text)
 
 
 if __name__ == "__main__":
