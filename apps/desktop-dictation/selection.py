@@ -49,6 +49,10 @@ class TextSelection:
         self.formats = {x.intern_atom(name): encoding for name, encoding in (
             ("UTF8_STRING", "utf-8"), ("text/plain;charset=utf-8", "utf-8"),
             ("text/plain", "utf-8"), ("TEXT", "utf-8"), ("STRING", "latin-1"))}
+        self.text_atom = x.intern_atom("TEXT")
+        self.utf8 = x.intern_atom("UTF8_STRING")
+        self.compound = x.intern_atom("COMPOUND_TEXT")
+        self.press_time = None
         self.saved = None
         self.recipient = None
         self.other_clients = {}
@@ -82,6 +86,7 @@ class TextSelection:
         if self.x.get_selection_owner(self.atom) != self.window:
             return False
         self.saved = None
+        self.press_time = None
         self.recipient = recipient
         self.other_clients = backup.values
         self.restore = on_read
@@ -97,14 +102,28 @@ class TextSelection:
         self.guarded_reads = self.outstanding.copy()
         self.x.flush()
 
+    def empty_text_format(self, target, saved):
+        if saved is not None and target in saved:
+            if (target in self.formats or target == self.compound or
+                    self.x.get_atom_name(target).lower().startswith("text/")):
+                return saved[target][:2]
+        elif target in self.formats:
+            return (self.utf8 if target == self.text_atom else target), 8
+        return None
+
     def serve(self, request):
         prop = request.property or request.target
         target = request.target
         client = self.client_id(request.requestor.id)
         saved = self.saved
-        delivering = self.restore is not None and client == self.recipient
-        if self.restore and not delivering:
+        recipient = self.restore is not None and client == self.recipient
+        delivering = recipient and request.time != X.CurrentTime and request.time == self.press_time
+        # An unidentified second connection could belong to the target. Keep
+        # the previous clipboard private until a distinct process is proven.
+        unknown_reader = self.restore is not None and client[0] != "process"
+        if self.restore and not recipient and not unknown_reader:
             saved = self.other_clients
+        guard = client in self.guarded_reads or unknown_reader or (recipient and not delivering)
         if request.selection != self.atom:
             prop = X.NONE
         elif target == self.targets:
@@ -112,12 +131,14 @@ class TextSelection:
                                               [self.targets, self.timestamp, *(saved if saved is not None else self.formats)])
         elif target == self.timestamp:
             request.requestor.change_property(prop, Xatom.INTEGER, 32, [self.time])
-        elif client in self.guarded_reads and target in self.formats:
-            # Complete one late text read without inserting unrelated clipboard
-            # data into the field. Other clients still get the restored formats.
-            request.requestor.change_property(prop, target, 8, b"")
-            self.guarded_reads.discard(client)
-            self.outstanding.discard(client)
+        elif guard and (empty_format := self.empty_text_format(target, saved)):
+            # Unattributed active reads stay empty until expiry. A restored
+            # selection or recovery Copy suppresses one advertised text read.
+            type_atom, bits = empty_format
+            request.requestor.change_property(prop, type_atom, bits, b"")
+            if client in self.guarded_reads:
+                self.guarded_reads.discard(client)
+                self.outstanding.discard(client)
         elif saved is not None:
             if target in saved:
                 type_atom, bits, data = saved[target]
@@ -129,14 +150,15 @@ class TextSelection:
                 prop = X.NONE
         elif target in self.formats:
             value = self.text.encode(self.formats[target], errors="replace")
-            request.requestor.change_property(prop, target, 8, value)
+            type_atom = self.utf8 if target == self.text_atom else target
+            request.requestor.change_property(prop, type_atom, 8, value)
         else:
             prop = X.NONE
         request.requestor.send_event(SelectionNotify(
             time=request.time, requestor=request.requestor, selection=request.selection,
             target=target, property=prop))
         self.x.flush()
-        if delivering and prop and target in self.formats:
+        if delivering and not guard and prop and target in self.formats:
             self.restore()
 
     def put_back(self, backup, late_client=None):

@@ -225,35 +225,62 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
     delayed = []
     def defer_paste(entry):
         entry.stop_emission_by_name("paste-clipboard")
-        delayed.append(entry)
+        delayed.append((entry, Gtk.get_current_event_time()))
 
     handler = first.connect("paste-clipboard", defer_paste)
     hold("Alt_L", "Super_L")
     keys("keyup", "Alt_L", "keyup", "Super_L")
     until(lambda: bool(delayed))
     first.disconnect(handler)
-    delayed.pop()
+    _, key_time = delayed.pop()
+    assert key_time != X.CurrentTime
     recipient = x.create_resource_object("window", int(other.stdout.readline()))
-    def other_read(expected):
+    def other_read(expected, command="read"):
         recipient.delete_property(prop)
         x.sync()
-        other.stdin.write("read\n")
+        other.stdin.write(command + "\n")
         other.stdin.flush()
         until(lambda: recipient.get_full_property(prop, utf8) is not None)
         assert recipient.get_full_property(prop, utf8).value == expected
 
     other_read(b"Newer clipboard")
     assert app.pending_backup is not None
-    def secondary_read(expected):
+    def secondary_read(expected, timestamp):
         reader.delete_property(prop)
-        reader.convert_selection(app.selection.atom, utf8, prop, X.CurrentTime)
+        reader.convert_selection(app.selection.atom, utf8, prop, timestamp)
         x.flush()
         until(lambda: reader.get_full_property(prop, utf8) is not None)
-        assert reader.get_full_property(prop, utf8).value == expected
+        value = reader.get_full_property(prop, utf8).value
+        assert value == expected
+        return value
 
-    secondary_read(text.encode())
+    secondary_read(text.encode(), key_time)
     until(lambda: app.pending_backup is None)
     assert app.clipboard.wait_for_text() == "Newer clipboard"
+
+    # arboard-style readers use CurrentTime even inside the V handler.
+    # Exercise the value the field would actually insert, including recovery.
+    generation = app.clipboard_generation
+    app.clipboard.set_text("CurrentTime sentinel", -1)
+    until(lambda: app.clipboard_generation > generation)
+    handler = first.connect("paste-clipboard", defer_paste)
+    hold("Alt_L", "Super_L")
+    keys("keyup", "Alt_L", "keyup", "Super_L")
+    until(lambda: bool(delayed))
+    first.disconnect(handler)
+    entry, _ = delayed.pop()
+    entry.set_text(entry.get_text() + secondary_read(b"", X.CurrentTime).decode())
+    until(lambda: app.pending_backup is None and app.overlay.recovery == text)
+    assert entry.get_text() == text
+    app.overlay.copy_recovery()
+    secondary_read(b"", X.CurrentTime)
+    secondary_read(text.encode(), X.CurrentTime)
+    # Copy consumed the recovery card. Resume via the next paused hold.
+    hold("Alt_L", "Super_L")
+    keys("keyup", "Alt_L", "keyup", "Super_L")
+    until(lambda: app.overlay.recovery == text)
+    app.overlay.resume.clicked()
+    app.overlay.dismiss_recovery()
 
     # Both fields belong to one X client. A late reader from the first
     # field must never consume the second transcript when the first expires.
@@ -267,6 +294,12 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
     keys("keyup", "Alt_L", "keyup", "Super_L")
     until(lambda: bool(delayed))
     first.disconnect(ignored)
+    # The same GTK process reads outside the shortcut handler. It must
+    # neither see either clipboard value nor acknowledge A's shortcut.
+    ordinary = []
+    app.clipboard.request_text(lambda _, value, _data: ordinary.append(value), None)
+    until(lambda: bool(ordinary))
+    assert not ordinary[0] and app.pending_backup is not None
     other_read(b"Original before two holds")
     second.grab_focus()
     audio.with_suffix(".txt").write_text("Second transcript")
@@ -285,8 +318,8 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
     assert app.overlay.recovery == "Second transcript"
     app.overlay.copy_recovery()
     other_read(b"Second transcript")
-    delayed.pop()
-    secondary_read(b"")
+    _, key_time = delayed.pop()
+    secondary_read(b"", key_time)
     until(lambda: not app.selection.outstanding)
     assert not first.get_text() and not second.get_text()
     keys("key", "ctrl+v")
@@ -317,9 +350,11 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
     hold("Alt_L", "Super_L")
     keys("keyup", "Alt_L", "keyup", "Super_L")
     until(lambda: app.pending_backup is not None)
-    delayed.pop().emit("paste-clipboard")
+    delayed.pop()[0].emit("paste-clipboard")
     until(lambda: first.get_text() == "Copied during pending paste")
-    other_read(b"Other client transcript")
+    other_read(b"")
+    assert app.pending_backup is not None
+    other_read(b"Other client transcript", "key-time")
     until(lambda: app.pending_backup is None)
     assert app.clipboard.wait_for_text() == "Copied during pending paste"
     x.screen().root.change_property(app.active_atom, Xatom.WINDOW, 32, [xid])
@@ -337,6 +372,19 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
     app.overlay.resume.clicked()
     assert not app.paused_clients
     app.overlay.dismiss_recovery()
+
+    # Without a verified focused process a second connection might otherwise
+    # paste the previous clipboard, so send no shortcut at all.
+    app.selection.xres = None
+    try:
+        serial = app.paste_serial
+        hold("Alt_L", "Super_L")
+        keys("keyup", "Super_L", "keyup", "Alt_L")
+        until(lambda: app.overlay.recovery == "Other client transcript")
+        assert app.paste_serial == serial and app.pending_backup is None
+        app.overlay.dismiss_recovery()
+    finally:
+        app.selection.xres = xres
 
     # An empty selection and an intervening owner cannot tell us whether
     # the first shortcut was consumed. Copy must guard either recovery card.
@@ -360,7 +408,7 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
             app.clipboard.set_text("External copy", -1)
             until(lambda: app.x.get_selection_owner(app.selection.atom))
         app.overlay.copy_recovery()
-        delayed.pop().emit("paste-clipboard")
+        delayed.pop()[0].emit("paste-clipboard")
         until(lambda: not app.selection.outstanding)
         assert not first.get_text()
         keys("key", "ctrl+v")
@@ -369,9 +417,7 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
         app.overlay.resume.clicked()
         app.overlay.dismiss_recovery()
 
-    app.clipboard.set_text("Discard before empty fixture", -1)
-    app.clipboard.clear()
-    until(lambda: not app.x.get_selection_owner(app.selection.atom))
+    app.clipboard.set_text("Restored compound text", -1)
     # A field can accept Ctrl+V and defer reading the selection until the next hold.
     first.set_text("")
     first.grab_focus()
@@ -387,10 +433,26 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
     keys("keyup", "Alt_L", "keyup", "Super_L")
     until(lambda: app.recording is not None and app.recording.got_final)
     assert not second.get_text()
-    delayed.pop().emit("paste-clipboard")
-    until(lambda: second.get_text() == "Second delayed transcript" and app.pending_backup is None)
-    assert first.get_text() == "First delayed transcript"
-    assert not app.clipboard.wait_for_text()
+    delayed.pop()[0].emit("paste-clipboard")
+    until(lambda: app.pending_backup is None and app.overlay.recovery == "Second delayed transcript")
+    assert not first.get_text() and not second.get_text()
+    compound = Gdk.Atom.intern("COMPOUND_TEXT", False)
+    def compound_read():
+        data = app.clipboard.wait_for_contents(compound)
+        return data.get_data_type().name(), data.get_format(), bytes(data.get_data() or b"")
+    assert compound_read() == ("COMPOUND_TEXT", 8, b"")
+    assert compound_read() == ("COMPOUND_TEXT", 8, b"Restored compound text")
+    app.overlay.resume.clicked()
+    while app.overlay.recovery is not None:
+        app.overlay.dismiss_recovery()
+
+    # Consecutive event-stamped GTK pastes proceed without recovery.
+    for entry, transcript in ((first, "Direct A"), (second, "Direct B")):
+        entry.grab_focus()
+        audio.with_suffix(".txt").write_text(transcript)
+        hold("Alt_L", "Super_L")
+        keys("keyup", "Super_L", "keyup", "Alt_L")
+        until(lambda: entry.get_text() == transcript and app.pending_backup is None)
     second.set_text("")
     hold("Alt_L", "Super_L")
     app.worker.kill()
@@ -437,6 +499,24 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
     assert not second.get_text() and app.overlay.label.get_text() == "Cancelled"
     assert app.worker is warm_worker and warm_worker.poll() is None
     app.stop_worker()
+
+    # An ordinary read *inside* GTK's key handler and the entry's default
+    # paste can have identical wire fields, including requestor and time.
+    fields = []
+    serve = app.selection.serve
+    def observe(request):
+        if request.target in app.selection.formats:
+            fields.append((request.requestor.id, request.selection, request.target,
+                           request.property, request.time))
+        serve(request)
+    app.selection.serve = observe
+    app.selection.copy("Event context", X.CurrentTime)
+    observed = []
+    second.connect("paste-clipboard", lambda *_: observed.append(app.clipboard.wait_for_text()))
+    keys("key", "ctrl+v")
+    until(lambda: second.get_text() == "Event context")
+    assert observed == ["Event context"] and len(fields) == 2
+    assert fields[0] == fields[1] and fields[0][-1] != X.CurrentTime, fields
 
 
 if __name__ == "__main__":

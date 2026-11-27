@@ -163,6 +163,7 @@ class Dictation:
         self.expire_pending = None
         self.paused_clients = {}
         self.lock_generation = 0
+        self.paste_press = None
         self.paste_serial = 0
         self.selection = TextSelection(self.x)
         self.clipboard = Gtk.Clipboard.get(Gdk.SELECTION_CLIPBOARD)
@@ -287,6 +288,12 @@ class Dictation:
                 self.modifiers_changed()
             elif event.type == X.KeyRelease and event.detail in self.chord:
                 self.check_release()
+            elif (self.paste_press is not None and getattr(event, "extension", None) == self.xi
+                  and event.evtype == xinput.RawKeyPress
+                  and self.paste_press == (event.sequence_number, struct.unpack_from("=I", event.data, 6)[0])):
+                # XI2 raw time and detail start at wire bytes 12 and 16.
+                self.selection.press_time = struct.unpack_from("=I", event.data, 2)[0]
+                self.paste_press = None
             elif self.recording:
                 if event.type == X.KeyPress and event.detail == self.escape:
                     self.cancel()
@@ -467,6 +474,7 @@ class Dictation:
             if serial == self.paste_serial and not restored:
                 restored = True
                 self.expire_pending = None
+                self.paste_press = None
                 self.pending_backup = None
                 self.selection.put_back(rec.backup, late_client)
             return False
@@ -488,7 +496,8 @@ class Dictation:
         self.x.grab_server()
         try:
             self.x.sync()
-            safe = (client not in self.paused_clients and rec.backup is not None and rec.backup.ready
+            safe = (client[0] == "process" and client not in self.paused_clients
+                    and rec.backup is not None and rec.backup.ready
                     and not self.x.pending_events()
                     and not rec.unsafe and rec.target == self.focus()
                     and rec.target[0] and client == self.selection.client_id(rec.target[0])
@@ -504,8 +513,17 @@ class Dictation:
                     self.expire_pending = expire
                     self.pending_backup = rec.backup
                     self.paste_serial = serial
-                    for key in keys:
+                    for key in keys[:-1]:
                         xtest.fake_input(self.x, X.KeyPress, key)
+                    # Isolate V in its own server clock tick. In particular, a
+                    # GTK read that asks for fresh server time after dispatch
+                    # must not accidentally acquire the V timestamp.
+                    self.x.sync()
+                    time.sleep(.002)
+                    self.paste_press = (self.x.display.request_serial, keys[-1])
+                    xtest.fake_input(self.x, X.KeyPress, keys[-1])
+                    self.x.sync()
+                    time.sleep(.002)
                     for key in reversed(keys):
                         xtest.fake_input(self.x, X.KeyRelease, key)
                     pasted = True
