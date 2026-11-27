@@ -267,6 +267,7 @@ class Dictation:
             if isinstance(event, xfixes.SelectionNotify):
                 if event.owner.id not in (X.NONE, self.selection.window.id):
                     self.clipboard_generation += 1
+                if event.owner.id != self.selection.window.id:
                     self.selection.expired_reads.clear()
             elif event.type == X.SelectionRequest:
                 self.selection.serve(event)
@@ -391,7 +392,6 @@ class Dictation:
             self.paused_clients.pop(client, None)
             self.selection.expired_reads.discard(client)
         self.paused_clients[client] = resume
-        self.selection.expired_reads.add(client)
         return resume
 
     def commit(self, text):
@@ -426,16 +426,16 @@ class Dictation:
         restored = False
         read = False
         lock_generation = self.lock_generation
-        def restore():
+        def restore(late_client=None):
             nonlocal restored
             if serial == self.paste_serial and not restored:
                 restored = True
                 self.pending_backup = None
-                self.selection.put_back(rec.backup)
+                self.selection.put_back(rec.backup, late_client)
             return False
         def expire():
             if serial == self.paste_serial and not restored:
-                restore()
+                restore(client if not read else None)
                 if not read:
                     # The original paste can still read. Only an explicit Resume
                     # permits another automatic delivery to this X11 client.

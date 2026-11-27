@@ -247,6 +247,46 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
     app.overlay.resume.clicked()
     assert not app.paused_clients
     app.overlay.dismiss_recovery()
+    # A fresh copy before expiry belongs to the external owner. When a later
+    # paste targets another X client, the paused client can still read its copy.
+    first.grab_focus()
+    handler = first.connect("paste-clipboard", defer_paste)
+    hold("Super_L", "Alt_L")
+    keys("keyup", "Super_L", "keyup", "Alt_L")
+    until(lambda: bool(delayed))
+    first.disconnect(handler)
+    generation = app.clipboard_generation
+    app.clipboard.set_text("Copied during pending paste", -1)
+    until(lambda: app.clipboard_generation > generation)
+    assert app.pending_backup is not None
+    until(lambda: app.pending_backup is None and app.overlay.resume.is_visible())
+
+    recipient = x.screen().root.create_window(0, 0, 8, 8, 0, 0, X.InputOnly, X.CopyFromParent)
+    recipient.map()
+    x.screen().root.change_property(app.active_atom, Xatom.WINDOW, 32, [recipient.id])
+    recipient.set_input_focus(X.RevertToParent, X.CurrentTime)
+    x.sync()
+    audio.with_suffix(".txt").write_text("Other client transcript")
+    hold("Alt_L", "Super_L")
+    keys("keyup", "Alt_L", "keyup", "Super_L")
+    until(lambda: app.pending_backup is not None)
+    delayed.pop().emit("paste-clipboard")
+    until(lambda: first.get_text() == "Copied during pending paste")
+    recipient.convert_selection(app.selection.atom, utf8, prop, X.CurrentTime)
+    x.flush()
+    until(lambda: recipient.get_full_property(prop, utf8) is not None)
+    assert recipient.get_full_property(prop, utf8).value == b"Other client transcript"
+    until(lambda: app.pending_backup is None)
+    assert app.clipboard.wait_for_text() == "Copied during pending paste"
+    x.screen().root.change_property(app.active_atom, Xatom.WINDOW, 32, [xid])
+    x.create_resource_object("window", xid).set_input_focus(X.RevertToParent, X.CurrentTime)
+    recipient.destroy()
+    x.sync()
+    until(lambda: app.overlay.recovery is not None)
+    app.overlay.resume.clicked()
+    assert not app.paused_clients
+    app.overlay.dismiss_recovery()
+
     app.clipboard.set_text("Discard before empty fixture", -1)
     app.clipboard.clear()
     until(lambda: not app.x.get_selection_owner(app.selection.atom))

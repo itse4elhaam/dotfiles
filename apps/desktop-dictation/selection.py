@@ -79,7 +79,7 @@ class TextSelection:
         if delivering and prop and target in self.formats:
             self.restore()
 
-    def put_back(self, backup):
+    def put_back(self, backup, late_client=None):
         self.restore = None
         self.recipient = None
         self.other_clients = {}
@@ -88,6 +88,9 @@ class TextSelection:
         try:
             if self.x.get_selection_owner(self.atom) == self.window:
                 self._restore_owned(backup)
+                # Only our restored selection can receive this delayed request.
+                if backup.values and late_client is not None:
+                    self.expired_reads.add(late_client)
             else:
                 self.saved = None
         finally:
