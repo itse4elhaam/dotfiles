@@ -7,6 +7,10 @@ Never enable screen readers, Orca, speech-dispatcher, accessibility speech, or d
 
 Keep Codex fast mode disabled. Do not enable fast mode, set `service_tier` to `fast`, or select a priority/fast service tier in T3 Code, including for delegated tasks. Use the default service tier. Only a new, explicit user request to re-enable fast mode overrides this rule.
 
+## Media on Google Drive
+
+On Elhaam’s workstation, open archived media, captions and receipts under `~/GoogleDrive/` before downloading an SSD copy. The mount is read-only. For content projects, `content:` maps to `~/GoogleDrive/Content/`. Publish through the project’s authorized uploader and verify the Drive file and build receipt. Use writable scratch for an encode, and keep a large local copy only for a specific remaining step or retention request. Follow the project’s storage and cleanup rules.
+
 ## Compute permission
 
 Remote compute is off by default. Never install or launch boxes.dev or wake any of its machines. Agent 37 requires Elhaam's explicit permission for each specific run, including submitting work to an existing instance, starting one, or resuming one. This applies to delegated work, retries that start another run, and scheduled jobs. Account setup and earlier approvals do not authorize a run.
