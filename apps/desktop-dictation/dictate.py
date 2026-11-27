@@ -40,7 +40,7 @@ class Recording:
         self.finished = False
         self.got_final = False
         self.last_partial = ""
-        self.unsafe = False
+        self.unsafe = not app.focus_inside(*target)
         self.target = target
         self.client = app.selection.client_id(self.target[0])
         self.clipboard_generation = app.clipboard_generation
@@ -419,14 +419,19 @@ class Dictation:
         self.x.ungrab_keyboard(X.CurrentTime)
         return True
 
-    def focus_inside(self, window, focus_id):
+    def focus_inside(self, window_id, focus_id):
+        if not window_id or focus_id in (X.NONE, X.PointerRoot):
+            return False
         focused = self.x.create_resource_object("window", focus_id)
-        for _ in range(32):
-            if focused == window:
-                return True
-            if focused == self.root:
-                break
-            focused = focused.query_tree().parent
+        try:
+            for _ in range(32):
+                if focused.id == window_id:
+                    return True
+                if focused == self.root:
+                    break
+                focused = focused.query_tree().parent
+        except error.BadWindow:
+            pass
         return False
 
     def modifiers_down(self):
@@ -519,8 +524,8 @@ class Dictation:
             safe = (client[0] == "process" and client not in self.paused_clients
                     and not self.x.pending_events()
                     and not rec.unsafe and rec.target == self.focus()
-                    and rec.target[0] and client == self.selection.client_id(rec.target[0])
-                    and rec.target[1] not in (X.NONE, X.PointerRoot)
+                    and self.focus_inside(*rec.target)
+                    and client == self.selection.client_id(rec.target[0])
                     and rec.clipboard_generation == self.clipboard_generation
                     and rec.clipboard_owner == self.x.get_selection_owner(self.selection.atom)
                     and not self.modifiers_down())
@@ -530,7 +535,6 @@ class Dictation:
                 keys = []
                 if rec.browser and is_browser_class(wm_class):
                     if (plan and keyboard_state(self.x, self.xkb) == layout
-                            and self.focus_inside(window, rec.target[1])
                             and not any(self.x.query_keymap()) and not self.x.pending_events()):
                         type_text(self.x, plan)
                         typed = True

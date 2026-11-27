@@ -196,6 +196,21 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
             app.stop_worker()
         return
     target = x.create_resource_object("window", xid)
+    # A stable active-window property can disagree with actual keyboard focus.
+    recipient = x.create_resource_object("window", int(other.stdout.readline()))
+    root = x.screen().root
+    root.change_property(app.active_atom, Xatom.WINDOW, 32, [recipient.id])
+    x.sync()
+    before_paste = app.paste_serial
+    hold("Super_L", "Alt_L")
+    assert not app.glow.get_visible()
+    keys("keyup", "Alt_L", "keyup", "Super_L")
+    until(lambda: app.overlay.recovery == text)
+    assert first.get_text() == text and not second.get_text()
+    assert app.paste_serial == before_paste and app.clipboard.wait_for_text() == "Original text"
+    app.overlay.dismiss_recovery()
+    root.change_property(app.active_atom, Xatom.WINDOW, 32, [xid])
+    x.sync()
     original_class = target.get_wm_class()
     serial = app.paste_serial
     for wm_class in (("terminal", "XTerm"), ("uxterm", "UXTerm"), ("urxvt", "URxvt")):
@@ -297,7 +312,6 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
     first.disconnect(handler)
     _, key_time = delayed.pop()
     assert key_time != X.CurrentTime
-    recipient = x.create_resource_object("window", int(other.stdout.readline()))
     def other_read(expected, command="read"):
         recipient.delete_property(prop)
         x.sync()
