@@ -5,6 +5,8 @@ install -d "$HOME/.local/share/desktop-dictation" "$HOME/.config/systemd/user"
 for file in dictate.py overlay.py glow.py selection.py forest.jpg transcribe.cjs; do
     install -m 644 "$here/$file" "$HOME/.local/share/desktop-dictation/$file"
 done
+install -d "$HOME/.local/share/desktop-dictation/fonts"
+install -m 644 "$here/fonts/Inter-latin-variable.ttf" "$here/fonts/OFL.txt" "$HOME/.local/share/desktop-dictation/fonts/"
 unit="desktop-dictation.service"
 source_unit="$here/../../.config/systemd/user/$unit"
 destination="$HOME/.config/systemd/user/$unit"

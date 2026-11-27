@@ -1,6 +1,6 @@
 # Desktop dictation
 
-On Pop!_OS/X11, place the caret in an editable field, hold **Super + Left Alt**, speak, and release either key. Both press orders work. A blue–lavender glow outlines the window you started in. Its lower edge swells with the microphone, then disappears when capture stops. Moving focus clears the outline. The bottom card shows a separate waveform and live text. The preview above the waveform updates as you speak. Press **Esc while holding the shortcut** to discard the recording.
+On Pop!_OS/X11, place the caret in an editable field, hold **Super + Left Alt**, speak, and release either key. Both press orders work. A blue–lavender glow outlines the window you started in. Its lower edge swells with the microphone, then disappears when capture stops. Moving focus clears the outline. The bottom card shows the live transcript above its waveform in T3’s Inter typeface. Press **Esc while holding the shortcut** to discard the recording.
 
 Run `apps/desktop-dictation/install.sh` from this checkout to install or update the user service. It uses the system Python 3.10 with GTK 3, PyGObject, pycairo and python-xlib, PulseAudio-compatible `parec`, and the Linux x64 T3 Code Nightly AppImage in `~/Applications`. Download **Parakeet Unified English 0.6B** and the Silero silence filter through T3 once. T3 can be closed during dictation.
 

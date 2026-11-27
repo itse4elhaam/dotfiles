@@ -87,6 +87,8 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
     start = time.monotonic()
     hold("Super_L", "Alt_L")
     until(app.glow.get_mapped)
+    run = app.overlay.label.get_layout().get_iter().get_run_readonly()
+    assert run.item.analysis.font.describe().get_family() == "Inter"
     from Xlib.ext import shape
     Gdk.Display.get_default().sync()
     light = x.create_resource_object("window", app.glow.get_window().get_xid())

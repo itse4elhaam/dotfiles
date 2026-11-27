@@ -1,4 +1,6 @@
+import ctypes
 import math
+import os
 import time
 from collections import deque
 from pathlib import Path
@@ -8,7 +10,9 @@ import gi
 gi.require_version("Gtk", "3.0")
 gi.require_version("Gdk", "3.0")
 gi.require_version("GdkX11", "3.0")
-from gi.repository import Gdk, GdkPixbuf, GLib, Gtk, Pango
+gi.require_version("PangoCairo", "1.0")
+gi.require_version("PangoFc", "1.0")
+from gi.repository import Gdk, GdkPixbuf, GLib, Gtk, Pango, PangoCairo, PangoFc
 
 
 class Overlay(Gtk.Window):
@@ -16,6 +20,14 @@ class Overlay(Gtk.Window):
 
     def __init__(self, copy_text):
         super().__init__(type=Gtk.WindowType.POPUP)
+        # T3 ships Inter as a webfont. Make the same variable face available
+        # to this GTK process, including the intermediate weights.
+        fontconfig = ctypes.CDLL("libfontconfig.so.1")
+        fontconfig.FcConfigGetCurrent.restype = ctypes.c_void_p
+        fontconfig.FcConfigAppFontAddFile.argtypes = (ctypes.c_void_p, ctypes.c_char_p)
+        font = Path(__file__).with_name("fonts") / "Inter-latin-variable.ttf"
+        if fontconfig.FcConfigAppFontAddFile(fontconfig.FcConfigGetCurrent(), os.fsencode(font)):
+            PangoFc.FontMap.config_changed(PangoCairo.FontMap.get_default())
         self.copy_text = copy_text
         self.set_accept_focus(False)
         self.set_type_hint(Gdk.WindowTypeHint.NOTIFICATION)
@@ -44,7 +56,7 @@ class Overlay(Gtk.Window):
         self.indicator = Gtk.Label(label="●", name="indicator")
         self.status = Gtk.Label(name="status", xalign=0)
         self.clock = Gtk.Label(name="clock")
-        self.escape = Gtk.Label(label="esc", name="keycap")
+        self.escape = Gtk.Label(label="Esc", name="keycap")
         self.hint = Gtk.Label(label="Cancel", name="hint")
         for widget in (self.indicator, self.status, self.clock):
             head.pack_start(widget, False, False, 0)
@@ -83,14 +95,20 @@ class Overlay(Gtk.Window):
         self.add(body)
         style = Gtk.CssProvider()
         style.load_from_data(b"""
-            #dictation label {font-family: 'Inter', 'Noto Sans', sans-serif; color: #dbe4ff;}
-            #dictation #transcript {font-size: 18px; font-weight: 400;}
-            #dictation #status {font-size: 13px; font-weight: 600;}
-            #dictation #clock, #dictation #keycap {font: 11px 'JetBrains Mono', monospace; color: #acb7db;}
-            #dictation #keycap {padding: 0 5px; border: 1px solid rgba(195,210,255,.22); border-radius: 4px;}
-            #dictation #hint {font-size: 11px; color: #a9b4ce;}
+            #dictation label {font-family: 'Inter', 'Fira Sans', 'Noto Sans', sans-serif; color: #dbe4ff;}
+            #dictation #transcript {font-size: 20px; font-weight: 500; letter-spacing: -.4px; color: #e8edff;}
+            #dictation #status {font-size: 12px; font-weight: 600; color: #ced8f2;}
+            #dictation #clock {font-size: 12px; font-weight: 500; font-feature-settings: "tnum"; color: #afbddb;}
+            #dictation #keycap {font-size: 11px; font-weight: 500; padding: 1px 5px; color: #bdc9e5;
+                border: 1px solid rgba(195,210,255,.22); border-radius: 4px;}
+            #dictation #hint {font-size: 12px; font-weight: 500; color: #bdc9e0;}
+            #dictation button label {font-size: 12px; font-weight: 500;}
             #dictation #indicator {font-size: 10px; color: #8ddbd9;}
-            #dictation button {min-height: 16px; padding: 1px 7px; border-radius: 6px; background: #313950; color: #dde7ff;}
+            #dictation button {min-height: 18px; padding: 1px 7px; border-radius: 6px;
+                border: 1px solid rgba(183,201,245,.24); background: #30394e; color: #dde7ff;
+                box-shadow: none; text-shadow: none;}
+            #dictation button label {text-shadow: none;}
+            #dictation button:hover {background: #404b64; border-color: rgba(192,212,255,.48);}
         """)
         Gtk.StyleContext.add_provider_for_screen(self.get_screen(), style, 600)
 
