@@ -1,0 +1,13 @@
+--- a/packages/shared/src/keybindingMatching.ts
++++ b/packages/shared/src/keybindingMatching.ts
+@@ -100,6 +100,10 @@
+   shortcut: KeybindingShortcut,
+   platform: string,
+ ): boolean {
++  if (shortcut.key === "altright") {
++    return event.code === "AltRight" &&
++      matchesKeybindingShortcutModifiers({ altKey: false, ctrlKey: event.ctrlKey, metaKey: event.metaKey, shiftKey: event.shiftKey }, shortcut, platform);
++  }
+   if (
+     !isMacPlatform(platform) &&
+     event.getModifierState?.("AltGraph") &&

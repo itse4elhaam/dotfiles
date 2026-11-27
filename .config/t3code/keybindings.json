@@ -21,6 +21,11 @@
     "command": "workspace.focusPrevious"
   },
   {
+    "key": "altright",
+    "command": "composer.dictation",
+    "when": "!terminalFocus"
+  },
+  {
     "key": "mod+shift+d",
     "command": "composer.dictation",
     "when": "!terminalFocus"

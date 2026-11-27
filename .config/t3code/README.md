@@ -41,6 +41,17 @@ than replacing that file. Credentials, sessions, databases, browser data,
 backups, and transient toggle state stay outside Git. Logging in is not the
 backup mechanism for this configuration.
 
+## Dictation shortcuts
+
+In the composer, tap either Right Alt or Ctrl+Shift+D to start dictation and tap
+again to finish. In Auto mode, holding either shortcut for at least 300 ms
+finishes recording on release. Ctrl+Shift+D still splits a focused terminal.
+
+The `altright` binding requires the physical-key matcher in
+[right-alt.patch](right-alt.patch). The local Linux AppImage for nightly
+`0.1.11-nightly.20261120.4969` includes this change. When upgrading to a stock
+release, check for native Right Alt support or reapply the matcher to that build.
+
 ## Wallpaper and top-bar controls
 
 - **Ctrl+Alt+Z** shows or hides the top bar by switching the theme preset.
