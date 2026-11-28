@@ -699,18 +699,26 @@ class Dictation:
         else:
             self.clipboard.set_text(text, -1)
 
-    def probe_chrome_paste_grabs(self, window):
+    def probe_chrome_paste_grabs(self, window, client):
         # Probe every native shortcut before touching CLIPBOARD. XUngrabKey
         # releases only this client's reservations, including partial successes.
         # The surrounding server grab excludes competitors until we reinstall
         # these grabs after dispatching our own XTest V.
         masks = [X.ControlMask | shift | lock for shift in (0, X.ShiftMask)
                  for lock in self.lock_masks]
+        previous = self.resume_grabs.get(window.id)
+        if previous and previous[0] != client:
+            # X can reuse the id of a window that has been destroyed.
+            del self.resume_grabs[window.id]
+            previous = None
         caught = error.CatchError()
         for mask in masks:
             window.grab_key(self.v_key, mask, False, X.GrabModeAsync, X.GrabModeSync, onerror=caught)
         for mask in masks:
-            window.ungrab_key(self.v_key, mask, onerror=caught)
+            # If a new offer is declined, the user's original manual
+            # paste shortcut must still be able to release its guard.
+            if previous is None or mask not in previous[2]:
+                window.ungrab_key(self.v_key, mask, onerror=caught)
         self.x.sync()
         return [] if caught.get_error() else masks
 
@@ -719,10 +727,16 @@ class Dictation:
         window = self.x.create_resource_object("window", rec.target[0])
         masks = {X.ControlMask | (X.ShiftMask if shift else 0) | lock
                  for shift in self.paste_shift_states for lock in self.lock_masks}
-        for mask in masks:
+        requests = {mask: error.CatchError(error.BadAccess, error.BadWindow) for mask in masks}
+        for mask, result in requests.items():
             window.grab_key(self.v_key, mask, False, X.GrabModeAsync, X.GrabModeSync,
-                            onerror=lambda exc, _: isinstance(exc, (error.BadAccess, error.BadWindow)))
-        self.resume_grabs[window.id] = rec.client, rec.target, masks
+                            onerror=result)
+        self.x.sync()
+        acquired = {mask for mask, result in requests.items() if result.get_error() is None}
+        if acquired:
+            self.resume_grabs[window.id] = rec.client, rec.target, acquired
+        else:
+            self.resume_grabs.pop(window.id, None)
 
     def replay_resume_shortcut(self, event, queued):
         # Replay the physical V to its native handler even if Resume raced
@@ -898,7 +912,7 @@ class Dictation:
                                               "chromium", "chromium-browser") for name in wm_class)
                 focus_window = self.x.create_resource_object("window", rec.target[1])
                 if chrome:
-                    paste_grabs = self.probe_chrome_paste_grabs(focus_window)
+                    paste_grabs = self.probe_chrome_paste_grabs(focus_window, client)
                     if not paste_grabs:
                         reason = "Paste shortcut in use"
                 if (reason is None and paste_shortcut(wm_class) == rec.paste_keys and all(keys)

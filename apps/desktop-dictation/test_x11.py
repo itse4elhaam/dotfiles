@@ -440,6 +440,21 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
             until(lambda: app.pending_backup is None)
             assert app.clipboard.wait_for_text() == "Original text"
             print("A fresh hold inserted into another Chrome window", flush=True)
+            if not real:
+                # A new hold probes Chrome's shortcuts before claiming the
+                # selection. A declined claim must preserve the older guard's
+                # manual Ctrl+V, even when both use this same window.
+                from unittest.mock import patch
+                serial = app.paste_serial
+                with patch("selection.MAX_GESTURES", 0):
+                    hold("Super_L", "Alt_L")
+                    keys("keyup", "Alt_L", "keyup", "Super_L")
+                    until(lambda: app.recording is None)
+                assert app.paste_serial == serial and app.overlay.copy_button.get_visible()
+                keys("key", "ctrl+a", "ctrl+v")
+                until(lambda: title().startswith("[") and json.JSONDecoder().raw_decode(title())[0] ==
+                      ["insertFromPaste", "Original text", True])
+                assert not app.paused_clients
         finally:
             chrome.terminate()
             chrome.wait(timeout=10)
