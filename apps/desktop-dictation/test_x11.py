@@ -171,6 +171,9 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
             }
             ready();
             const edits = [];
+            document.addEventListener("focusin", event => {
+              if (edits.length) document.title = JSON.stringify(edits) + " focus=" + event.target.id;
+            });
             document.oninput = event => {
               if (!event.isTrusted) throw Error("Expected native input");
               const field = event.target;
@@ -250,6 +253,7 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
                         raise AssertionError(f"Editing and plain-text paste: {title()!r}") from exc
                     assert not app.paused_clients
                     keys("key", "Tab")
+                    until(lambda: " focus=next" in title())
             assert app.pending_read == "untagged"
             keys("key", "x")
             until(lambda: app.pending_read == "typing")
