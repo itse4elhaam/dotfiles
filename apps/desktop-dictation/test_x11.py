@@ -172,9 +172,9 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
             const edits = [];
             document.oninput = event => {
               const field = event.target;
-              edits.push([field.id, event.inputType, field.value ?? field.innerText]);
+              edits.push([field.id, event.inputType, field.value ?? field.textContent]);
               document.title = JSON.stringify(edits);
-              if (field.id !== "next") field.nextElementSibling.focus();
+              if (field.id === "first" || field.id === "second") field.nextElementSibling.focus();
             };
             </script>""")
         chrome = subprocess.Popen(["google-chrome", "--ozone-platform=x11",
@@ -212,7 +212,7 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
                     until(lambda: time.monotonic() - app.recording.started >= 2)
                 keys("keyup", "Alt_L", "keyup", "Super_L")
                 until(lambda: app.recording is None, 12)
-                if real and name == "next":
+                if real and name in ("editor", "next"):
                     # The confirmation card appears only after negotiation.
                     # Read the released transcript while the guard is active.
                     sentence = app.overlay.label.get_text()
@@ -234,6 +234,20 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
                 assert app.paste_serial == serial + 1
                 assert app.clipboard.wait_for_text() == "Original text"
                 print(name, "native paste", sentence, flush=True)
+                if name == "editor":
+                    assert app.pending_read == "untagged"
+                    keys("key", "BackSpace", "ctrl+a", "Delete", "ctrl+shift+v")
+                    expected.extend([
+                        [name, "deleteContentBackward", sentence[:-1]],
+                        [name, "deleteContentForward", ""],
+                        [name, "insertFromPaste", "Original text"],
+                    ])
+                    try:
+                        until(correct_edits)
+                    except AssertionError as exc:
+                        raise AssertionError(f"Editing and plain-text paste: {title()!r}") from exc
+                    assert not app.paused_clients
+                    keys("key", "Tab")
             assert app.pending_read == "untagged"
             keys("key", "x")
             until(lambda: app.pending_read == "typing")
@@ -680,6 +694,44 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
             secondary_read(b"CurrentTime sentinel", X.CurrentTime)
         assert entry.get_text() == text + "x"
         secondary_read(None, stamp)
+        app.overlay.dismiss_recovery()
+
+    # A clipboard manager can read the original selection just before Ctrl+V.
+    # Queue the conversion and the key on the server before the daemon runs.
+    for source in ("other app", "recipient", "unknown"):
+        first.set_text("")
+        handler = first.connect("paste-clipboard", defer_paste)
+        hold("Alt_L", "Super_L")
+        keys("keyup", "Alt_L", "keyup", "Super_L")
+        until(lambda: bool(delayed))
+        first.disconnect(handler)
+        delayed.pop()
+        secondary_read(text.encode(), X.CurrentTime)
+        if source == "recipient":
+            reader.convert_selection(app.selection.atom, utf8, prop, X.CurrentTime)
+            x.sync()
+        else:
+            recipient.delete_property(prop)
+            x.sync()
+            other.stdin.write("queued-read\n")
+            other.stdin.flush()
+            assert other.stdout.readline().strip() == "queued"
+        xres = app.selection.xres
+        try:
+            if source == "unknown":
+                app.selection.xres = None
+            keys("key", "ctrl+v")
+            until(lambda: app.pending_backup is None)
+        finally:
+            app.selection.xres = xres
+        if source == "other app":
+            until(lambda: first.get_text() == "CurrentTime sentinel")
+            assert recipient.get_full_property(prop, utf8).value == b"CurrentTime sentinel"
+            assert not app.paused_clients
+        else:
+            secondary_read(None, X.CurrentTime)
+            assert first.get_text() == "" and app.overlay.resume.get_visible()
+            app.overlay.resume.clicked()
         app.overlay.dismiss_recovery()
 
     # An editor may still be negotiating at the hard timeout. Its next

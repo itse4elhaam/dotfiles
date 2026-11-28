@@ -56,7 +56,10 @@ if __name__ == "__main__":
         elif command.strip() == "image/png":
             target = "image/png"
         else:
-            assert command.strip() == "read"
+            assert command.strip() in ("read", "queued-read")
         window.convert_selection(x.intern_atom("CLIPBOARD"), x.intern_atom(target),
                                  x.intern_atom("DICTATION_TEST_PASTE"), timestamp)
         x.flush()
+        if command.strip() == "queued-read":
+            x.sync()
+            print("queued", flush=True)
