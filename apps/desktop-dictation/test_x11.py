@@ -707,10 +707,7 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
         first.disconnect(handler)
         delayed.pop()
         secondary_read(text.encode(), X.CurrentTime)
-        if source == "recipient":
-            reader.convert_selection(app.selection.atom, utf8, prop, X.CurrentTime)
-            x.sync()
-        else:
+        if source != "recipient":
             recipient.delete_property(prop)
             x.sync()
             other.stdin.write("queued-read\n")
@@ -720,7 +717,10 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
         try:
             if source == "unknown":
                 app.selection.xres = None
-            keys("key", "ctrl+v")
+            if source == "recipient":
+                secondary_read(None, X.CurrentTime, queued_input=lambda: keys("key", "ctrl+v"))
+            else:
+                keys("key", "ctrl+v")
             until(lambda: app.pending_backup is None)
         finally:
             app.selection.xres = xres
