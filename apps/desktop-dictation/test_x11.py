@@ -100,6 +100,9 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
 
     app.clipboard.set_text("Original text", -1)
     until(lambda: app.clipboard_generation > 0)
+    paste_events = []
+    paste_handler = first.connect("paste-clipboard", lambda entry: paste_events.append(
+        bool(Gtk.get_current_event().send_event)))
     start = time.monotonic()
     hold("Super_L", "Alt_L")
     until(app.glow.get_mapped)
@@ -137,6 +140,8 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
     print(f"Inserted after {time.monotonic() - release:.2f}s: {text}", flush=True)
     until(lambda: app.selection.saved is not None)
     assert app.clipboard.wait_for_text() == "Original text"
+    first.disconnect(paste_handler)
+    assert paste_events == [True], "Expected a single window-addressed paste"
     assert app.overlay.recovery == text
     assert not app.overlay.wave.get_visible()
     assert app.overlay.label.get_ellipsize().value_nick == "end"
@@ -1691,7 +1696,7 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
     app.lock_changed(None, None, "ActiveChanged", GLib.Variant("(b)", (False,)))
 
     # A wrapped server timestamp is indistinguishable from an old request.
-    # Simulate just the repeated XI2 timestamp on the dispatched shortcut.
+    # Simulate just the repeated event timestamp on the dispatched shortcut.
     from unittest.mock import patch
     handler = second.connect("paste-clipboard", defer_paste)
     audio.with_suffix(".txt").write_text("Wrapped event")

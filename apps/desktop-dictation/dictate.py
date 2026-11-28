@@ -18,7 +18,8 @@ from overlay import Gdk, GLib, Gtk, Overlay
 from glow import RecordingGlow
 from gi.repository import GdkX11, Gio
 from Xlib import X, XK, display, error
-from Xlib.ext import xfixes, xinput, xtest
+from Xlib.ext import xfixes, xinput
+from Xlib.protocol.event import KeyPress, KeyRelease
 
 
 PASTE_TIMEOUT_MS = 1800
@@ -191,7 +192,6 @@ class Dictation:
         self.paste_target = None
         self.expire_pending = None
         self.lock_generation = 0
-        self.paste_press = None
         self.hold_serial = 0
         self.pending_read = None
         self.paste_serial = 0
@@ -470,12 +470,6 @@ class Dictation:
                 self.modifiers_changed()
             elif event.type == X.KeyRelease and event.detail in self.chord:
                 self.check_release()
-            elif (self.paste_press is not None and getattr(event, "extension", None) == self.xi
-                  and event.evtype == xinput.RawKeyPress
-                  and self.paste_press == (event.sequence_number, struct.unpack_from("=I", event.data, 6)[0])):
-                # XI2 raw time and detail start at wire bytes 12 and 16.
-                self.selection.dispatch(struct.unpack_from("=I", event.data, 2)[0])
-                self.paste_press = None
             elif self.recording:
                 if event.type == X.KeyPress and event.detail == self.escape:
                     self.cancel()
@@ -701,7 +695,8 @@ class Dictation:
         if not rec.paste_keys:
             return "Use Copy in this app"
         if (rec.unsafe or rec.target != self.focus() or not self.focus_inside(*rec.target)
-                or rec.client != self.selection.client_id(rec.target[0])):
+                or rec.client != self.selection.client_id(rec.target[0])
+                or rec.client != self.selection.client_id(rec.target[1])):
             return "Focus or input changed"
         if (rec.clipboard_generation != self.clipboard_generation
                 or rec.clipboard_owner != self.x.get_selection_owner(self.selection.atom)):
@@ -889,6 +884,9 @@ class Dictation:
         if self.recording is not rec:
             return
         timestamp = GdkX11.x11_get_server_time(self.overlay.get_window())
+        # GTK can request fresh server time while handling the paste. Keep
+        # that conversion distinct from one tagged with the directed event.
+        time.sleep(.002)
         pasted = False
         serial = self.paste_serial + 1
         restored = False
@@ -902,7 +900,6 @@ class Dictation:
             self.expire_pending = None
             self.finish_manual_paste = None
             self.paste_modifiers.clear()
-            self.paste_press = None
             self.pending_backup = None
             self.pending_read = None
             if not keep_replay:
@@ -1033,20 +1030,16 @@ class Dictation:
                     focus_window.change_attributes(event_mask=X.FocusChangeMask)
                     self.pending_backup = rec.backup
                     self.paste_serial = serial
-                    for key in keys[:-1]:
-                        xtest.fake_input(self.x, X.KeyPress, key)
-                    # Isolate V in its own server clock tick. In particular, a
-                    # GTK read that asks for fresh server time after dispatch
-                    # must not accidentally acquire the V timestamp.
-                    self.x.sync()
-                    time.sleep(.002)
-                    self.paste_press = (self.x.display.request_serial, keys[-1])
+                    self.selection.dispatch(timestamp)
                     self.replay_deadline = time.monotonic() + PASTE_TIMEOUT_MS / 1000
-                    xtest.fake_input(self.x, X.KeyPress, keys[-1])
-                    self.x.sync()
-                    time.sleep(.002)
-                    for key in reversed(keys):
-                        xtest.fake_input(self.x, X.KeyRelease, key)
+                    # Deliver V with its modifier state directly to the editor's
+                    # X connection without changing the keyboard's global state.
+                    state = X.ControlMask | (X.ShiftMask if XK.XK_Shift_L in rec.paste_keys else 0)
+                    for event_type in (KeyPress, KeyRelease):
+                        focus_window.send_event(event_type(
+                            time=timestamp, root=self.root, window=focus_window, child=X.NONE,
+                            root_x=0, root_y=0, event_x=0, event_y=0, state=state,
+                            detail=keys[-1], same_screen=True), event_mask=0, propagate=False)
                     # Hold the next manual V until Chrome sees the restored clipboard.
                     for mask in paste_grabs:
                         focus_window.grab_key(self.v_key, mask, False, X.GrabModeAsync, X.GrabModeSync)
@@ -1061,7 +1054,7 @@ class Dictation:
             self.overlay.message(text, duration=None, status="Waiting for app")
             remaining_ms = int((self.replay_deadline - time.monotonic()) * 1000) + 1
             GLib.timeout_add(max(1, remaining_ms), settle, True)
-            self.events()  # XSync may already have buffered the raw shortcut events.
+            self.events()
         else:
             self.recover(text, reason=reason)
 
