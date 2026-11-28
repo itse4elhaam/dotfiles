@@ -34,7 +34,7 @@ Keep the caret in the original field until insertion finishes. If dictation dete
 
 Dictation uses one native paste per utterance. Some editors include the paste shortcut’s timestamp. Others, including Chrome, request clipboard formats and text in several steps without a timestamp. After the first untagged text read, dictation waits for a 350 ms gap in the app’s requests before restoring the clipboard. The next dictation waits for this paste to finish.
 
-If you type as soon as the transcript appears, you can use the app’s usual paste shortcut to insert your previous clipboard contents. If the app requests more data after you type but before that shortcut or the end of the gap, dictation pauses paste and offers **Resume**.
+You can type or delete text as soon as the transcript appears, then use the app’s usual paste shortcut to insert your previous clipboard contents. Chrome also supports **Ctrl+Shift+V** to paste as plain text. If the app requests more data after you edit but before that shortcut or the end of the gap, dictation pauses paste and offers **Resume**.
 
 If that 350 ms gap hasn’t elapsed by 1.8 seconds after the dictation paste shortcut, dictation pauses paste for the app. Even a single read can trigger this if it arrives close to the deadline. Other apps regain access to the original clipboard, and the transcript stays on the **Copy** card. X11 gives the service no way to distinguish a new untagged request from an old one that the same app delayed indefinitely.
 

@@ -164,7 +164,7 @@ class Dictation:
         self.controls = {keycode("Control_L"), keycode("Control_R")}
         self.shifts = {keycode("Shift_L"), keycode("Shift_R")}
         self.paste_modifiers = set()
-        self.paste_needs_shift = False
+        self.paste_shift_states = set()
         self.finish_manual_paste = None
         self.chord = self.supers | {self.alt}
         self.other_modifiers = {keycode(name) for name in
@@ -338,11 +338,12 @@ class Dictation:
             symbol = self.x.keycode_to_keysym(code, 0)
             control = bool(self.paste_modifiers & self.controls)
             shifted = bool(self.paste_modifiers & self.shifts)
-            if symbol == XK.XK_v and control and shifted == self.paste_needs_shift:
+            if symbol == XK.XK_v and control and shifted in self.paste_shift_states:
                 return True
             printable = (0x20 <= symbol <= 0x7e or 0xa0 <= symbol <= 0xff
                          or 0x01000100 <= symbol <= 0x0110ffff)
-            if printable and (not control or (symbol == XK.XK_a and not shifted)):
+            deletion = symbol in (XK.XK_BackSpace, XK.XK_Delete, XK.XK_KP_Delete) and not shifted
+            if deletion or (printable and (not control or (symbol == XK.XK_a and not shifted))):
                 self.pending_read = "typing"
             else:
                 self.interrupt_paste()
@@ -363,8 +364,9 @@ class Dictation:
                 detail = struct.unpack_from("=I", event.data, 6)[0]
                 if event.evtype in (xinput.RawKeyPress, xinput.RawKeyRelease):
                     if self.paste_key(event, detail):
-                        # A queued request predating this V is still ambiguous.
-                        if deferred_requests:
+                        # A queued read from this editor could predate the V.
+                        # An identified clipboard manager reads independently.
+                        if any(self.selection.could_be_recipient(req) for req in deferred_requests):
                             self.interrupt_paste()
                         else:
                             manual_paste = True
@@ -741,11 +743,16 @@ class Dictation:
             if reason is None:
                 window = self.x.create_resource_object("window", rec.target[0])
                 keys = [self.x.keysym_to_keycode(sym) for sym in rec.paste_keys]
-                if (paste_shortcut(window.get_wm_class()) == rec.paste_keys and all(keys)
+                wm_class = window.get_wm_class() or ()
+                if (paste_shortcut(wm_class) == rec.paste_keys and all(keys)
                         and self.selection.claim(text, timestamp, client, rec.backup, on_read)):
                     self.pending_read = None
                     self.paste_modifiers.clear()
-                    self.paste_needs_shift = XK.XK_Shift_L in rec.paste_keys
+                    self.paste_shift_states = {XK.XK_Shift_L in rec.paste_keys}
+                    # Chrome also accepts Ctrl+Shift+V for plain-text paste.
+                    if any(name.lower() in ("google-chrome", "google-chrome-beta", "google-chrome-unstable",
+                                            "chromium", "chromium-browser") for name in wm_class):
+                        self.paste_shift_states.add(True)
                     self.finish_manual_paste = confirm
                     self.expire_pending = interrupt
                     self.paste_target = rec.target

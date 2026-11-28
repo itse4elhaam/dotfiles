@@ -82,6 +82,12 @@ class TextSelection:
                 pass
         return ("connection", base)
 
+    def could_be_recipient(self, request):
+        if request.selection != self.atom:
+            return False
+        client = self.client_id(request.requestor.id)
+        return client[0] != "process" or client == self.recipient
+
     def claim(self, text, timestamp, recipient, backup, on_read):
         # Keep exact tombstones even across clock wrap. At capacity use Copy
         # until restart instead of forgetting a potentially queued conversion.
