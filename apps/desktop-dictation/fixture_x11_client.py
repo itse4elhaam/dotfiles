@@ -15,6 +15,7 @@ if __name__ == "__main__":
     x.sync()
     print(window.id, flush=True)
     for command in sys.stdin:
+        target = "UTF8_STRING"
         timestamp = X.CurrentTime
         if command.strip() == "key-time":
             while True:
@@ -22,8 +23,10 @@ if __name__ == "__main__":
                 if event.type == X.KeyPress and event.detail == x.keysym_to_keycode(XK.XK_v):
                     timestamp = event.time
                     break
+        elif command.strip() == "image/png":
+            target = "image/png"
         else:
             assert command.strip() == "read"
-        window.convert_selection(x.intern_atom("CLIPBOARD"), x.intern_atom("UTF8_STRING"),
+        window.convert_selection(x.intern_atom("CLIPBOARD"), x.intern_atom(target),
                                  x.intern_atom("DICTATION_TEST_PASTE"), timestamp)
         x.flush()

@@ -52,7 +52,6 @@ class TextSelection:
             ("text/plain", "utf-8"), ("TEXT", "utf-8"), ("STRING", "latin-1"))}
         self.text_atom = x.intern_atom("TEXT")
         self.utf8 = x.intern_atom("UTF8_STRING")
-        self.compound = x.intern_atom("COMPOUND_TEXT")
         self.gestures = {}  # Dispatched V timestamp -> process identity (None on collision)
         self.replay = None
         self.press_time = None
@@ -119,15 +118,6 @@ class TextSelection:
         self.guarded_reads = set(paused_clients)
         self.x.flush()
 
-    def empty_text_format(self, target, saved):
-        if saved is not None and target in saved:
-            if (target in self.formats or target == self.compound or
-                    self.x.get_atom_name(target).lower().startswith("text/")):
-                return saved[target][:2]
-        elif target in self.formats:
-            return (self.utf8 if target == self.text_atom else target), 8
-        return None
-
     def serve(self, request):
         prop = request.property or request.target
         target = request.target
@@ -146,7 +136,7 @@ class TextSelection:
         unknown_reader = client[0] != "process" and (self.restore is not None or bool(self.guarded_reads))
         if self.restore and not recipient and not unknown_reader:
             saved = self.other_clients
-        guard = client in self.guarded_reads or unknown_reader or (recipient and not delivering and not untagged)
+        guard = client in self.guarded_reads or unknown_reader
         # Requests carrying an old V timestamp can arrive after restore,
         # Copy or Resume. Only the most recent successful offer can replay.
         repeated = (request.time in self.gestures and not delivering
@@ -154,20 +144,21 @@ class TextSelection:
         value_text = self.text
         if repeated:
             saved = None
-            guard = False
-            value_text = (self.replay[1] if previous == client and self.replay
-                          and request.time == self.replay[0] else "")
-        if request.selection != self.atom:
+            if previous == client and self.replay and request.time == self.replay[0]:
+                value_text = self.replay[1]
+            else:
+                guard = True
+        elif recipient and not delivering and not untagged:
+            guard = True
+        # Refuse the whole conversion, including TARGETS and fallback formats.
+        # A successful empty payload tells GTK to replace the selected text.
+        if request.selection != self.atom or guard:
             prop = X.NONE
         elif target == self.targets:
             request.requestor.change_property(prop, Xatom.ATOM, 32,
                                               [self.targets, self.timestamp, *(saved if saved is not None else self.formats)])
         elif target == self.timestamp:
             request.requestor.change_property(prop, Xatom.INTEGER, 32, [self.time])
-        elif guard and (empty_format := self.empty_text_format(target, saved)):
-            # A clipboard read cannot identify the field or retire a delayed shortcut.
-            type_atom, bits = empty_format
-            request.requestor.change_property(prop, type_atom, bits, b"")
         elif saved is not None:
             if target in saved:
                 type_atom, bits, data = saved[target]
@@ -191,6 +182,10 @@ class TextSelection:
             self.allow_current_time = untagged
             self.replay = (self.press_time, self.text)
             self.restore(untagged=untagged)
+        elif untagged and prop and self.replay and target == self.targets:
+            # Chrome negotiates more targets between its first read and the
+            # conversion it inserts. TARGETS alone cannot acknowledge a paste.
+            self.restore(untagged=True)
 
     def put_back(self, backup, late_client=None):
         self.restore = None
