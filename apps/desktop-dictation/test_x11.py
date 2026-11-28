@@ -143,9 +143,11 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
         until(lambda: bool(second.get_text()), 12)
         print(f"Short hold inserted after {time.monotonic() - release:.2f}s: {second.get_text()}", flush=True)
         assert "front" in second.get_text().lower()
-        app.stop_worker()
-        return
-    assert text == "Finished words."
+        if "--chrome" not in sys.argv:
+            app.stop_worker()
+            return
+    else:
+        assert text == "Finished words."
     assert paste_shortcut(("gnome-terminal-server", "Gnome-terminal")) == (XK.XK_Control_L, XK.XK_Shift_L, XK.XK_v)
     if "--chrome" in sys.argv:
         page = directory / "editor.html"
@@ -188,13 +190,22 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
                 return prop.value.decode() if prop else ""
             until(lambda: title().startswith("Dictation fixture ready"))
             expected = []
-            for name in ("first", "second", "editor"):
+            for name, direction in (("first", "Center"), ("second", "Left"), ("editor", "Right")):
                 serial = app.paste_serial
                 sentence = f"One complete sentence for {name}."
-                audio.with_suffix(".txt").write_text(sentence)
+                if real:
+                    subprocess.run(["sox", samples / f"Front_{direction}.wav", "-r", "16000", "-c", "1",
+                                    "-b", "16", "-e", "signed", "-t", "raw", audio], check=True)
+                else:
+                    audio.with_suffix(".txt").write_text(sentence)
                 hold("Super_L", "Alt_L")
+                if real:
+                    until(lambda: time.monotonic() - app.recording.started >= 2)
                 keys("keyup", "Alt_L", "keyup", "Super_L")
-                until(lambda: app.recording is None)
+                until(lambda: app.recording is None, 12)
+                if real:
+                    until(lambda: app.overlay.recovery and direction.lower() in app.overlay.recovery.lower())
+                    sentence = app.overlay.recovery
                 expected.append([name, "insertFromPaste", sentence])
                 until(lambda: title().startswith("[") and json.JSONDecoder().raw_decode(title())[0] == expected)
                 assert app.paste_serial == serial + 1

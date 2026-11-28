@@ -38,4 +38,4 @@ The clipboard delivery path preserves supported existing formats. If text reache
 
 ## Testing
 
-Run `/usr/bin/python3 apps/desktop-dictation/test_x11.py` with Xvfb and xdotool on PATH. The fixture creates a private X server, supplies audio and verifies input, focus, clipboard and overlay behavior. Pass `--chrome` for a real browser field in a throwaway profile, or `--real-model` to transcribe recorded speech with the installed local engine.
+Run `/usr/bin/python3 apps/desktop-dictation/test_x11.py` with Xvfb and xdotool on PATH. The fixture creates a private X server, supplies audio and verifies input, focus, clipboard and overlay behavior. Pass `--chrome` for browser fields in a throwaway profile with extensions disabled. Add `--real-model` to dictate three different recordings into those fields using the installed local engine.
