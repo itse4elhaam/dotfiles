@@ -763,6 +763,25 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
     secondary_read(b"CurrentTime sentinel", X.CurrentTime)
     app.overlay.dismiss_recovery()
 
+    # The request reaches X before the cutoff but the dictation event loop
+    # can't answer until afterward. Check both an unread and an active offer.
+    for already_read in (False, True):
+        handler = first.connect("paste-clipboard", defer_paste)
+        hold("Alt_L", "Super_L")
+        keys("keyup", "Alt_L", "keyup", "Super_L")
+        until(lambda: bool(delayed))
+        first.disconnect(handler)
+        delayed.pop()
+        if already_read:
+            secondary_read(text.encode(), X.CurrentTime)
+        def past_deadline():
+            time.sleep(max(0, app.replay_deadline - time.monotonic()) + .025)
+        secondary_read(None, X.CurrentTime, queued_input=past_deadline)
+        assert app.overlay.resume.get_visible() and app.overlay.recovery == text
+        other_read(b"CurrentTime sentinel")
+        app.overlay.resume.clicked()
+        app.overlay.dismiss_recovery()
+
     # A key after dispatch but before the application's first read can
     # change the field. Keep the transcript for recovery in this case.
     handler = first.connect("paste-clipboard", defer_paste)

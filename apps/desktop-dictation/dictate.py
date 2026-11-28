@@ -21,6 +21,9 @@ from Xlib import X, XK, display, error
 from Xlib.ext import xfixes, xinput, xtest
 
 
+PASTE_TIMEOUT_MS = 1800
+
+
 def paste_shortcut(wm_class):
     names = tuple(name.lower() for name in (wm_class or ()))
     if any(name in ("xterm", "uxterm", "rxvt", "urxvt", "urxvtc", "rxvt-unicode") for name in names):
@@ -279,6 +282,12 @@ class Dictation:
         else:
             self.retire_replay()
 
+    def expire_overdue_paste(self):
+        if self.paste_target is None or time.monotonic() < self.replay_deadline:
+            return False
+        self.interrupt_paste()
+        return True
+
     def retire_replay(self):
         self.selection.replay = None
         if self.paste_target is not None:
@@ -425,33 +434,35 @@ class Dictation:
                         elif code not in self.chord:
                             self.recording.unsafe = True
         if manual_paste and self.finish_manual_paste:
-            if self.focus() == self.paste_target:
+            if self.focus() != self.paste_target:
+                self.interrupt_paste()
+            elif not self.expire_overdue_paste():
                 self.finish_manual_paste()
                 batch_recipient = None
-            else:
-                self.interrupt_paste()
         if deferred_requests:
-            if not self.expire_pending and time.monotonic() >= self.replay_deadline:
-                self.retire_replay()
             # A cancellation can release an empty clipboard while draining.
             owns_selection = self.x.get_selection_owner(self.selection.atom) == self.selection.window
             if not owns_selection:
                 self.interrupt_paste()
             for request in deferred_requests:
-                if (self.pending_read == "typing" and
-                        self.selection.client_id(request.requestor.id) == self.selection.recipient):
+                client = self.selection.client_id(request.requestor.id)
+                if self.pending_read == "typing" and client == self.selection.recipient:
                     # Typing could have moved the caret before a delayed
                     # conversion. Refuse it and its possible fallback reads.
                     self.interrupt_paste()
+                # A busy event loop or an X server round trip can outlast the
+                # timer. Check the absolute cutoff before each wire reply.
+                if self.expire_overdue_paste():
+                    owns_selection = self.x.get_selection_owner(self.selection.atom) == self.selection.window
                 if not owns_selection:
                     self.selection.notify(request, X.NONE)
                 elif batch_recipient is not None and self.paste_target is None:
                     # Even a previously acknowledged tagged offer may have
                     # ended in this batch. Never substitute its saved clipboard
                     # for a conversion queued against that offer.
-                    self.selection.serve(request, interrupted_client=batch_recipient)
+                    self.selection.serve(request, client=client, interrupted_client=batch_recipient)
                 else:
-                    self.selection.serve(request)
+                    self.selection.serve(request, client=client)
         # Round trips can buffer more events in python-xlib without another
         # fd wakeup. Yield to GLib before taking a fresh finite snapshot.
         if self.x.pending_events() and self.event_idle is None:
@@ -704,6 +715,7 @@ class Dictation:
             # A timer can run while raw input is buffered on the X connection.
             self.x.sync()
             self.events()
+            self.expire_overdue_paste()
             if restored:
                 return False
             # An untagged recipient still negotiating at the hard deadline
@@ -769,6 +781,7 @@ class Dictation:
                     self.x.sync()
                     time.sleep(.002)
                     self.paste_press = (self.x.display.request_serial, keys[-1])
+                    self.replay_deadline = time.monotonic() + PASTE_TIMEOUT_MS / 1000
                     xtest.fake_input(self.x, X.KeyPress, keys[-1])
                     self.x.sync()
                     time.sleep(.002)
@@ -783,8 +796,8 @@ class Dictation:
         if pasted:
             self.end("Transcript ready")
             self.overlay.sent(text)
-            self.replay_deadline = time.monotonic() + 1.8
-            GLib.timeout_add(1800, settle, True)
+            remaining_ms = int((self.replay_deadline - time.monotonic()) * 1000) + 1
+            GLib.timeout_add(max(1, remaining_ms), settle, True)
             self.events()  # XSync may already have buffered the raw shortcut events.
         else:
             self.recover(text, reason=reason)

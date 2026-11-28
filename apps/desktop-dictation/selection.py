@@ -124,10 +124,9 @@ class TextSelection:
         self.guarded_reads = set(paused_clients)
         self.x.flush()
 
-    def serve(self, request, interrupted_client=None):
+    def serve(self, request, client, interrupted_client=None):
         prop = request.property or request.target
         target = request.target
-        client = self.client_id(request.requestor.id)
         saved = self.saved
         recipient = self.restore is not None and client == self.recipient
         previous = self.gestures.get(request.time)
