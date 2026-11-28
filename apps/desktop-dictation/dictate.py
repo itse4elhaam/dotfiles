@@ -34,6 +34,11 @@ def paste_shortcut(wm_class):
     return (XK.XK_Control_L, XK.XK_v)
 
 
+def is_chrome(wm_class):
+    return any(name.lower() in ("google-chrome", "google-chrome-beta", "google-chrome-unstable",
+                                "chromium", "chromium-browser") for name in wm_class)
+
+
 class Recording:
     def __init__(self, app, target):
         self.app = app
@@ -218,6 +223,7 @@ class Dictation:
                 lock_masks |= {mask | (1 << index) for mask in lock_masks}
         self.lock_masks = lock_masks
         self.resume_grabs = {}
+        self.clients_atom = self.x.intern_atom("_NET_CLIENT_LIST")
         self.v_key = keycode("v")
         errors = []
         grabs = [(self.alt, X.Mod4Mask), *((code, X.Mod1Mask) for code in self.supers)]
@@ -274,8 +280,15 @@ class Dictation:
                     self.end("Cancelled")
                 self.interrupt_paste()
                 self.release_resume_shortcuts()
+                self.watch_window_changes()
                 self.overlay.clear_recoveries()
                 self.stop_worker()
+            else:
+                self.watch_guarded_windows()
+
+    def watch_window_changes(self):
+        guarded = not self.locked and not self.selection.guarded_reads.isdisjoint(self.navigation_guards)
+        self.root.change_attributes(event_mask=X.PropertyChangeMask if self.paste_target or guarded else 0)
 
     def watch_input(self, mask):
         self.root.xinput_select_events([(xinput.AllMasterDevices, mask)])
@@ -298,7 +311,7 @@ class Dictation:
         if self.paste_target is not None:
             _, focus_id = self.paste_target
             self.paste_target = None
-            self.root.change_attributes(event_mask=0)
+            self.watch_window_changes()
             self.x.create_resource_object("window", focus_id).change_attributes(
                 event_mask=0, onerror=lambda exc, _: isinstance(exc, error.BadWindow))
             if self.recording is None:
@@ -412,6 +425,9 @@ class Dictation:
                      and event.window.id == self.paste_target[1])
                     or (event.type == X.PropertyNotify and event.atom == self.active_atom)):
                 self.redirect_paste()
+            if (event.type == X.PropertyNotify and event.window == self.root
+                    and event.atom in (self.active_atom, self.clients_atom)):
+                self.watch_guarded_windows(active_only=event.atom == self.active_atom)
             # These events and the final grab are ordered on the same connection.
             if isinstance(event, xfixes.SelectionNotify):
                 empty_restore = (event.owner.id == X.NONE
@@ -429,6 +445,7 @@ class Dictation:
                     # taking over ends our reason to intercept manual V.
                     if not empty_restore:
                         self.release_resume_shortcuts()
+                        self.watch_window_changes()
             elif event.type == X.SelectionRequest:
                 if not deferred_requests:
                     # The focus round trip brings preceding input and focus
@@ -503,13 +520,16 @@ class Dictation:
                 self.interrupt_paste()
             for request in deferred_requests:
                 client = self.selection.client_id(request.requestor.id)
-                if request.selection == self.selection.atom:
+                if owns_selection and request.selection == self.selection.atom:
                     # An old conversion arrived before a fresh dispatch. Keep
                     # the ordinary pause until the user explicitly resumes.
-                    readers = tuple(self.navigation_guards) if client[0] != "process" else (client,)
+                    readers = self.selection.guarded_reads if client[0] != "process" else (client,)
                     for reader in readers:
-                        if self.navigation_guards.pop(reader, None) is not None:
-                            self.overlay.late_read(reader, show=self.recording is None)
+                        if reader in self.selection.guarded_reads and reader in self.paused_clients:
+                            if self.navigation_guards.pop(reader, None) is not None:
+                                self.watch_window_changes()
+                            if not self.locked:
+                                self.overlay.late_read(reader, show=self.recording is None)
                 if (request.selection == self.selection.atom
                         and self.pending_read in ("typing", "navigation", "redirected")
                         and (client == self.selection.recipient or client[0] != "process")):
@@ -748,11 +768,49 @@ class Dictation:
         self.x.sync()
         return caught.get_error() is None
 
-    def watch_resume_shortcut(self, rec):
-        # After navigation, keep only a passive grab on this app window.
-        window = self.x.create_resource_object("window", rec.target[0])
+    def watch_guarded_windows(self, active_only=False):
+        clients = self.selection.guarded_reads.intersection(self.navigation_guards)
+        self.watch_window_changes()
+        if self.locked or not clients:
+            return
+        # Keep identities and ownership stable through passive-grab installation.
+        self.x.grab_server()
+        try:
+            if self.x.get_selection_owner(self.selection.atom) != self.selection.window:
+                return
+            # The WM lists client windows even when it reparents them under frames.
+            # Bare X servers have the top-level windows directly under the root.
+            windows = {self.focus()[0]}
+            if not active_only:
+                listed = self.root.get_full_property(self.clients_atom, X.AnyPropertyType)
+                windows.update(listed.value if listed else (w.id for w in self.root.query_tree().children))
+            for xid in windows:
+                if not xid or xid == self.root.id:
+                    continue
+                client = self.selection.client_id(xid)
+                if client not in clients:
+                    continue
+                window = self.x.create_resource_object("window", xid)
+                try:
+                    if window.get_attributes().map_state != X.IsViewable:
+                        continue
+                    wm_class = window.get_wm_class() or ()
+                except error.BadWindow:
+                    continue
+                keys = paste_shortcut(wm_class)
+                if keys:
+                    shifts = {XK.XK_Shift_L in keys}
+                    if is_chrome(wm_class):
+                        shifts.add(True)
+                    self.watch_resume_shortcut(client, (xid, None), shifts)
+        finally:
+            self.x.ungrab_server()
+            self.x.flush()
+
+    def watch_resume_shortcut(self, client, target, shifts):
+        window = self.x.create_resource_object("window", target[0])
         masks = {X.ControlMask | (X.ShiftMask if shift else 0) | lock
-                 for shift in self.paste_shift_states for lock in self.lock_masks}
+                 for shift in shifts for lock in self.lock_masks}
         requests = {mask: error.CatchError(error.BadAccess, error.BadWindow) for mask in masks}
         for mask, result in requests.items():
             window.grab_key(self.v_key, mask, False, X.GrabModeAsync, X.GrabModeSync,
@@ -760,25 +818,35 @@ class Dictation:
         self.x.sync()
         acquired = {mask for mask, result in requests.items() if result.get_error() is None}
         if acquired:
-            self.resume_grabs[window.id] = rec.client, rec.target, acquired
+            self.resume_grabs[window.id] = client, target, acquired
         else:
             self.resume_grabs.pop(window.id, None)
 
     def replay_resume_shortcut(self, event, queued):
         # Replay the physical V to its native handler even if Resume raced
         # the frozen grab, or an older conversion prevents releasing the guard.
+        resumed = None
+        self.x.grab_server()
         try:
             grab = self.resume_grabs.get(event.window.id)
             if not grab or self.locked:
                 return
             client, target, _ = grab
-            if (self.focus() == target and self.selection.client_id(event.window.id) == client
+            active, focused = self.focus()
+            if (active == target[0] and (target[1] is None or focused == target[1])
+                    and self.focus_inside(active, focused)
+                    and self.selection.client_id(focused) == client
+                    and self.selection.client_id(active) == client
                     and not any(self.selection.could_be_recipient(req, client) for req in queued)):
                 self.resume_client(client)
-                self.overlay.client_resumed(client)
+                resumed = client
         finally:
             self.x.allow_events(X.ReplayKeyboard, event.time)
+            self.x.ungrab_server()
             self.x.flush()
+
+        if resumed is not None:
+            self.overlay.client_resumed(resumed)
 
     def release_resume_shortcuts(self, client=None):
         if not self.resume_grabs:
@@ -796,6 +864,7 @@ class Dictation:
         self.navigation_guards.pop(client, None)
         self.paused_clients.pop(client, None)
         self.selection.guarded_reads.discard(client)
+        self.watch_window_changes()
 
     def commit(self, text):
         if self.recording.cancelled:
@@ -858,7 +927,10 @@ class Dictation:
             if late_client is not None:
                 self.paused_clients[client] = rec.app_name
                 self.navigation_guards[client] = guard_hold
-                self.watch_resume_shortcut(rec)
+                if rec.backup.values:
+                    self.watch_guarded_windows()
+                else:
+                    self.watch_resume_shortcut(client, rec.target, self.paste_shift_states)
             if self.lock_generation == lock_generation:
                 self.overlay.recover_confirmed(text, show=self.recording is None, client=late_client)
 
@@ -871,7 +943,7 @@ class Dictation:
             navigated = self.pending_read in ("navigation", "redirected")
             restore(client)
             if navigated:
-                self.watch_resume_shortcut(rec)
+                self.watch_resume_shortcut(client, rec.target, self.paste_shift_states)
             # A conversion need not be the paste that changes the field.
             self.paused_clients[client] = rec.app_name
             if self.lock_generation == lock_generation:
@@ -934,8 +1006,7 @@ class Dictation:
                 window = self.x.create_resource_object("window", rec.target[0])
                 keys = [self.x.keysym_to_keycode(sym) for sym in rec.paste_keys]
                 wm_class = window.get_wm_class() or ()
-                chrome = any(name.lower() in ("google-chrome", "google-chrome-beta", "google-chrome-unstable",
-                                              "chromium", "chromium-browser") for name in wm_class)
+                chrome = is_chrome(wm_class)
                 focus_window = self.x.create_resource_object("window", rec.target[1])
                 shift_states = {XK.XK_Shift_L in rec.paste_keys}
                 if chrome:  # Chrome also accepts Ctrl+Shift+V for plain-text paste.
@@ -957,7 +1028,7 @@ class Dictation:
                     self.finish_manual_paste = lambda: confirm(guard_hold=None)
                     self.expire_pending = interrupt
                     self.paste_target = rec.target
-                    self.root.change_attributes(event_mask=X.PropertyChangeMask)
+                    self.watch_window_changes()
                     focus_window.change_attributes(event_mask=X.FocusChangeMask)
                     self.pending_backup = rec.backup
                     self.paste_serial = serial

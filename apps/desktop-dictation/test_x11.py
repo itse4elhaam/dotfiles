@@ -476,6 +476,7 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
                 target.set_input_focus(X.RevertToParent, X.CurrentTime)
                 x.sync()
             activate(browser)
+            until(lambda: browser.id in app.resume_grabs)
             hold("Super_L", "Alt_L")
             assert app.recording.client in app.navigation_guards and app.recording.target[0] == browser.id
             if real:
@@ -511,6 +512,10 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
                 assert app.overlay.status.get_text().startswith("Sent to app")
                 assert json.JSONDecoder().raw_decode(title(second_browser))[0] == second_edits
                 print("Immediate Chrome window switch after Enter inserted exactly once", flush=True)
+                # The last delivery was in A. A manual paste back in B must
+                # still resume its normal clipboard, even after a declined offer.
+                browser = second_browser
+                activate(browser)
                 # A new hold probes Chrome's shortcuts before claiming the
                 # selection. A declined claim must preserve the older guard's
                 # manual Ctrl+V, even when both use this same window.
@@ -522,14 +527,44 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
                     until(lambda: app.recording is None)
                 assert app.paste_serial == serial and app.overlay.copy_button.get_visible()
                 keys("key", "ctrl+a", "ctrl+v")
-                expected.append(["chat", "insertFromPaste", "Original text"])
-                until(correct_edits)
+                second_edits.append(["insertFromPaste", "Original text", True])
+                until(renderer_logged)
                 assert not app.paused_clients
+                audio.with_suffix(".txt").write_text("After manual paste.")
+                keys("key", "ctrl+a")
+                hold("Super_L", "Alt_L")
+                keys("keyup", "Alt_L", "keyup", "Super_L")
+                second_edits.append(["insertFromPaste", "After manual paste.", True])
+                until(renderer_logged)
+                keys("key", "Return")
+                second_edits.append(["submit", "After manual paste.", True])
+                until(renderer_logged)
+                until(lambda: bool(app.navigation_guards) and app.pending_backup is None)
+                app.lock_changed(None, None, "ActiveChanged", GLib.Variant("(b)", (True,)))
+                assert not app.resume_grabs and not app.overlay.get_visible()
+                app.lock_changed(None, None, "ActiveChanged", GLib.Variant("(b)", (False,)))
+                keys("key", "ctrl+v")
+                second_edits.append(["insertFromPaste", "Original text", True])
+                until(renderer_logged)
+                assert not app.paused_clients
+                keys("key", "ctrl+a")
+                audio.with_suffix(".txt").write_text("After unlock.")
+                hold("Super_L", "Alt_L")
+                keys("keyup", "Alt_L", "keyup", "Super_L")
+                second_edits.append(["insertFromPaste", "After unlock.", True])
+                until(renderer_logged)
+                print("Manual paste and fresh dictation succeeded in an earlier window and after unlock", flush=True)
             until(lambda: app.pending_backup is None)
             assert app.clipboard.wait_for_text() == "Original text"
         finally:
             chrome.terminate()
-            chrome.wait(timeout=10)
+            # Chrome can request CLIPBOARD while shutting down. Keep serving X.
+            try:
+                until(lambda: chrome.poll() is not None, 10)
+            finally:
+                if chrome.poll() is None:
+                    chrome.kill()
+                    chrome.wait()
             app.stop_worker()
         return
     # Inspect a freshly mapped popup before processing another GTK frame.
@@ -1238,8 +1273,18 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
         app.x.sync()
         assert paste_key_available(), takeover
         if app.locked:
-            assert not app.overlay.get_visible()
+            secondary_read(None, X.CurrentTime)
+            assert not app.overlay.get_visible() and not app.overlay.pending
             app.lock_changed(None, None, "ActiveChanged", GLib.Variant("(b)", (False,)))
+            assert not app.overlay.get_visible() and not app.overlay.pending
+            secondary_read(None, X.CurrentTime)
+            assert app.overlay.resume.get_mapped() and app.overlay.recovery is None
+            assert not app.overlay.copy_button.get_visible()
+            app.overlay.recover_confirmed("Other app transcript", show=True)
+            unrelated = app.overlay.confirmed_card
+            secondary_read(None, X.CurrentTime)
+            assert app.overlay.recovery is None and app.overlay.resume.get_mapped()
+            assert app.overlay.confirmed_card is unrelated and unrelated in app.overlay.pending
         elif takeover != "clear":
             second.set_text("")
             keys("key", "ctrl+v")

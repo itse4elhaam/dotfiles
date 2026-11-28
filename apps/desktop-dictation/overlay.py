@@ -238,6 +238,11 @@ class Overlay(Gtk.Window):
             self.pending = [item for item in self.pending if item is not card]
             self.confirmed_card = None
             self.recover(card[0], client=client, show=show)
+        elif not self.pending or self.pending[-1][2] != client:
+            self.pending = [item for item in self.pending if item[0] is not None or item[2] != client]
+            self.pending.append((None, "Auto-paste paused", client))
+            if show:
+                self.show_recovery()
 
     def recall(self):
         if self.confirmed_card is not None and not self.pending:
