@@ -1,5 +1,5 @@
 [Unit]
-Description=Push-to-talk desktop dictation with T3 Parakeet
+Description=Push-to-talk desktop dictation with local Parakeet
 PartOf=graphical-session.target
 After=graphical-session-pre.target
 ConditionEnvironment=XDG_SESSION_TYPE=x11

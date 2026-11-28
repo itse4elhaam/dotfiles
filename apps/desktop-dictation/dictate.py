@@ -125,7 +125,9 @@ class Recording:
         try:
             for line in self.worker.stdout:
                 event = json.loads(line)
-                if event["type"] == "partial":
+                if event["type"] == "progress":
+                    self.post(self.app.engine_progress, event["text"])
+                elif event["type"] == "partial":
                     self.post(self.app.partial, event["text"])
                 elif event["type"] == "final":
                     self.got_final = True
@@ -162,8 +164,8 @@ class Dictation:
         self.other_modifiers = {keycode(name) for name in
                                 ("Alt_R", "Shift_L", "Shift_R", "Control_L", "Control_R",
                                  "ISO_Level3_Shift", "Meta_L", "Meta_R")} - self.chord - {0}
-        self.image = os.path.expanduser(os.environ.get(
-            "T3_DICTATION_APPIMAGE", "~/Applications/T3-Code-Nightly-x86_64.AppImage"))
+        self.worker_path = Path(os.environ.get("DESKTOP_DICTATION_WORKER",
+                                               Path(__file__).with_name("transcribe.py")))
         self.paused_clients = {}
         self.overlay = Overlay(self.copy_recovery, self.paused_clients, self.resume_client)
         self.glow = RecordingGlow()
@@ -228,14 +230,13 @@ class Dictation:
 
     def get_worker(self):
         if self.worker is None or self.worker.poll() is not None:
-            if not os.access(self.image, os.X_OK):
-                raise FileNotFoundError(self.image)
+            if not self.worker_path.is_file():
+                raise FileNotFoundError(self.worker_path)
             cpu_list = ",".join(map(str, sorted(os.sched_getaffinity(0))[:2]))
             self.worker = subprocess.Popen(
-                ["taskset", "--cpu-list", cpu_list, self.image,
-                 str(Path(__file__).resolve().with_name("transcribe.cjs"))],
+                ["taskset", "--cpu-list", cpu_list, "/usr/bin/python3", "-I", str(self.worker_path)],
                 stdin=subprocess.PIPE, stdout=subprocess.PIPE, start_new_session=True,
-                env={**os.environ, "ELECTRON_RUN_AS_NODE": "1", "OMP_NUM_THREADS": "2"})
+                env={**os.environ, "OMP_NUM_THREADS": "2", "OPENBLAS_NUM_THREADS": "2"})
         return self.worker
 
     def stop_worker(self):
@@ -288,7 +289,7 @@ class Dictation:
             GLib.timeout_add(90, lambda: self.recording is recording and self.tick())
         except OSError as exc:
             print(exc, file=sys.stderr)
-            self.end("Could not start microphone or T3 speech engine")
+            self.end("Could not start microphone or speech engine")
 
     def events(self, *_):
         while self.x.pending_events():
@@ -409,6 +410,10 @@ class Dictation:
             self.recover(self.recording.last_partial, incomplete=True)
         else:
             self.end(message)
+
+    def engine_progress(self, text):
+        if not self.recording.cancelled and not self.recording.last_partial:
+            self.overlay.label.set_text(text)
 
     def partial(self, text):
         if not self.recording.cancelled and text.strip():

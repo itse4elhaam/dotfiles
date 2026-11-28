@@ -16,12 +16,11 @@ from gi.repository import Gdk, GdkPixbuf, GLib, Gtk, Pango, PangoCairo, PangoFc
 
 
 class Overlay(Gtk.Window):
-    """A focus-free transcription card using T3's Zen / Tokyo Drift Forest palette."""
+    """A focus-free transcription card with a live waveform."""
 
     def __init__(self, copy_text, paused_clients, resume_client):
         super().__init__(type=Gtk.WindowType.POPUP)
-        # T3 ships Inter as a webfont. Make the same variable face available
-        # to this GTK process, including the intermediate weights.
+        # Register the variable face for this process only.
         fontconfig = ctypes.CDLL("libfontconfig.so.1")
         fontconfig.FcConfigGetCurrent.restype = ctypes.c_void_p
         fontconfig.FcConfigAppFontAddFile.argtypes = (ctypes.c_void_p, ctypes.c_char_p)

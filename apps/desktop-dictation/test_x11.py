@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-"""Run GTK integration checks on a private Xvfb. Add --real-model to exercise T3."""
+"""Run GTK integration checks on a private Xvfb. Add --real-model to exercise the installed Parakeet engine."""
 import os
 from pathlib import Path
 import signal
@@ -19,6 +19,17 @@ def exercise(directory, real, other):
     os.environ["PATH"] = str(directory) + os.pathsep + os.environ["PATH"]
     audio = directory / "fixture.pcm"
     if real:
+        # Exercise the worker with an empty home and just its own runtime and models.
+        installed = Path(os.environ.get("XDG_DATA_HOME", Path.home() / ".local/share")) / "desktop-dictation"
+        fixture_home = directory / "home"
+        data_home = fixture_home / ".local/share"
+        app_data = data_home / "desktop-dictation"
+        app_data.mkdir(parents=True)
+        for asset in (installed / "models", *installed.glob("engine-*")):
+            (app_data / asset.name).symlink_to(asset)
+        os.environ.update(HOME=str(fixture_home), XDG_DATA_HOME=str(data_home),
+                          XDG_CONFIG_HOME=str(fixture_home / ".config"))
+        os.environ.pop("DESKTOP_DICTATION_WORKER", None)
         samples = Path("/usr/share/sounds/alsa")
         subprocess.run(["sox", samples / "Front_Center.wav", samples / "Front_Left.wav",
                         samples / "Front_Center.wav", "-r", "16000", "-c", "1", "-b", "16",
@@ -37,7 +48,7 @@ for line in sys.stdin.buffer:
     elif line != b":start\\n":
         print(json.dumps({"type":"partial", "text":"Live words"}), flush=True)
 """)
-        os.environ["T3_DICTATION_APPIMAGE"] = str(worker)
+        os.environ["DESKTOP_DICTATION_WORKER"] = str(worker)
     os.environ["DICTATION_FIXTURE"] = str(audio)
     executable(directory / "parec", """
 import os, sys, time
@@ -80,7 +91,7 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
     def hold(a, b):
         keys("keydown", a, "keydown", b)
         until(lambda: app.recording is not None)
-        until(lambda: app.overlay.label.get_text() != "Speak now…", 12)
+        until(lambda: bool(app.recording.last_partial), 15)
         assert max(app.overlay.levels) > 0
 
     app.clipboard.set_text("Original text", -1)
