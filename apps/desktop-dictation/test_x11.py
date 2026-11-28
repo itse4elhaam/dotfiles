@@ -2,6 +2,7 @@
 """Run GTK integration checks on a private Xvfb. Add --real-model to exercise T3."""
 import os
 from pathlib import Path
+import signal
 import subprocess
 import sys
 import tempfile
@@ -561,6 +562,11 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
         keys("keyup", "Super_L", "keyup", "Alt_L")
         until(lambda: entry.get_text() == transcript and app.pending_backup is None)
     assert app.overlay.pending == [("Direct B", False, None)]
+    assert app.overlay.status.get_text() == "Sent to app"
+    until(lambda: not app.overlay.get_visible(), 6)
+    os.kill(os.getpid(), signal.SIGUSR1)
+    until(lambda: app.overlay.get_visible() and app.overlay.recovery == "Direct B")
+    assert window.get_focus() is second
     app.overlay.dismiss_recovery()
     second.set_text("")
     hold("Alt_L", "Super_L")
@@ -608,6 +614,28 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
     assert not second.get_text() and app.overlay.label.get_text() == "Cancelled"
     assert app.worker is warm_worker and warm_worker.poll() is None
     app.stop_worker()
+
+    app.clipboard.set_text("Temporary value", -1)
+    app.clipboard.clear()
+    until(lambda: not app.x.get_selection_owner(app.selection.atom))
+    early_reads = []
+    def read_before_default(_entry):
+        early_reads.append(app.clipboard.wait_for_text())
+        idle = []
+        from gi.repository import GLib
+        GLib.idle_add(lambda: idle.append(True))
+        until(lambda: bool(idle))
+    handler = second.connect("paste-clipboard", read_before_default)
+    audio.with_suffix(".txt").write_text("Empty clipboard start")
+    hold("Super_L", "Alt_L")
+    keys("keyup", "Alt_L", "keyup", "Super_L")
+    until(lambda: second.get_text() == "Empty clipboard start")
+    assert early_reads == ["Empty clipboard start"]
+    second.disconnect(handler)
+    until(lambda: app.pending_backup is None)
+    assert not app.x.get_selection_owner(app.selection.atom)
+    second.set_text("")
+    app.overlay.dismiss_recovery()
 
     # An ordinary read *inside* GTK's key handler and the entry's default
     # paste can have identical wire fields, including requestor and time.
@@ -657,6 +685,8 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
     current_time = app.selection.replay[0]
     app.lock_changed(None, None, "ActiveChanged", GLib.Variant("(b)", (True,)))
     assert app.selection.replay is None and not app.overlay.pending
+    app.show_last()
+    assert not app.overlay.get_visible() and app.overlay.confirmed_card is None
     secondary_read(b"", current_time)
     other_read(b"Before GTK handler")
     app.lock_changed(None, None, "ActiveChanged", GLib.Variant("(b)", (False,)))

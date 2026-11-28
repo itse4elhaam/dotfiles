@@ -232,7 +232,15 @@ class Overlay(Gtk.Window):
         if show:
             self.show_recovery()
 
-    def show_recovery(self):
+    def recall(self):
+        if self.confirmed_card is not None and not self.pending:
+            self.pending.append(self.confirmed_card)
+        if self.pending:
+            self.show_recovery(auto_hide=False)
+        else:
+            self.message("No recent transcript", 1800)
+
+    def show_recovery(self, auto_hide=True):
         self.dismiss_on_release = False
         text, incomplete, client = self.pending[-1]
         paused = client in self.paused_clients
@@ -242,6 +250,9 @@ class Overlay(Gtk.Window):
         status = "Auto-paste paused" if paused else "Ready to copy"
         if incomplete:
             status = "Partial transcript"
+        acknowledged = self.pending[-1] is self.confirmed_card
+        if acknowledged:
+            status = "Sent to app"
         if len(self.pending) > 1:
             status += f" · {len(self.pending)} left"
         if text is None:
@@ -259,6 +270,17 @@ class Overlay(Gtk.Window):
         self.show()
         self.set_opacity(1)
         self.clickable(True)
+        if acknowledged and auto_hide:
+            serial = self.serial
+            def tuck_away():
+                if self.serial != serial:
+                    return False
+                if self.hold_notice.get_visible() or self.copy_button.get_state_flags() & Gtk.StateFlags.PRELIGHT:
+                    return True
+                self.pending.pop()
+                self.next_recovery()
+                return False
+            GLib.timeout_add(4000, tuck_away)
 
     def resume_paste(self, *_):
         client = self.pending[-1][2]
@@ -304,7 +326,7 @@ class Overlay(Gtk.Window):
         self.pending.extend((None, False, client) for client in self.paused_clients)
         self.next_recovery()
 
-    def present_at(self, window):
+    def present_at(self, window, animate=True):
         self.hide_card()
         self.started = time.monotonic()
         self.listening = True
@@ -322,9 +344,11 @@ class Overlay(Gtk.Window):
         self.resize(width, height)
         x = area.x + (area.width - width) // 2
         y = area.y + area.height - height - 20
-        self.set_opacity(0)
-        self.move(x, y + 18)
+        self.set_opacity(0 if animate else 1)
+        self.move(x, y + 18 if animate else y)
         self.show_all()
+        if not animate:
+            return
         serial = self.serial
 
         def rise():

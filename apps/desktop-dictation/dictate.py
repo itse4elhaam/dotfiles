@@ -216,6 +216,15 @@ class Dictation:
         self.keymap = Gdk.Keymap.get_for_display(Gdk.Display.get_default())
         self.keymap.connect("state-changed", self.modifiers_changed)
         GLib.timeout_add_seconds(5, self.maintenance)
+        GLib.unix_signal_add(GLib.PRIORITY_DEFAULT, signal.SIGUSR1, self.show_last)
+
+    def show_last(self):
+        if not self.locked and self.recording is None:
+            active, _ = self.focus()
+            window = GdkX11.X11Window.foreign_new_for_display(Gdk.Display.get_default(), active) if active else None
+            self.overlay.present_at(window, animate=False)
+            self.overlay.recall()
+        return True
 
     def get_worker(self):
         if self.worker is None or self.worker.poll() is not None:
@@ -521,7 +530,13 @@ class Dictation:
             nonlocal read
             read = True
             self.overlay.recover_confirmed(text, show=self.recording is None)
-            GLib.idle_add(restore)
+            # With an empty backup, dropping ownership now would also drop
+            # a second conversion from the same GTK paste handler. Keep the
+            # empty selection available until the delivery window closes.
+            if rec.backup.values:
+                GLib.idle_add(restore)
+            else:
+                self.selection.saved = {}
         self.x.grab_server()
         try:
             self.x.sync()

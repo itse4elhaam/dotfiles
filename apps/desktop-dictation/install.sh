@@ -7,6 +7,7 @@ for file in dictate.py overlay.py glow.py literal.py selection.py forest.jpg tra
 done
 install -d "$HOME/.local/share/desktop-dictation/fonts"
 install -m 644 "$here/fonts/Inter-latin-variable.ttf" "$here/fonts/OFL.txt" "$HOME/.local/share/desktop-dictation/fonts/"
+install -Dm644 "$here/last-dictation.desktop" "$HOME/.local/share/applications/last-dictation.desktop"
 unit="desktop-dictation.service"
 source_unit="$here/../../.config/systemd/user/$unit"
 destination="$HOME/.config/systemd/user/$unit"
