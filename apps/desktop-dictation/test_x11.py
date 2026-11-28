@@ -822,7 +822,18 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
     until(lambda: second.get_text() == "Empty clipboard start")
     assert early_reads == ["Empty clipboard start"]
     second.disconnect(handler)
+    # Typing after the text actually lands must leave the next hold usable,
+    # including when there was no previous clipboard owner to restore.
+    keys("key", "x")
+    until(lambda: second.get_text() == "Empty clipboard startx" and app.pending_backup is None)
+    assert not app.paused_clients and not app.overlay.resume.get_visible()
+    serial = app.paste_serial
+    audio.with_suffix(".txt").write_text("Again")
+    hold("Alt_L", "Super_L")
+    keys("keyup", "Super_L", "keyup", "Alt_L")
+    until(lambda: second.get_text() == "Empty clipboard startxAgain")
     until(lambda: app.pending_backup is None)
+    assert app.paste_serial == serial + 1 and not app.paused_clients
     assert not app.x.get_selection_owner(app.selection.atom)
     second.set_text("")
     app.overlay.dismiss_recovery()
