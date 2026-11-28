@@ -169,7 +169,7 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
                 prop = browser.get_full_property(x.intern_atom("_NET_WM_NAME"), X.AnyPropertyType)
                 return prop.value.decode() if prop else ""
             serial = app.paste_serial
-            for app_class in ("google-chrome", "com.t3tools.T3Code"):
+            for app_class in ("google-chrome", "chromium"):
                 if app_class != "google-chrome":
                     browser.set_wm_class(app_class.lower(), app_class)
                     x.sync()

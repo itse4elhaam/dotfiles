@@ -23,7 +23,7 @@ from Xlib.ext import xfixes, xinput, xtest
 
 def paste_shortcut(wm_class):
     names = tuple(name.lower() for name in (wm_class or ()))
-    if names and names[-1] in ("google-chrome", "chromium", "chromium-browser", "com.t3tools.t3code"):
+    if names and names[-1] in ("google-chrome", "chromium", "chromium-browser"):
         return ()
     if any(name in ("xterm", "uxterm", "rxvt", "urxvt", "urxvtc", "rxvt-unicode") for name in names):
         return ()
