@@ -234,9 +234,8 @@ class Dictation:
         if self.worker is None or self.worker.poll() is not None:
             if not self.worker_path.is_file():
                 raise FileNotFoundError(self.worker_path)
-            cpu_list = ",".join(map(str, sorted(os.sched_getaffinity(0))[:2]))
             self.worker = subprocess.Popen(
-                ["taskset", "--cpu-list", cpu_list, "/usr/bin/python3", "-I", str(self.worker_path)],
+                ["/usr/bin/python3", "-I", str(self.worker_path)],
                 stdin=subprocess.PIPE, stdout=subprocess.PIPE, start_new_session=True,
                 env={**os.environ, "OMP_NUM_THREADS": "2", "OPENBLAS_NUM_THREADS": "2"})
         return self.worker

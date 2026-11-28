@@ -100,8 +100,24 @@ def emit(kind, text):
     print(json.dumps({"type": kind, "text": text}), flush=True)
 
 
+def worker_cpus():
+    allowed = sorted(os.sched_getaffinity(0))
+    # Two hardware threads on one core compete for the same execution units.
+    # Pick separate cores when the service's allowed CPU set contains them.
+    first = allowed[0]
+    topology = Path("/sys/devices/system/cpu")
+    try:
+        siblings = (topology / f"cpu{first}/topology/thread_siblings_list").read_text()
+        for cpu in allowed[1:]:
+            if (topology / f"cpu{cpu}/topology/thread_siblings_list").read_text() != siblings:
+                return [first, cpu]
+    except OSError:
+        pass
+    return allowed[:2]
+
+
 def recognize():
-    cpus = sorted(os.sched_getaffinity(0))[:2]
+    cpus = worker_cpus()
     os.sched_setaffinity(0, cpus)
     os.environ["TRANSCRIBE_BACKENDS"] = "cpu"
     os.environ["OMP_NUM_THREADS"] = str(len(cpus))
