@@ -615,6 +615,16 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
     until(lambda: time.monotonic() >= first_read + .40)
     assert app.pending_backup is not None
     secondary_read(text.encode(), X.CurrentTime)
+    # One paste can use both timestamps, and can try an unsupported format
+    # before requesting its final payload. Keep the offer across each read.
+    for target, expected in ((app.selection.targets, offered), (app.selection.utf8, text.encode()),
+                             (x.intern_atom("COMPOUND_TEXT"), None)):
+        wake = time.monotonic() + .21
+        until(lambda: time.monotonic() >= wake)
+        secondary_read(expected, current_gesture, target)
+    wake = time.monotonic() + .21
+    until(lambda: time.monotonic() >= wake)
+    entry.set_text(secondary_read(text.encode(), X.CurrentTime).decode())
     until(lambda: app.pending_backup is None and app.overlay.recovery == text)
     assert entry.get_text() == text and not app.paused_clients
     secondary_read(text.encode(), current_gesture)

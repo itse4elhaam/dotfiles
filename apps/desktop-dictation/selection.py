@@ -176,14 +176,18 @@ class TextSelection:
         else:
             prop = X.NONE
         self.notify(request, prop)
-        if (untagged or delivering) and not guard and prop and target in self.formats:
+        if not recipient or guard or request.selection != self.atom:
+            return
+        if self.replay:
+            # After a CurrentTime payload, an editor can switch timestamps as
+            # it negotiates further formats. Even a refusal can lead to a
+            # fallback read. Keep the offer until that negotiation goes quiet.
+            if self.allow_current_time and request.time in (X.CurrentTime, self.press_time):
+                self.restore(untagged=True)
+        elif (untagged or delivering) and prop and target in self.formats:
             self.allow_current_time = untagged
             self.replay = (self.press_time, self.text)
             self.restore(untagged=untagged)
-        elif untagged and prop and self.replay and target == self.targets:
-            # Chrome negotiates more targets between its first read and the
-            # conversion it inserts. TARGETS alone cannot acknowledge a paste.
-            self.restore(untagged=True)
 
     def notify(self, request, prop):
         request.requestor.send_event(SelectionNotify(
