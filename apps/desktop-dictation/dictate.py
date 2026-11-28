@@ -650,7 +650,7 @@ class Dictation:
             self.recording.last_partial = text.strip()
             self.overlay.label.set_text(text.strip())
 
-    def end(self, message):
+    def end(self, message=None):
         self.glow.stop()
         self.idle_since = time.monotonic()
         rec, self.recording = self.recording, None
@@ -658,7 +658,8 @@ class Dictation:
             rec.close()
         if self.paste_target is None:
             self.watch_input(0)
-        self.overlay.message(message, 2200)
+        if message is not None:
+            self.overlay.message(message, 2200)
 
     def keyboard_available(self):
         # Called under our server grab. No client can acquire a new keyboard
@@ -717,7 +718,7 @@ class Dictation:
 
     def recover(self, text, incomplete=False, reason=None):
         client = self.recording.client
-        self.end("")
+        self.end()
         self.overlay.recover(text, incomplete, client, reason=reason)
 
     def copy_recovery(self, text):
@@ -936,13 +937,15 @@ class Dictation:
                 confirm()
                 return False
             navigated = self.pending_read in ("navigation", "redirected")
+            unread_timeout = self.pending_read is None and time.monotonic() >= self.replay_deadline
             restore(client)
             if navigated:
                 self.watch_resume_shortcut(client, rec.target, self.paste_shift_states)
             # A conversion need not be the paste that changes the field.
             self.paused_clients[client] = rec.app_name
             if self.lock_generation == lock_generation:
-                self.overlay.recover(text, client=client, show=self.recording is None)
+                reason = "App didn’t read the paste" if unread_timeout else None
+                self.overlay.recover(text, client=client, show=self.recording is None, reason=reason)
             return False
 
         def settle(deadline=False):
@@ -1054,8 +1057,8 @@ class Dictation:
             self.x.ungrab_server()
             self.x.flush()
         if pasted:
-            self.end("Transcript ready")
-            self.overlay.sent(text)
+            self.end()
+            self.overlay.message(text, duration=None, status="Waiting for app")
             remaining_ms = int((self.replay_deadline - time.monotonic()) * 1000) + 1
             GLib.timeout_add(max(1, remaining_ms), settle, True)
             self.events()  # XSync may already have buffered the raw shortcut events.

@@ -262,7 +262,7 @@ class Overlay(Gtk.Window):
         self.serial += 1
         self.listening = False
         self.recovery = text
-        if text is not None and paused and status not in ("Partial transcript", "Sent to app"):
+        if text is not None and paused and status == "Ready to copy":
             status = "Auto-paste paused"
         acknowledged = self.pending[-1] is self.confirmed_card
         if text is not None and len(self.pending) > 1:
@@ -305,29 +305,6 @@ class Overlay(Gtk.Window):
         self.pending = [card for card in self.pending if card[0] is not None or card[2] != client]
         if showing:
             self.next_recovery()
-
-    def sent(self, text):
-        self.serial += 1
-        self.dismiss_on_release = False
-        self.status.set_text("Released")
-        self.indicator.set_text("✓")
-        self.label.set_text(text)
-        serial = self.serial
-        def fade():
-            if self.serial != serial:
-                return False
-            if self.hold_notice.get_visible():
-                self.dismiss_result()
-                return False
-            opacity = max(0, self.get_opacity() - .16)
-            self.set_opacity(opacity)
-            if not opacity:
-                self.dismiss_result()
-            return opacity > 0
-        def begin_fade():
-            GLib.timeout_add(16, fade)
-            return False
-        GLib.timeout_add(700, begin_fade)
 
     def copy_recovery(self, *_):
         text = self.recovery
@@ -378,7 +355,7 @@ class Overlay(Gtk.Window):
             return progress < 1
         GLib.timeout_add(16, rise)
 
-    def message(self, text, duration):
+    def message(self, text, duration, *, status="Dictation"):
         self.dismiss_on_release = False
         self.serial += 1
         serial = self.serial
@@ -387,7 +364,7 @@ class Overlay(Gtk.Window):
         self.hint.hide()
         self.escape.hide()
         self.clock.hide()
-        self.status.set_text("Dictation")
+        self.status.set_text(status)
         self.indicator.set_text("◇")
         self.wave.hide()
         self.label.set_ellipsize(Pango.EllipsizeMode.END)
@@ -396,7 +373,8 @@ class Overlay(Gtk.Window):
             if self.serial == serial:
                 self.dismiss_result()
             return False
-        GLib.timeout_add(duration, dismiss)
+        if duration is not None:
+            GLib.timeout_add(duration, dismiss)
 
     def level(self, rms):
         if self.listening:

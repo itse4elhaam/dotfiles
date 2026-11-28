@@ -1340,6 +1340,9 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
     keys("keyup", "Alt_L", "keyup", "Super_L")
     until(lambda: bool(delayed))
     first.disconnect(ignored)
+    assert app.overlay.get_mapped() and app.overlay.status.get_text() == "Waiting for app"
+    assert app.overlay.label.get_text() == "Ignored transcript"
+    assert not app.overlay.actions.get_visible()
     # TARGETS alone must still expire to Copy/Resume recovery.
     secondary_read(offered, X.CurrentTime, app.selection.targets)
     assert app.selection.replay is None
@@ -1351,6 +1354,8 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
     assert ordinary == [None] and app.pending_backup is not None
     other_read(b"Original before two holds")
     until(lambda: app.pending_backup is None and app.overlay.resume.is_visible())
+    assert app.overlay.status.get_text().startswith("App didn’t read the paste")
+    assert app.overlay.copy_button.get_mapped() and app.overlay.recovery == "Ignored transcript"
     second.grab_focus()
     audio.with_suffix(".txt").write_text("Second transcript")
     hold("Super_L", "Alt_L")
