@@ -545,8 +545,9 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
         until(notified)
         result = reader.get_full_property(prop, X.AnyPropertyType)
         value = None if result is None else result.value
-        if result is not None and target == app.selection.targets:
-            assert result.property_type == Xatom.ATOM and result.format == 32
+        if result is not None and target in (app.selection.targets, app.selection.timestamp):
+            expected_type = Xatom.ATOM if target == app.selection.targets else Xatom.INTEGER
+            assert result.property_type == expected_type and result.format == 32
             value = list(value)
         elif result is not None:
             assert result.property_type == target
@@ -650,6 +651,13 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
     until(lambda: bool(delayed))
     first.disconnect(handler)
     delayed.pop()
+    secondary_read(text.encode(), X.CurrentTime)
+    # Some editors ask when the clipboard was claimed before choosing a
+    # format. Their following payload read is still part of this paste.
+    first_read = time.monotonic()
+    until(lambda: time.monotonic() >= first_read + .225)
+    secondary_read([app.selection.time], X.CurrentTime, app.selection.timestamp)
+    until(lambda: time.monotonic() >= first_read + .45)
     secondary_read(text.encode(), X.CurrentTime)
     deadline = time.monotonic() + 3
     while app.pending_backup is not None and time.monotonic() < deadline:
