@@ -218,6 +218,11 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
             until(field, 20)
             browser = x.create_resource_object("window", int(field().splitlines()[0]))
             x.screen().root.change_property(app.active_atom, Xatom.WINDOW, 32, [browser.id])
+            # Model a reparenting WM so the focus path includes an intermediate frame.
+            if not real:
+                frame = x.screen().root.create_window(0, 0, 960, 640, 0, X.CopyFromParent)
+                frame.map()
+                browser.reparent(frame, 0, 0)
             browser.set_input_focus(X.RevertToParent, X.CurrentTime)
             x.sync()
             def title(target=None):
@@ -227,8 +232,7 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
                 return prop.value.decode() if prop else ""
             until(lambda: title().startswith("Dictation fixture ready"))
             if not real:
-                # A separate X client may already own a passive shortcut on
-                # Chrome's focused window, even with no active keyboard grab.
+                # Exercise each dispatch policy against independent passive grabs.
                 generation = app.clipboard_generation
                 app.clipboard.set_text("Original text", -1)
                 until(lambda: app.clipboard_generation > generation)
@@ -236,10 +240,28 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
                 masks = {X.ControlMask | shift | lock for shift in (0, X.ShiftMask)
                          for lock in app.lock_masks}
                 probe = display.Display()
-                probe_window = probe.create_resource_object("window", focus.id)
+                child = focus.create_window(10, 10, 8, 8, 0, 0, X.InputOnly, X.CopyFromParent)
+                child.map()
+                child.warp_pointer(4, 4)
+                browser_class = browser.get_wm_class()
+                terminal_class = ("gnome-terminal-server", "Gnome-terminal")
+                ctrl_shift = X.ControlMask | X.ShiftMask
+                cases = (
+                    (browser_class, x.screen().root, "v", X.ControlMask, "ctrl+v"),
+                    (browser_class, frame, "v", ctrl_shift, "ctrl+shift+v"),
+                    (browser_class, focus, "v", X.ControlMask, "ctrl+v"),
+                    (browser_class, focus, "v", ctrl_shift, "ctrl+shift+v"),
+                    (("fixture", "Fixture"), child, "v", X.ControlMask, "ctrl+v"),
+                    (("fixture", "Fixture"), frame, "Control_L", 0, "Control_L"),
+                    (terminal_class, frame, "Shift_L", X.ControlMask, "ctrl+Shift_L"),
+                    (terminal_class, focus, "v", ctrl_shift, "ctrl+shift+v"),
+                )
                 try:
-                    for occupied in (X.ControlMask, X.ControlMask | X.ShiftMask):
-                        focus.grab_key(app.v_key, occupied, False, X.GrabModeAsync, X.GrabModeAsync)
+                    for wm_class, grab_window, name, occupied, shortcut in cases:
+                        browser.set_wm_class(*wm_class)
+                        code = x.keysym_to_keycode(XK.string_to_keysym(name))
+                        probe_window = probe.create_resource_object("window", grab_window.id)
+                        grab_window.grab_key(code, occupied, False, X.GrabModeAsync, X.GrabModeAsync)
                         x.sync()
                         serial = app.paste_serial
                         owner = x.get_selection_owner(app.selection.atom)
@@ -247,7 +269,7 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
                         hold("Super_L", "Alt_L")
                         keys("keyup", "Alt_L", "keyup", "Super_L")
                         until(lambda: app.recording is None)
-                        assert app.paste_serial == serial, "Dispatched despite occupied Chrome shortcut"
+                        assert app.paste_serial == serial, f"Dispatched despite occupied {shortcut}"
                         assert app.overlay.status.get_text() == "Paste shortcut in use"
                         assert app.overlay.recovery == "Shortcut conflict" and app.overlay.copy_button.get_visible()
                         assert title().startswith("Dictation fixture ready") and x.get_input_focus().focus == focus
@@ -255,29 +277,31 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
                         assert app.clipboard.wait_for_text() == "Original text"
                         # The competitor keeps its grab. Every other combination
                         # must be free, including any partial dictation reservations.
-                        for mask in masks:
+                        for mask in masks | {occupied}:
                             caught = error.CatchError()
-                            probe_window.grab_key(app.v_key, mask, False, X.GrabModeAsync,
+                            probe_window.grab_key(code, mask, False, X.GrabModeAsync,
                                                   X.GrabModeAsync, onerror=caught)
                             probe.sync()
                             if mask == occupied:
                                 assert isinstance(caught.get_error(), error.BadAccess)
                             else:
                                 assert caught.get_error() is None
-                                probe_window.ungrab_key(app.v_key, mask)
+                                probe_window.ungrab_key(code, mask)
                         probe.sync()
                         events = [x.next_event() for _ in range(x.pending_events())]
-                        assert all(event.type != X.KeyPress or event.detail != app.v_key for event in events)
-                        shortcut = "ctrl+shift+v" if occupied & X.ShiftMask else "ctrl+v"
+                        assert all(event.type != X.KeyPress or event.detail != code for event in events)
                         keys("key", shortcut)
                         x.sync()
                         events = [x.next_event() for _ in range(x.pending_events())]
-                        assert any(event.type == X.KeyPress and event.detail == app.v_key
-                                   and event.window == focus for event in events)
-                        focus.ungrab_key(app.v_key, occupied)
+                        assert any(event.type == X.KeyPress and event.detail == code
+                                   and event.window == grab_window for event in events)
+                        grab_window.ungrab_key(code, occupied)
                         x.sync()
                         app.overlay.dismiss_recovery()
                 finally:
+                    child.destroy()
+                    browser.set_wm_class(*browser_class)
+                    x.sync()
                     probe.close()
             expected = []
             for name, direction in (("first", "Center"), ("second", "Left"), ("editor", "Right"), ("next", "Center")):

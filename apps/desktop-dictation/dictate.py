@@ -665,7 +665,9 @@ class Dictation:
         return False
 
     def modifiers_down(self):
-        return self.root.query_pointer().mask & (X.ShiftMask | X.ControlMask | X.Mod1Mask | X.Mod4Mask | X.Mod5Mask)
+        # The low eight bits are core keyboard modifiers. Dispatch only from
+        # a lock state covered by the passive-key preflight.
+        return (self.root.query_pointer().mask & 0xff) not in self.lock_masks
 
     def hold_blocked(self, client):
         if client not in self.paused_clients:
@@ -712,28 +714,39 @@ class Dictation:
         else:
             self.clipboard.set_text(text, -1)
 
-    def probe_chrome_paste_grabs(self, window, client):
-        # Probe every native shortcut before touching CLIPBOARD. XUngrabKey
-        # releases only this client's reservations, including partial successes.
-        # The surrounding server grab excludes competitors until we reinstall
-        # these grabs after dispatching our own XTest V.
-        masks = [X.ControlMask | shift | lock for shift in (0, X.ShiftMask)
-                 for lock in self.lock_masks]
-        previous = self.resume_grabs.get(window.id)
-        if previous and previous[0] != client:
-            # X can reuse the id of a window that has been destroyed.
-            del self.resume_grabs[window.id]
-            previous = None
+    def paste_keys_available(self, window, client, keys, v_masks):
+        # A passive grab can intercept any press, starting with bare Control.
+        # Probe while the server is grabbed so no client can race dispatch.
+        shortcuts = [(keys[0], lock) for lock in self.lock_masks]
+        if len(keys) == 3:
+            shortcuts.extend((keys[1], X.ControlMask | lock) for lock in self.lock_masks)
+        shortcuts.extend((keys[-1], mask) for mask in v_masks)
+        # X also activates grabs below focus when the grab window contains
+        # the pointer. Start at that child and walk the whole path to root.
+        child = window.query_pointer().child
+        while child:
+            window = child
+            child = window.query_pointer().child
         caught = error.CatchError()
-        for mask in masks:
-            window.grab_key(self.v_key, mask, False, X.GrabModeAsync, X.GrabModeSync, onerror=caught)
-        for mask in masks:
-            # If a new offer is declined, the user's original manual
-            # paste shortcut must still be able to release its guard.
-            if previous is None or mask not in previous[2]:
-                window.ungrab_key(self.v_key, mask, onerror=caught)
+        while True:
+            previous = self.resume_grabs.get(window.id)
+            if previous and previous[0] != self.selection.client_id(window.id):
+                # The XID has been reused since the guarded window closed.
+                del self.resume_grabs[window.id]
+                previous = None
+            if previous and previous[0] != client:
+                return False
+            for key, mask in shortcuts:
+                window.grab_key(key, mask, False, X.GrabModeAsync, X.GrabModeSync, onerror=caught)
+                # A declined offer must leave the previous resume shortcut intact.
+                # UngrabKey can only release this connection's reservations.
+                if not (previous and key == self.v_key and mask in previous[2]):
+                    window.ungrab_key(key, mask, onerror=caught)
+            if window == self.root:
+                break
+            window = window.query_tree().parent
         self.x.sync()
-        return [] if caught.get_error() else masks
+        return caught.get_error() is None
 
     def watch_resume_shortcut(self, rec):
         # After navigation, keep only a passive grab on this app window.
@@ -924,20 +937,23 @@ class Dictation:
                 chrome = any(name.lower() in ("google-chrome", "google-chrome-beta", "google-chrome-unstable",
                                               "chromium", "chromium-browser") for name in wm_class)
                 focus_window = self.x.create_resource_object("window", rec.target[1])
-                if chrome:
-                    paste_grabs = self.probe_chrome_paste_grabs(focus_window, client)
-                    if not paste_grabs:
-                        reason = "Paste shortcut in use"
-                if (reason is None and paste_shortcut(wm_class) == rec.paste_keys and all(keys)
-                        and self.selection.claim(text, timestamp, client, rec.backup, on_read)):
+                shift_states = {XK.XK_Shift_L in rec.paste_keys}
+                if chrome:  # Chrome also accepts Ctrl+Shift+V for plain-text paste.
+                    shift_states.add(True)
+                v_masks = [X.ControlMask | (X.ShiftMask if shift else 0) | lock
+                           for shift in shift_states for lock in self.lock_masks]
+                if paste_shortcut(wm_class) != rec.paste_keys or not all(keys):
+                    reason = "Paste shortcut changed"
+                elif not self.paste_keys_available(focus_window, client, keys, v_masks):
+                    reason = "Paste shortcut in use"
+                elif self.selection.claim(text, timestamp, client, rec.backup, on_read):
+                    if chrome:
+                        paste_grabs = v_masks
                     if client in self.navigation_guards:
                         self.resume_client(client)
                     self.pending_read = None
                     self.paste_modifiers.clear()
-                    self.paste_shift_states = {XK.XK_Shift_L in rec.paste_keys}
-                    # Chrome also accepts Ctrl+Shift+V for plain-text paste.
-                    if chrome:
-                        self.paste_shift_states.add(True)
+                    self.paste_shift_states = shift_states
                     self.finish_manual_paste = lambda: confirm(guard_hold=None)
                     self.expire_pending = interrupt
                     self.paste_target = rec.target
