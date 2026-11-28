@@ -55,7 +55,7 @@ class Recording:
         except error.BadWindow:
             self.paste_keys = ()
             self.unsafe = True
-        if not self.paste_keys or self.client in app.paused_clients:
+        if not self.paste_keys or app.hold_blocked(self.client):
             self.backup = None
         elif app.pending_backup is not None and self.clipboard_owner == app.selection.window:
             # Keep serving the first paste until its client reads it or it expires.
@@ -176,6 +176,7 @@ class Dictation:
         self.worker_path = Path(os.environ.get("DESKTOP_DICTATION_WORKER",
                                                Path(__file__).with_name("transcribe.py")))
         self.paused_clients = {}
+        self.navigation_guards = {}  # client -> last hold when navigation was observed
         self.overlay = Overlay(self.copy_recovery, self.paused_clients, self.resume_client)
         self.glow = RecordingGlow(self.x)
         self.recording = None
@@ -364,6 +365,7 @@ class Dictation:
                   or symbol in (XK.XK_Tab, XK.XK_Return, XK.XK_KP_Enter, XK.XK_Escape)):
                 # Navigation may redirect a native paste within the same X window.
                 self.pending_read = "navigation"
+                self.navigation_hold = self.hold_serial
             else:
                 self.interrupt_paste()
         return False
@@ -489,7 +491,15 @@ class Dictation:
                 self.interrupt_paste()
             for request in deferred_requests:
                 client = self.selection.client_id(request.requestor.id)
-                if self.pending_read in ("typing", "navigation") and client == self.selection.recipient:
+                if request.selection == self.selection.atom:
+                    # An old conversion arrived before a fresh dispatch. Keep
+                    # the ordinary pause until the user explicitly resumes.
+                    readers = tuple(self.navigation_guards) if client[0] != "process" else (client,)
+                    for reader in readers:
+                        if self.navigation_guards.pop(reader, None) is not None:
+                            self.overlay.late_read(reader, show=self.recording is None)
+                if (request.selection == self.selection.atom and self.pending_read in ("typing", "navigation")
+                        and (client == self.selection.recipient or client[0] != "process")):
                     # Typing could have moved the caret before a delayed
                     # conversion. Refuse it and its possible fallback reads.
                     self.interrupt_paste()
@@ -538,10 +548,15 @@ class Dictation:
             self.stop_worker()
         return True
 
-    def modifiers_changed(self, *_):
+    def modifiers_changed(self, keymap=None):
         # GDK receives XKB modifier changes even during Mutter's Super grab.
         # Idle dictation therefore needs neither keystroke monitoring nor polling.
         keys = self.x.query_keymap()
+        if keymap is not None and not self.held and self.expire_pending and self.chord_down(keys):
+            # GDK can announce the chord before our X connection has processed
+            # the Enter that preceded it. The keymap round trip buffered both.
+            self.events()
+            keys = self.x.query_keymap()
         if (not self.held and self.chord_down(keys) and
                 not any(keys[c // 8] & (1 << (c % 8)) for c in self.other_modifiers)):
             self.held = True
@@ -639,9 +654,15 @@ class Dictation:
     def modifiers_down(self):
         return self.root.query_pointer().mask & (X.ShiftMask | X.ControlMask | X.Mod1Mask | X.Mod4Mask | X.Mod5Mask)
 
+    def hold_blocked(self, client):
+        if client not in self.paused_clients:
+            return False
+        navigation_hold = self.navigation_guards.get(client)
+        return navigation_hold is None or self.hold_serial <= navigation_hold
+
     def paste_blocked_reason(self, rec):
         # Called after syncing inside the server grab, immediately before dispatch.
-        if rec.client in self.paused_clients:
+        if self.hold_blocked(rec.client):
             # The card shows the live pause state until the user resumes.
             return "Ready to copy"
         if rec.client[0] != "process":
@@ -732,6 +753,7 @@ class Dictation:
 
     def resume_client(self, client):
         self.release_resume_shortcuts(client)
+        self.navigation_guards.pop(client, None)
         self.paused_clients.pop(client, None)
         self.selection.guarded_reads.discard(client)
 
@@ -786,10 +808,19 @@ class Dictation:
                                        onerror=lambda exc, _: isinstance(exc, error.BadWindow))
             self.x.flush()
 
-        def confirm(keep_replay=False):
-            restore(keep_replay=keep_replay)
+        # A new hold permits one bounded offer. Guard the restored clipboard
+        # again unless the user deliberately pastes or resumes.
+        renewed_hold = hold_serial if client in self.navigation_guards else None
+
+        def confirm(keep_replay=False, guard_hold=renewed_hold):
+            late_client = client if guard_hold is not None else None
+            restore(late_client=late_client, keep_replay=keep_replay and late_client is None)
+            if late_client is not None:
+                self.paused_clients[client] = rec.app_name
+                self.navigation_guards[client] = guard_hold
+                self.watch_resume_shortcut(rec)
             if self.lock_generation == lock_generation:
-                self.overlay.recover_confirmed(text, show=self.recording is None)
+                self.overlay.recover_confirmed(text, show=self.recording is None, client=late_client)
 
         def interrupt():
             if self.pending_read == "tagged":
@@ -821,17 +852,19 @@ class Dictation:
             self.x.sync()
             self.events()
             self.expire_overdue_paste()
-            if restored:
+            if restored or (not deadline and settle_timer is not None):
                 return False
             # An untagged recipient still negotiating at the hard deadline
             # could otherwise paste the restored clipboard on its next read.
-            if (self.pending_read in (None, "navigation") or (deadline and self.pending_read in ("untagged", "typing"))
-                    or self.focus() != rec.target or
-                    self.x.get_selection_owner(self.selection.atom) != self.selection.window):
+            if (self.pending_read is None or self.focus() != rec.target
+                    or self.x.get_selection_owner(self.selection.atom) != self.selection.window
+                    or (deadline and self.pending_read != "tagged")):
                 return interrupt()
-            if deadline or settle_timer is None:
-                confirm(keep_replay=(self.pending_read != "typing" and bool(rec.backup.values)
-                                     and not deadline and hold_serial == self.hold_serial))
+            if self.pending_read == "navigation":
+                confirm(guard_hold=self.navigation_hold)
+                return False
+            confirm(keep_replay=(self.pending_read != "typing" and bool(rec.backup.values)
+                                 and not deadline and hold_serial == self.hold_serial))
             return False
 
         settle_timer = None
@@ -870,13 +903,15 @@ class Dictation:
                         reason = "Paste shortcut in use"
                 if (reason is None and paste_shortcut(wm_class) == rec.paste_keys and all(keys)
                         and self.selection.claim(text, timestamp, client, rec.backup, on_read)):
+                    if client in self.navigation_guards:
+                        self.resume_client(client)
                     self.pending_read = None
                     self.paste_modifiers.clear()
                     self.paste_shift_states = {XK.XK_Shift_L in rec.paste_keys}
                     # Chrome also accepts Ctrl+Shift+V for plain-text paste.
                     if chrome:
                         self.paste_shift_states.add(True)
-                    self.finish_manual_paste = confirm
+                    self.finish_manual_paste = lambda: confirm(guard_hold=None)
                     self.expire_pending = interrupt
                     self.paste_target = rec.target
                     self.root.change_attributes(event_mask=X.PropertyChangeMask)

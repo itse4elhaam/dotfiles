@@ -223,14 +223,21 @@ class Overlay(Gtk.Window):
         if show:
             self.show_recovery()
 
-    def recover_confirmed(self, text, show):
+    def recover_confirmed(self, text, show, client=None):
         # A conversion acknowledges the shortcut, not insertion into a field.
         if self.confirmed_card is not None:
             self.pending = [card for card in self.pending if card is not self.confirmed_card]
-        self.confirmed_card = (text, "Sent to app", None)
+        self.confirmed_card = (text, "Sent to app", client)
         self.pending.append(self.confirmed_card)
         if show:
             self.show_recovery()
+
+    def late_read(self, client, show):
+        card = self.confirmed_card
+        if card and card[2] == client:
+            self.pending = [item for item in self.pending if item is not card]
+            self.confirmed_card = None
+            self.recover(card[0], client=client, show=show)
 
     def recall(self):
         if self.confirmed_card is not None and not self.pending:
@@ -250,7 +257,7 @@ class Overlay(Gtk.Window):
         self.serial += 1
         self.listening = False
         self.recovery = text
-        if text is not None and paused and status != "Partial transcript":
+        if text is not None and paused and status not in ("Partial transcript", "Sent to app"):
             status = "Auto-paste paused"
         acknowledged = self.pending[-1] is self.confirmed_card
         if text is not None and len(self.pending) > 1:

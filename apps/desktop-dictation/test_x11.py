@@ -163,7 +163,7 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
         page = directory / "editor.html"
         page.write_text("""<meta charset="utf-8"><title>Dictation fixture</title>
             <input id="first" autofocus><textarea id="second"></textarea>
-            <div id="editor" contenteditable></div><div id="next" contenteditable></div>
+            <div id="editor" contenteditable></div><div id="next" contenteditable></div><input id="chat">
             <script>
             function ready() {
               if (document.hasFocus() && document.activeElement.id === "first")
@@ -177,6 +177,12 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
             });
             let plainPasteStarted = false;
             document.onkeydown = event => {
+              if (event.target.id === "chat" && event.key === "Enter") {
+                event.preventDefault();
+                edits.push(["chat", "submit", event.target.value]);
+                event.target.value = "";
+                document.title = JSON.stringify(edits);
+              }
               if (event.target.id === "editor" && event.ctrlKey && event.shiftKey && event.code === "KeyV") {
                 plainPasteStarted = true;
                 document.title = "Manual paste key delivered";
@@ -196,13 +202,13 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
               if (field.id === "first" || field.id === "second") field.nextElementSibling.focus();
             };
             </script>""")
+        chrome_env = dict(os.environ, DBUS_SESSION_BUS_ADDRESS="unix:path=" + str(directory / "no-session-bus"),
+                          GTK_USE_PORTAL="0")
         chrome = subprocess.Popen(["google-chrome", "--ozone-platform=x11",
             "--user-data-dir=" + str(directory / "chrome-profile"), "--no-first-run",
             "--no-default-browser-check", "--disable-background-networking", "--disable-sync",
             "--disable-extensions", "--disable-gpu", "--password-store=basic",
-            page.as_uri()], env=dict(os.environ,
-                DBUS_SESSION_BUS_ADDRESS="unix:path=" + str(directory / "no-session-bus"),
-                GTK_USE_PORTAL="0"), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            page.as_uri()], env=chrome_env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         try:
             def field():
                 return subprocess.run(["xdotool", "search", "--onlyvisible", "--name", "Dictation fixture"],
@@ -369,6 +375,71 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
             assert not app.paused_clients
             until(lambda: app.pending_backup is None)
             assert app.clipboard.wait_for_text() == "Original text"
+            keys("key", "Tab", "Tab")
+            until(lambda: " focus=chat" in title())
+            for number in range(3):
+                sentence = f"Chat message {number + 1}."
+                audio.with_suffix(".txt").write_text(sentence)
+                if number == 1 and not real:
+                    until(lambda: app.recording is not None and bool(app.recording.last_partial))
+                    # A hold begun before quiet inherits the outstanding backup.
+                    assert app.recording.backup is previous_backup, (
+                        app.pending_read, app.navigation_guards, app.paused_clients, app.recording.unsafe)
+                else:
+                    hold("Super_L", "Alt_L")
+                if real:
+                    until(lambda: time.monotonic() - app.recording.started >= 2)
+                keys("keyup", "Alt_L", "keyup", "Super_L")
+                until(lambda: app.recording is None, 12)
+                if real:
+                    sentence = app.overlay.label.get_text()
+                expected.append(["chat", "insertFromPaste", sentence])
+                try:
+                    until(correct_edits)
+                except AssertionError as exc:
+                    raise AssertionError((number, title(), app.overlay.status.get_text(), app.navigation_guards,
+                                          app.paused_clients, app.hold_serial, app.overlay.pending)) from exc
+                assert app.pending_read == "untagged" and app.focus()[0] == browser.id
+                if number < 2:
+                    previous_backup = app.pending_backup
+                    assert previous_backup is not None
+                    if number == 0 and not real:
+                        keys("key", "Return", "keydown", "Super_L", "keydown", "Alt_L")
+                    else:
+                        keys("key", "Return")
+                    expected.append(["chat", "submit", sentence])
+                    until(correct_edits)
+                    if number == 1:
+                        until(lambda: bool(app.navigation_guards))
+            until(lambda: app.pending_backup is None)
+            assert app.navigation_guards and app.clipboard.wait_for_text() == "Original text"
+            print("Chrome chat submitted twice and inserted three successive messages", flush=True)
+            other_page = directory / "chat-window.html"
+            other_page.write_text("""<title>Second chat fixture</title><input autofocus
+                oninput="document.title=JSON.stringify([event.inputType,this.value,document.activeElement===this])">""")
+            subprocess.run(["google-chrome", "--user-data-dir=" + str(directory / "chrome-profile"),
+                            "--new-window", other_page.as_uri()], env=chrome_env, timeout=10,
+                           check=True, capture_output=True)
+            def other_chat():
+                return subprocess.run(["xdotool", "search", "--onlyvisible", "--name", "Second chat fixture"],
+                                      capture_output=True, text=True).stdout.strip()
+            until(other_chat)
+            browser = x.create_resource_object("window", int(other_chat().splitlines()[0]))
+            x.screen().root.change_property(app.active_atom, Xatom.WINDOW, 32, [browser.id])
+            browser.set_input_focus(X.RevertToParent, X.CurrentTime)
+            x.sync()
+            hold("Super_L", "Alt_L")
+            assert app.recording.client in app.navigation_guards and app.recording.target[0] == browser.id
+            if real:
+                until(lambda: time.monotonic() - app.recording.started >= 2)
+            keys("keyup", "Alt_L", "keyup", "Super_L")
+            until(lambda: app.recording is None, 12)
+            sentence = app.overlay.label.get_text() if real else sentence
+            until(lambda: title().startswith("[") and json.JSONDecoder().raw_decode(title())[0] ==
+                  ["insertFromPaste", sentence, True])
+            until(lambda: app.pending_backup is None)
+            assert app.clipboard.wait_for_text() == "Original text"
+            print("A fresh hold inserted into another Chrome window", flush=True)
         finally:
             chrome.terminate()
             chrome.wait(timeout=10)
@@ -954,6 +1025,14 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
             # The X server answers GTK directly when there is no owner.
             until_time = time.monotonic() + .15
             until(lambda: time.monotonic() >= until_time)
+        elif clipboard_kind == "text" and not queued_read:
+            serial = app.paste_serial
+            hold("Alt_L", "Super_L")
+            native_paste_refused(second)
+            keys("keyup", "Super_L", "keyup", "Alt_L")
+            until(lambda: app.recording is None)
+            assert app.paste_serial == serial and app.overlay.recovery == text
+            app.overlay.dismiss_recovery()
         else:
             native_paste_refused(second)
         if clipboard_kind == "text":
@@ -962,7 +1041,8 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
             secondary_read(None, X.CurrentTime, queued_input=lambda: keys("key", "ctrl+v"))
             secondary_read(None, X.CurrentTime)
         assert second.get_text() == keep and second.get_selection_bounds() == (0, len(keep))
-        assert app.overlay.status.get_text().startswith("Auto-paste paused")
+        status = "Sent to app" if not queued_read and clipboard_kind == "no owner" else "Auto-paste paused"
+        assert app.overlay.status.get_text().startswith(status)
         assert app.overlay.resume.is_visible() and app.overlay.recovery == text
         assert len(app.overlay.pending) == cards_before + 1
         if clipboard_kind == "no owner":
