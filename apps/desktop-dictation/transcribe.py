@@ -62,7 +62,7 @@ def clean(text, settings):
 
 
 class SpeechGate:
-    """Pass speech with 256 ms pre-roll and 512 ms trailing silence."""
+    """Pass speech with pre-roll and enough trailing audio for a streaming preview."""
     def __init__(self, vad, frame_samples):
         self.vad = vad
         self.vad.stream_reset()
@@ -70,6 +70,9 @@ class SpeechGate:
         self.pending = array("f")
         self.before = deque(maxlen=8)
         self.tail = 0
+        # A short phrase followed by silence still needs one complete
+        # Parakeet streaming window before the user releases the shortcut.
+        self.trailing_frames = (35200 + frame_samples - 1) // frame_samples  # 2.2 s at 16 kHz
 
     def filter(self, pcm, final=False):
         self.pending.extend(pcm)
@@ -86,7 +89,7 @@ class SpeechGate:
                     output.extend(previous)
                 self.before.clear()
                 output.extend(frame)
-                self.tail = 16
+                self.tail = self.trailing_frames
             elif self.tail:
                 output.extend(frame)
                 self.tail -= 1
