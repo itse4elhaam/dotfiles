@@ -140,8 +140,6 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
         page.write_text("""<title>Dictation fixture</title>
             <input autofocus oninput="document.title=this.value">
             <div contenteditable oninput="document.title=this.innerText"></div>""")
-        sentence = "Hello, T3! Let's send 42 words (OK?)."
-        audio.with_suffix(".txt").write_text(sentence)
         chrome = subprocess.Popen(["google-chrome", "--ozone-platform=x11",
             "--user-data-dir=" + str(directory / "chrome-profile"), "--no-first-run",
             "--no-default-browser-check", "--disable-background-networking", "--disable-sync",
@@ -159,40 +157,25 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
             def title():
                 prop = browser.get_full_property(x.intern_atom("_NET_WM_NAME"), X.AnyPropertyType)
                 return prop.value.decode() if prop else ""
-            owner = x.get_selection_owner(app.selection.atom)
-            original_serial = app.paste_serial
-            for element in ("input", "contenteditable"):
-                if element == "contenteditable":
-                    keys("key", "Tab", "key", "Caps_Lock")
-                    sentence = "Second field: Caps Lock works, too!"
-                    audio.with_suffix(".txt").write_text(sentence)
+            serial = app.paste_serial
+            for app_class in ("google-chrome", "com.t3tools.T3Code"):
+                if app_class != "google-chrome":
+                    browser.set_wm_class(app_class.lower(), app_class)
+                    x.sync()
+                    keys("key", "Tab")
+                owner = x.get_selection_owner(app.selection.atom)
+                original_title = title()
+                sentence = f"One complete sentence for {app_class}."
+                audio.with_suffix(".txt").write_text(sentence)
                 hold("Super_L", "Alt_L")
                 keys("keyup", "Alt_L", "keyup", "Super_L")
-                until(lambda: app.recording is None)
-                until(lambda: sentence == title(), 8)
+                until(lambda: app.overlay.recovery == sentence)
+                assert title() == original_title and app.paste_serial == serial
                 assert x.get_selection_owner(app.selection.atom) == owner
-                assert app.clipboard.wait_for_text() == "Original text"
-                print(browser.get_wm_class(), element, title(), flush=True)
-            # Exercise the installed T3 class and a layout with directly
-            # representable Unicode on the same private Chromium renderer.
-            keys("key", "Caps_Lock", "key", "ctrl+a")
-            browser.set_wm_class("com.t3tools.t3code", "com.t3tools.T3Code")
-            x.sync()
-            subprocess.run(["setxkbmap", "de"], check=True)
-            sentence = "Grüße aus Köln!"
-            audio.with_suffix(".txt").write_text(sentence)
-            hold("Alt_L", "Super_L")
-            keys("keyup", "Super_L", "keyup", "Alt_L")
-            until(lambda: title() == sentence, 8)
-            print(browser.get_wm_class(), "German layout", title(), flush=True)
-            for unsupported in ("Prefix then newline\n", "Prefix then tab\t", "Prefix then emoji 🐈", "x" * 257):
-                audio.with_suffix(".txt").write_text(unsupported)
-                hold("Super_L", "Alt_L")
-                keys("keyup", "Super_L", "keyup", "Alt_L")
-                until(lambda: app.overlay.recovery == unsupported)
-                assert title() == sentence
-                assert app.paste_serial == original_serial
-                assert x.get_selection_owner(app.selection.atom) == owner
+                app.overlay.copy_recovery()
+                keys("key", "ctrl+v")
+                until(lambda: title() == sentence)
+                print(browser.get_wm_class(), "manual paste", title(), flush=True)
         finally:
             chrome.terminate()
             chrome.wait(timeout=10)

@@ -15,7 +15,6 @@ from pathlib import Path
 
 from selection import ClipboardBackup, TextSelection
 from overlay import Gdk, GLib, Gtk, Overlay
-from literal import is_browser_class, keyboard_state, plan_text, type_text, watch_layout
 from glow import RecordingGlow
 from gi.repository import GdkX11, Gio
 from Xlib import X, XK, display, error
@@ -24,6 +23,8 @@ from Xlib.ext import xfixes, xinput, xtest
 
 def paste_shortcut(wm_class):
     names = tuple(name.lower() for name in (wm_class or ()))
+    if names and names[-1] in ("google-chrome", "chromium", "chromium-browser", "com.t3tools.t3code"):
+        return ()
     if any(name in ("xterm", "uxterm", "rxvt", "urxvt", "urxvtc", "rxvt-unicode") for name in names):
         return ()
     terminals = ("terminal", "kitty", "alacritty", "ghostty", "wezterm", "tilix", "konsole", "terminator", "foot")
@@ -49,11 +50,11 @@ class Recording:
             window = app.x.create_resource_object("window", target[0])
             wm_class = window.get_wm_class() if target[0] else None
             self.app_name = wm_class[-1] if wm_class else f"application {self.client[1]}"
-            self.browser = is_browser_class(wm_class)
+            self.paste_keys = paste_shortcut(wm_class)
         except error.BadWindow:
-            self.browser = False
+            self.paste_keys = ()
             self.unsafe = True
-        if self.browser or self.client in app.paused_clients:
+        if not self.paste_keys or self.client in app.paused_clients:
             self.backup = None
         elif app.pending_backup is not None and self.clipboard_owner == app.selection.window:
             # Keep serving the first paste until its client reads it or it expires.
@@ -152,7 +153,6 @@ class Dictation:
     def __init__(self):
         self.x = display.Display()
         self.root = self.x.screen().root
-        self.xkb = watch_layout(self.x)
         self.active_atom = self.x.intern_atom("_NET_ACTIVE_WINDOW")
         def keycode(name):
             return self.x.keysym_to_keycode(XK.string_to_keysym(name))
@@ -497,9 +497,7 @@ class Dictation:
         if self.recording is not rec:
             return
         timestamp = GdkX11.x11_get_server_time(self.overlay.get_window())
-        layout = keyboard_state(self.x, self.xkb) if rec.browser else None
-        plan = plan_text(self.x, layout, text) if layout else None
-        typed = pasted = False
+        pasted = False
         serial = self.paste_serial + 1
         restored = False
         read = False
@@ -548,18 +546,11 @@ class Dictation:
                     and rec.clipboard_generation == self.clipboard_generation
                     and rec.clipboard_owner == self.x.get_selection_owner(self.selection.atom)
                     and not self.modifiers_down())
-            if safe and self.keyboard_available():
+            if safe and rec.paste_keys and rec.backup and rec.backup.ready and self.keyboard_available():
                 window = self.x.create_resource_object("window", rec.target[0])
-                wm_class = window.get_wm_class()
-                keys = []
-                if rec.browser and is_browser_class(wm_class):
-                    if (plan and keyboard_state(self.x, self.xkb) == layout
-                            and not any(self.x.query_keymap()) and not self.x.pending_events()):
-                        type_text(self.x, plan)
-                        typed = True
-                elif not (rec.browser or is_browser_class(wm_class)) and rec.backup and rec.backup.ready:
-                    keys = [self.x.keysym_to_keycode(sym) for sym in paste_shortcut(wm_class)]
-                if keys and self.selection.claim(text, timestamp, client, rec.backup, on_read):
+                keys = [self.x.keysym_to_keycode(sym) for sym in rec.paste_keys]
+                if (paste_shortcut(window.get_wm_class()) == rec.paste_keys and all(keys)
+                        and self.selection.claim(text, timestamp, client, rec.backup, on_read)):
                     self.expire_pending = expire
                     self.pending_backup = rec.backup
                     self.paste_serial = serial
@@ -582,11 +573,10 @@ class Dictation:
         finally:
             self.x.ungrab_server()
             self.x.flush()
-        if typed or pasted:
+        if pasted:
             self.end("Transcript ready")
             self.overlay.sent(text)
-            if pasted:
-                GLib.timeout_add(1800, expire)
+            GLib.timeout_add(1800, expire)
         else:
             self.recover(text)
 
