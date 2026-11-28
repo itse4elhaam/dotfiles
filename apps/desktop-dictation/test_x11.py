@@ -3,6 +3,7 @@
 import json
 import os
 from pathlib import Path
+import selectors
 import signal
 import subprocess
 import sys
@@ -434,8 +435,8 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
         # terminal response is on the wire before allowing Copy or Resume.
         serve = app.selection.serve
         targets = []
-        def observe(request):
-            serve(request)
+        def observe(request, **kwargs):
+            serve(request, **kwargs)
             targets.append(request.target)
         app.selection.serve = observe
         try:
@@ -502,7 +503,7 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
 
     # A transient switch can leave the snapshot identical when the old
     # timestamp is presented. Exercise both X focus and the WM active window.
-    for redirect in ("focus", "active window", "expiry"):
+    for redirect in ("focus", "active window", "queued CurrentTime", "expiry"):
         handler = first.connect("paste-clipboard", defer_paste)
         hold("Alt_L", "Super_L")
         keys("keyup", "Super_L", "keyup", "Alt_L")
@@ -517,6 +518,9 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
         elif redirect == "active window":
             for active in (recipient.id, xid):
                 x.screen().root.change_property(app.active_atom, Xatom.WINDOW, 32, [active])
+        elif redirect == "queued CurrentTime":
+            secondary_read(None, X.CurrentTime, queued_input=lambda: keys("key", "Right"))
+            secondary_read(b"Newer clipboard", X.CurrentTime)
         else:
             until(lambda: app.selection.replay is None)
         x.sync()
@@ -570,7 +574,7 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
     until(lambda: bool(delayed))
     first.disconnect(handler)
     delayed.pop()
-    keys("key", "Right")
+    secondary_read(None, X.CurrentTime, queued_input=lambda: keys("key", "Right"))
     until(lambda: app.overlay.resume.is_visible() and app.pending_backup is None)
     app.overlay.dismiss_recovery()
     assert not app.overlay.get_visible()
@@ -608,7 +612,7 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
         secondary_read(text.encode(), X.CurrentTime)
         assert app.pending_backup is not None
         assert not app.overlay.status.get_text().startswith("Sent")
-        keys("key", "Tab")
+        secondary_read(None, X.CurrentTime, app.selection.targets, queued_input=lambda: keys("key", "Tab"))
         until(lambda: second.has_focus() and app.pending_backup is None)
         keep = "KEEP THIS SELECTION"
         second.set_text(keep)
@@ -714,7 +718,10 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
     until(lambda: bool(delayed))
     first.disconnect(handler)
     generation = app.clipboard_generation
-    app.clipboard.set_text("Copied during pending paste", -1)
+    def replace_selection():
+        app.clipboard.set_text("Copied during pending paste", -1)
+        Gdk.Display.get_default().sync()
+    secondary_read(None, delayed[-1][1], queued_input=replace_selection)
     until(lambda: app.clipboard_generation > generation)
     until(lambda: app.pending_backup is None and app.overlay.resume.is_visible())
 
@@ -935,11 +942,11 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
     # paste can have identical wire fields, including requestor and time.
     fields = []
     serve = app.selection.serve
-    def observe(request):
+    def observe(request, **kwargs):
         if request.target in app.selection.formats:
             fields.append((request.requestor.id, request.selection, request.target,
                            request.property, request.time))
-        serve(request)
+        serve(request, **kwargs)
     app.selection.serve = observe
     generation = app.clipboard_generation
     app.clipboard.set_text("Before GTK handler", -1)
@@ -1040,6 +1047,50 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
         app.overlay.copy_recovery()
         secondary_read(None, gesture[0][-1])
         secondary_read(b"At capacity", X.CurrentTime)
+    # Queue the GTK default handler's *first* conversion, then move the
+    # caret on the private display before the daemon processes either event.
+    generation = app.clipboard_generation
+    app.clipboard.set_text("Before first conversion", -1)
+    until(lambda: app.clipboard_generation > generation)
+    audio.with_suffix(".txt").write_text("Finished words.")
+    with subprocess.Popen([sys.executable, Path(__file__).with_name("fixture_x11_client.py"), "--gtk-entry"],
+                          env=dict(os.environ, DBUS_SESSION_BUS_ADDRESS="unix:path=" + str(directory / "no-bus")),
+                          stdout=subprocess.PIPE, bufsize=0) as native, selectors.DefaultSelector() as ready:
+        try:
+            ready.register(native.stdout, selectors.EVENT_READ)
+            def read_entry():
+                assert ready.select(timeout=4), "GTK entry did not respond"
+                return json.loads(native.stdout.readline())
+            gtk_window = x.create_resource_object("window", read_entry())
+            x.screen().root.change_property(app.active_atom, Xatom.WINDOW, 32, [gtk_window.id])
+            gtk_window.set_input_focus(X.RevertToParent, X.CurrentTime)
+            x.sync()
+            serial = app.paste_serial
+            events = app.events
+            blocked = []
+            def busy_events(*args):
+                if not blocked and app.paste_serial > serial:
+                    blocked.append(True)
+                    assert read_entry() == ["requested", "AB", 0]
+                    keys("key", "Right")
+                    assert read_entry() == ["cursor", "AB", 1]
+                return events(*args)
+            start = len(fields)
+            with patch.object(app, "events", busy_events):
+                hold("Super_L", "Alt_L")
+                keys("keyup", "Alt_L", "keyup", "Super_L")
+                until(lambda: blocked and app.pending_backup is None)
+            # Wait for GTK's fallback conversions before querying its field.
+            until(lambda: any(f[2] == Xatom.STRING for f in fields[start:]))
+            assert fields[start][-1] == app.selection.press_time != X.CurrentTime
+            keys("key", "F12")
+            assert read_entry() == ["snapshot", "AB", 1]
+            assert app.overlay.recovery == "Finished words."
+            assert app.overlay.status.get_text().startswith("Auto-paste paused")
+            assert app.overlay.resume.get_visible()
+            other_read(b"Before first conversion")
+        finally:
+            native.terminate()
     app.stop_worker()
 
 

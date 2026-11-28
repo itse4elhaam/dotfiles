@@ -118,7 +118,7 @@ class TextSelection:
         self.guarded_reads = set(paused_clients)
         self.x.flush()
 
-    def serve(self, request):
+    def serve(self, request, interrupted_client=None):
         prop = request.property or request.target
         target = request.target
         client = self.client_id(request.requestor.id)
@@ -133,10 +133,11 @@ class TextSelection:
         untagged = (recipient and self.allow_current_time and request.time == X.CurrentTime)
         # An unidentified second connection could belong to the target. Keep
         # the previous clipboard private until a distinct process is proven.
-        unknown_reader = client[0] != "process" and (self.restore is not None or bool(self.guarded_reads))
+        unknown_reader = client[0] != "process" and (
+            self.restore is not None or bool(self.guarded_reads) or interrupted_client is not None)
         if self.restore and not recipient and not unknown_reader:
             saved = self.other_clients
-        guard = client in self.guarded_reads or unknown_reader
+        guard = client == interrupted_client or client in self.guarded_reads or unknown_reader
         # Requests carrying an old V timestamp can arrive after restore,
         # Copy or Resume. Only the most recent successful offer can replay.
         repeated = (request.time in self.gestures and not delivering
@@ -174,10 +175,7 @@ class TextSelection:
             request.requestor.change_property(prop, type_atom, 8, value)
         else:
             prop = X.NONE
-        request.requestor.send_event(SelectionNotify(
-            time=request.time, requestor=request.requestor, selection=request.selection,
-            target=target, property=prop))
-        self.x.flush()
+        self.notify(request, prop)
         if (untagged or delivering) and not guard and prop and target in self.formats:
             self.allow_current_time = untagged
             self.replay = (self.press_time, self.text)
@@ -186,6 +184,12 @@ class TextSelection:
             # Chrome negotiates more targets between its first read and the
             # conversion it inserts. TARGETS alone cannot acknowledge a paste.
             self.restore(untagged=True)
+
+    def notify(self, request, prop):
+        request.requestor.send_event(SelectionNotify(
+            time=request.time, requestor=request.requestor, selection=request.selection,
+            target=request.target, property=prop))
+        self.x.flush()
 
     def put_back(self, backup, late_client=None):
         self.restore = None

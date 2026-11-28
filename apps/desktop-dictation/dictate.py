@@ -181,6 +181,7 @@ class Dictation:
         self.hold_serial = 0
         self.pending_read = None
         self.paste_serial = 0
+        self.event_idle = None
         self.replay_deadline = 0
         self.selection = TextSelection(self.x)
         self.clipboard = Gtk.Clipboard.get(Gdk.SELECTION_CLIPBOARD)
@@ -316,7 +317,12 @@ class Dictation:
 
     def events(self, *_):
         deferred_requests = []
-        while self.x.pending_events():
+        batch_recipient = None
+        if self.selection.replay:
+            batch_recipient = self.selection.gestures[self.selection.replay[0]]
+        remaining = self.x.pending_events()
+        while remaining:
+            remaining -= 1
             event = self.x.next_event()
             if (self.paste_target and self.selection.press_time is not None
                     and getattr(event, "extension", None) == self.xi):
@@ -338,16 +344,14 @@ class Dictation:
                     self.interrupt_paste()
                     self.selection.guarded_reads.clear()
             elif event.type == X.SelectionRequest:
-                if self.paste_target and self.focus() != self.paste_target:
-                    self.interrupt_paste()
-                if deferred_requests or (self.selection.replay and event.time == self.selection.replay[0]):
-                    # A redirect may already follow the request in the X queue.
-                    # Drain through a server round trip before answering it.
-                    if not deferred_requests:
-                        self.x.sync()
-                    deferred_requests.append(event)
-                else:
-                    self.selection.serve(event)
+                if not deferred_requests:
+                    # The focus round trip brings preceding input and focus
+                    # events into this snapshot. Do it once per batch for
+                    # first reads, replay and target negotiation alike.
+                    if self.paste_target and self.focus() != self.paste_target:
+                        self.interrupt_paste()
+                    remaining = self.x.pending_events()
+                deferred_requests.append(event)
             elif event.type == X.SelectionClear:
                 if self.x.get_selection_owner(self.selection.atom) != self.selection.window:
                     self.selection.text = ""
@@ -378,11 +382,33 @@ class Dictation:
                             self.cancel()
                         elif code not in self.chord:
                             self.recording.unsafe = True
-        if deferred_requests and not self.expire_pending and time.monotonic() >= self.replay_deadline:
-            self.retire_replay()
-        for request in deferred_requests:
-            self.selection.serve(request)
+        if deferred_requests:
+            if not self.expire_pending and time.monotonic() >= self.replay_deadline:
+                self.retire_replay()
+            # A cancellation can release an empty clipboard while draining.
+            owns_selection = self.x.get_selection_owner(self.selection.atom) == self.selection.window
+            if not owns_selection:
+                self.interrupt_paste()
+            for request in deferred_requests:
+                if not owns_selection:
+                    self.selection.notify(request, X.NONE)
+                elif batch_recipient is not None and self.paste_target is None:
+                    # Even a previously acknowledged tagged offer may have
+                    # ended in this batch. Never substitute its saved clipboard
+                    # for a conversion queued against that offer.
+                    self.selection.serve(request, interrupted_client=batch_recipient)
+                else:
+                    self.selection.serve(request)
+        # Round trips can buffer more events in python-xlib without another
+        # fd wakeup. Yield to GLib before taking a fresh finite snapshot.
+        if self.x.pending_events() and self.event_idle is None:
+            self.event_idle = GLib.idle_add(self.buffered_events)
         return True
+
+    def buffered_events(self):
+        self.event_idle = None
+        self.events()
+        return False
 
     def chord_down(self, keys=None):
         if keys is None:
