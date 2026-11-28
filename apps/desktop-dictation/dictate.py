@@ -414,7 +414,7 @@ class Dictation:
         if self.recording.cancelled:
             self.end("Cancelled")
         elif self.recording.last_partial:
-            self.recover(self.recording.last_partial, incomplete=True)
+            self.recover(self.recording.last_partial, "Partial transcript")
         else:
             self.end(message)
 
@@ -459,10 +459,10 @@ class Dictation:
     def modifiers_down(self):
         return self.root.query_pointer().mask & (X.ShiftMask | X.ControlMask | X.Mod1Mask | X.Mod4Mask | X.Mod5Mask)
 
-    def recover(self, text, incomplete=False):
+    def recover(self, text, status=None):
         client = self.recording.client
         self.end("")
-        self.overlay.recover(text, incomplete, client)
+        self.overlay.recover(text, status, client)
 
     def copy_recovery(self, text):
         if self.expire_pending:
@@ -590,9 +590,9 @@ class Dictation:
             if pasted:
                 GLib.timeout_add(1800, expire)
             else:
-                self.overlay.recover_confirmed(text, show=True)
+                self.overlay.recover_confirmed(text, show=True, status="Inserted")
         else:
-            self.recover(text)
+            self.recover(text, "Check field before pasting" if field_ready else None)
 
 
 if __name__ == "__main__":

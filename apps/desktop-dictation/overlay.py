@@ -218,16 +218,15 @@ class Overlay(Gtk.Window):
         self.hint.hide()
         self.escape.hide()
 
-    def recover(self, text, incomplete=False, client=None, show=True):
-        self.pending.append((text, incomplete, client))
+    def recover(self, text, status=None, client=None, show=True):
+        self.pending.append((text, status, client))
         if show:
             self.show_recovery()
 
-    def recover_confirmed(self, text, show):
-        # A conversion acknowledges the shortcut, not insertion into a field.
+    def recover_confirmed(self, text, show, status="Sent to app"):
         if self.confirmed_card is not None:
             self.pending = [card for card in self.pending if card is not self.confirmed_card]
-        self.confirmed_card = (text, False, None)
+        self.confirmed_card = (text, status, None)
         self.pending.append(self.confirmed_card)
         if show:
             self.show_recovery()
@@ -242,17 +241,13 @@ class Overlay(Gtk.Window):
 
     def show_recovery(self, auto_hide=True):
         self.dismiss_on_release = False
-        text, incomplete, client = self.pending[-1]
+        text, detail, client = self.pending[-1]
         paused = client in self.paused_clients
         self.serial += 1
         self.listening = False
         self.recovery = text
-        status = "Auto-paste paused" if paused else "Ready to copy"
-        if incomplete:
-            status = "Partial transcript"
+        status = detail or ("Auto-paste paused" if paused else "Ready to copy")
         acknowledged = self.pending[-1] is self.confirmed_card
-        if acknowledged:
-            status = "Sent to app"
         if len(self.pending) > 1:
             status += f" · {len(self.pending)} left"
         if text is None:
@@ -323,7 +318,7 @@ class Overlay(Gtk.Window):
         # Copy may itself expire an earlier paste and queue its transcript.
         # Keep all transcript cards, then offer Resume for each paused app.
         self.pending = [card for card in self.pending if card[0] is not None]
-        self.pending.extend((None, False, client) for client in self.paused_clients)
+        self.pending.extend((None, None, client) for client in self.paused_clients)
         self.next_recovery()
 
     def present_at(self, window, animate=True):

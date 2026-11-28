@@ -150,7 +150,11 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
         runtime = directory / "runtime"
         runtime.mkdir(mode=0o700)
         os.environ["XDG_RUNTIME_DIR"] = str(runtime)
-        browser_env = dict(os.environ, HOME=str(directory), XDG_CONFIG_HOME=str(directory / "config"))
+        # Keep file choosers on the private X server instead of the session's
+        # desktop portal. The extension and native host do not require D-Bus.
+        browser_env = dict(os.environ, HOME=str(directory), XDG_CONFIG_HOME=str(directory / "config"),
+                           DBUS_SESSION_BUS_ADDRESS=f"unix:path={runtime}/no-session-bus",
+                           GTK_USE_PORTAL="0", GSETTINGS_BACKEND="memory", GIO_USE_VFS="local")
         subprocess.run([here / "install-chrome-field.sh"], env=browser_env, check=True)
         pages = directory / "pages"
         pages.mkdir()
@@ -193,13 +197,15 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
                 prop = browser.get_full_property(x.intern_atom("_NET_WM_NAME"), X.AnyPropertyType)
                 return prop.value.decode() if prop else ""
             # Use Chrome's own Load unpacked dialog in the throwaway profile.
-            keys("key", "ctrl+l")
-            keys("type", "chrome://extensions/")
-            keys("key", "Return")
-            until(lambda: title().startswith("Extensions"))
+            if not title().startswith("Extensions"):
+                time.sleep(2)
+                keys("windowraise", str(browser.id), "windowfocus", str(browser.id), "key", "ctrl+l")
+                keys("type", "chrome://extensions/")
+                keys("key", "Return")
+                until(lambda: title().startswith("Extensions"), 18)
             time.sleep(.6)
             keys("mousemove", "80", "170", "click", "1")
-            until(lambda: search("Select the extension directory|Select Folder|Open File"), 5)
+            until(lambda: search("Select the extension directory|Select Folder|Open File"), 12)
             dialog = search("Select the extension directory|Select Folder|Open File").splitlines()[0]
             keys("windowfocus", dialog, "key", "ctrl+l")
             keys("type", str(directory / ".local/share/desktop-dictation/chrome-field"))
@@ -233,7 +239,7 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
                 dictate()
                 expected = json.dumps([element, sentence, "insertText", sentence, True], separators=(",", ":"))
                 until(lambda: title().startswith(expected))
-                assert app.overlay.status.get_text().startswith("Sent to app") and app.overlay.recovery == sentence
+                assert app.overlay.status.get_text().startswith("Inserted") and app.overlay.recovery == sentence
                 assert app.clipboard.wait_for_text() == "Original text"
                 print(element, expected, flush=True)
             # Auto-advance left focus in next. Try an unarmed writable field, then a readonly field.
@@ -656,7 +662,7 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
         hold("Alt_L", "Super_L")
         keys("keyup", "Super_L", "keyup", "Alt_L")
         until(lambda: entry.get_text() == transcript and app.pending_backup is None)
-    assert app.overlay.pending == [("Direct B", False, None)]
+    assert len(app.overlay.pending) == 1 and app.overlay.recovery == "Direct B"
     assert app.overlay.status.get_text() == "Sent to app"
     until(lambda: not app.overlay.get_visible(), 6)
     os.kill(os.getpid(), signal.SIGUSR1)
