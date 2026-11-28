@@ -189,7 +189,8 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
             browser.set_input_focus(X.RevertToParent, X.CurrentTime)
             x.sync()
             def title():
-                prop = browser.get_full_property(x.intern_atom("_NET_WM_NAME"), X.AnyPropertyType)
+                # Read the fixture's edit log in one X request as Chrome updates it.
+                prop = browser.get_full_property(x.intern_atom("_NET_WM_NAME"), X.AnyPropertyType, sizehint=1024)
                 return prop.value.decode() if prop else ""
             until(lambda: title().startswith("Dictation fixture ready"))
             expected = []
@@ -500,6 +501,47 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
     app.overlay.resume.clicked()
     secondary_read(b"CurrentTime sentinel", X.CurrentTime)
     assert not app.paused_clients and not app.overlay.get_visible()
+
+    # The first CurrentTime conversion can precede GTK's actual insertion.
+    # Tab changes the focused entry without changing the X11 target window.
+    for empty in (False, True):
+        app.clipboard.set_text("Newer clipboard", -1)
+        if empty:
+            app.clipboard.clear()
+            until(lambda: not app.x.get_selection_owner(app.selection.atom))
+        first.grab_focus()
+        handler = first.connect("paste-clipboard", defer_paste)
+        cards_before = len(app.overlay.pending)
+        hold("Super_L", "Alt_L")
+        keys("keyup", "Alt_L", "keyup", "Super_L")
+        until(lambda: bool(delayed))
+        first.disconnect(handler)
+        delayed.pop()
+        secondary_read(text.encode(), X.CurrentTime)
+        assert app.pending_backup is not None
+        assert not app.overlay.status.get_text().startswith("Sent")
+        keys("key", "Tab")
+        until(lambda: second.has_focus() and app.pending_backup is None)
+        second.emit("paste-clipboard")
+        # Let the asynchronous GTK paste complete before inspecting the field.
+        until_time = time.monotonic() + .15
+        until(lambda: time.monotonic() >= until_time)
+        assert not second.get_text()
+        assert app.overlay.status.get_text().startswith("Auto-paste paused")
+        assert app.overlay.resume.is_visible() and app.overlay.recovery == text
+        assert len(app.overlay.pending) == cards_before + 1
+        if empty:
+            assert not app.x.get_selection_owner(app.selection.atom)
+        else:
+            other_read(b"Newer clipboard")
+        app.overlay.copy_recovery()
+        other_read(text.encode())
+        secondary_read(b"", X.CurrentTime)
+        app.overlay.resume.clicked()
+        keys("key", "ctrl+v")
+        until(lambda: second.get_text() == text)
+        second.set_text("")
+        assert not app.paused_clients and len(app.overlay.pending) == cards_before
 
     # Both fields belong to one X client. A late reader from the first
     # field must never consume the second transcript when the first expires.

@@ -546,46 +546,62 @@ class Dictation:
         lock_generation = self.lock_generation
         def restore(late_client=None):
             nonlocal restored
-            if serial == self.paste_serial and not restored:
-                restored = True
-                self.expire_pending = None
-                self.paste_press = None
-                self.pending_backup = self.pending_target = None
-                if self.recording is None:
-                    self.watch_input(0)
-                self.selection.put_back(rec.backup, late_client)
+            restored = True
+            self.expire_pending = None
+            self.paste_press = None
+            self.pending_backup = self.pending_target = None
+            if self.recording is None:
+                self.watch_input(0)
+            self.selection.put_back(rec.backup, late_client)
+
+        def interrupt():
+            self.selection.replay = None
+            restore(client)
+            # A conversion need not be the paste that changes the field.
+            self.paused_clients[client] = rec.app_name
+            if self.lock_generation == lock_generation:
+                self.overlay.recover(text, client=client, show=self.recording is None)
             return False
-        def expire():
-            if serial == self.paste_serial:
+
+        def settle(deadline=False):
+            nonlocal settle_timer
+            if serial != self.paste_serial:
+                return False
+            if deadline:
                 self.selection.replay = None
-            if serial == self.paste_serial and not restored:
-                restore(client if not read else None)
-                if not read:
-                    # The original paste can still read. Only an explicit Resume
-                    # permits another automatic delivery to this X11 client.
-                    self.paused_clients[client] = rec.app_name
-                    if self.lock_generation == lock_generation:
-                        self.overlay.recover(text, client=client, show=self.recording is None)
+            else:
+                settle_timer = None
+            if restored:
+                return False
+            # A timer can run while raw input is buffered on the X connection.
+            self.x.sync()
+            self.events()
+            if restored:
+                return False
+            if (not read or self.focus() != rec.target or
+                    self.x.get_selection_owner(self.selection.atom) != self.selection.window):
+                return interrupt()
+            if deadline or settle_timer is None:
+                restore()
+                self.overlay.recover_confirmed(text, show=self.recording is None)
             return False
 
         settle_timer = None
         def on_read(untagged):
             nonlocal read, settle_timer
-            if not read:
-                self.overlay.recover_confirmed(text, show=self.recording is None)
             read = True
             if untagged:
                 # Clients may negotiate several formats in one native paste.
                 # Serialize subsequent holds until their reads have settled.
                 if settle_timer is not None:
                     GLib.source_remove(settle_timer)
-                settle_timer = GLib.timeout_add(350, restore)
+                settle_timer = GLib.timeout_add(350, settle)
                 return
             # With an empty backup, dropping ownership now would also drop
             # a second conversion from the same GTK paste handler. Keep the
             # empty selection available until the delivery window closes.
             if rec.backup.values:
-                GLib.idle_add(restore)
+                GLib.idle_add(settle)
             else:
                 self.selection.saved = {}
         reason = None
@@ -598,7 +614,7 @@ class Dictation:
                 keys = [self.x.keysym_to_keycode(sym) for sym in rec.paste_keys]
                 if (paste_shortcut(window.get_wm_class()) == rec.paste_keys and all(keys)
                         and self.selection.claim(text, timestamp, client, rec.backup, on_read)):
-                    self.expire_pending = expire
+                    self.expire_pending = interrupt
                     self.pending_target = rec.target
                     self.pending_backup = rec.backup
                     self.paste_serial = serial
@@ -624,7 +640,7 @@ class Dictation:
         if pasted:
             self.end("Transcript ready")
             self.overlay.sent(text)
-            GLib.timeout_add(1800, expire)
+            GLib.timeout_add(1800, settle, True)
             self.events()  # XSync may already have buffered the raw shortcut events.
         else:
             self.recover(text, reason=reason)
