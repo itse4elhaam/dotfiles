@@ -62,7 +62,8 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
         time.sleep(.04)
 """)
     from dictate import Dictation, Gdk, Gtk, paste_shortcut
-    from Xlib import X, XK, Xatom, display
+    from Xlib import X, XK, Xatom, display, error
+    from gi.repository import GLib
     x = display.Display()
     window, box = Gtk.Window(), Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
     first, second = Gtk.Entry(), Gtk.Entry()
@@ -937,6 +938,65 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
         second.set_text("")
         assert not app.paused_clients and len(app.overlay.pending) == cards_before
 
+    # A passive synchronous grab can delay a real Ctrl+V even when there
+    # is no longer a dictation clipboard to protect. Check the X server's
+    # actual grab table from the fixture's independent connection.
+    target_window = x.create_resource_object("window", xid)
+
+    def paste_key_available():
+        conflict = error.CatchError(error.BadAccess)
+        target_window.grab_key(app.v_key, X.ControlMask, False, X.GrabModeAsync, X.GrabModeAsync,
+                               onerror=conflict)
+        x.sync()
+        if conflict.get_error():
+            return False
+        target_window.ungrab_key(app.v_key, X.ControlMask)
+        x.sync()
+        return True
+
+    for takeover in ("new copy", "new copy after empty backup", "clear", "lock"):
+        app.clipboard.set_text("Before navigation", -1)
+        if takeover == "new copy after empty backup":
+            app.clipboard.clear()
+            until(lambda: not app.x.get_selection_owner(app.selection.atom))
+        first.grab_focus()
+        handler = first.connect("paste-clipboard", defer_paste)
+        hold("Super_L", "Alt_L")
+        keys("keyup", "Alt_L", "keyup", "Super_L")
+        until(lambda: bool(delayed))
+        first.disconnect(handler)
+        delayed.pop()
+        secondary_read(text.encode(), X.CurrentTime)
+        keys("key", "Tab")
+        until(lambda: second.has_focus() and app.pending_backup is None)
+        app.x.sync()
+        assert not paste_key_available(), takeover
+        if takeover == "clear":
+            from Xlib.protocol import request
+            request.SetSelectionOwner(display=x.display, window=X.NONE, selection=app.selection.atom,
+                                      time=X.CurrentTime)
+            x.sync()
+            app.events()
+        elif takeover != "lock":
+            generation = app.clipboard_generation
+            app.clipboard.set_text("Fresh copy", -1)
+            until(lambda: app.clipboard_generation > generation)
+        else:
+            app.lock_changed(None, None, "ActiveChanged", GLib.Variant("(b)", (True,)))
+        app.x.sync()
+        assert paste_key_available(), takeover
+        if app.locked:
+            assert not app.overlay.get_visible()
+            app.lock_changed(None, None, "ActiveChanged", GLib.Variant("(b)", (False,)))
+        elif takeover != "clear":
+            second.set_text("")
+            keys("key", "ctrl+v")
+            until(lambda: second.get_text() == "Fresh copy")
+        for client in list(app.paused_clients):
+            app.resume_client(client)
+        app.overlay.clear_recoveries()
+        second.set_text("")
+
     # Both fields belong to one X client. A late reader from the first
     # field must never consume the second transcript when the first expires.
     first.grab_focus()
@@ -1193,7 +1253,6 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
     def read_before_default(_entry):
         early_reads.append(app.clipboard.wait_for_text())
         idle = []
-        from gi.repository import GLib
         GLib.idle_add(lambda: idle.append(True))
         until(lambda: bool(idle))
     handler = second.connect("paste-clipboard", read_before_default)
@@ -1286,7 +1345,6 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
     secondary_read(None, gesture[0][-1])
     assert app.clipboard.wait_for_text() == "Before GTK handler"
     # Lock while the latest conversion still has replayable text.
-    from gi.repository import GLib
     current_time = app.selection.replay[0]
     app.lock_changed(None, None, "ActiveChanged", GLib.Variant("(b)", (True,)))
     assert app.selection.replay is None and not app.overlay.pending

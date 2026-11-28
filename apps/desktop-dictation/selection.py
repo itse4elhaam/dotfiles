@@ -57,6 +57,7 @@ class TextSelection:
         self.press_time = None
         self.allow_current_time = False
         self.saved = None
+        self.empty_restore_serial = None
         self.recipient = None
         self.other_clients = {}
         # Processes whose delayed shortcut could read the selection we serve.
@@ -224,6 +225,7 @@ class TextSelection:
         if self.saved:
             self.window.set_selection_owner(self.atom, X.CurrentTime)
         else:
+            self.empty_restore_serial = self.x.display.request_serial
             protocol_request.SetSelectionOwner(display=self.x.display, window=X.NONE,
                                       selection=self.atom, time=X.CurrentTime)
         self.x.flush()

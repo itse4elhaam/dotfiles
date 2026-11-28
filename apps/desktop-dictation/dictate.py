@@ -272,6 +272,7 @@ class Dictation:
                 if self.recording:
                     self.end("Cancelled")
                 self.interrupt_paste()
+                self.release_resume_shortcuts()
                 self.overlay.clear_recoveries()
                 self.stop_worker()
 
@@ -399,12 +400,21 @@ class Dictation:
                 self.interrupt_paste()
             # These events and the final grab are ordered on the same connection.
             if isinstance(event, xfixes.SelectionNotify):
+                empty_restore = (event.owner.id == X.NONE
+                                 and event.sequence_number == self.selection.empty_restore_serial)
+                if empty_restore:
+                    self.selection.empty_restore_serial = None
                 if event.owner.id not in (X.NONE, self.selection.window.id):
                     self.clipboard_generation += 1
                 if (event.owner.id != self.selection.window.id and
                         self.x.get_selection_owner(self.selection.atom) != self.selection.window):
                     self.interrupt_paste()
                     self.selection.guarded_reads.clear()
+                    # Restoring an originally empty clipboard relinquishes
+                    # ownership as part of the same paste. A different owner
+                    # taking over ends our reason to intercept manual V.
+                    if not empty_restore:
+                        self.release_resume_shortcuts()
             elif event.type == X.SelectionRequest:
                 if not deferred_requests:
                     # The focus round trip brings preceding input and focus
@@ -694,14 +704,19 @@ class Dictation:
             self.x.allow_events(X.ReplayKeyboard, event.time)
             self.x.flush()
 
-    def resume_client(self, client):
+    def release_resume_shortcuts(self, client=None):
+        if not self.resume_grabs:
+            return
         for xid, (owner, _, masks) in list(self.resume_grabs.items()):
-            if owner == client:
+            if client is None or owner == client:
                 window = self.x.create_resource_object("window", xid)
                 for mask in masks:
                     window.ungrab_key(self.v_key, mask, onerror=lambda exc, _: isinstance(exc, error.BadWindow))
                 del self.resume_grabs[xid]
         self.x.flush()
+
+    def resume_client(self, client):
+        self.release_resume_shortcuts(client)
         self.paused_clients.pop(client, None)
         self.selection.guarded_reads.discard(client)
 
