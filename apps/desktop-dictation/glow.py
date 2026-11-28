@@ -7,11 +7,14 @@ import gi
 gi.require_version("Gdk", "3.0")
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gdk, Gtk
+from Xlib import X
+from Xlib.ext import shape
 
 
 class RecordingGlow(Gtk.Window):
-    def __init__(self):
+    def __init__(self, x_display):
         super().__init__(type=Gtk.WindowType.POPUP)
+        self.x_display = x_display
         self.set_accept_focus(False)
         self.set_focus_on_map(False)
         self.set_type_hint(Gdk.WindowTypeHint.NOTIFICATION)
@@ -36,7 +39,8 @@ class RecordingGlow(Gtk.Window):
         self.samples = deque([0.] * 32, maxlen=32)
 
     def place(self):
-        if not self.target or self.target.is_destroyed() or not self.target.is_viewable():
+        if (not self.x_display.has_extension("SHAPE") or not self.target
+                or self.target.is_destroyed() or not self.target.is_viewable()):
             self.stop()
             return False
         # The client rectangle excludes the compositor's invisible resize margins.
@@ -59,6 +63,18 @@ class RecordingGlow(Gtk.Window):
                 region.subtract(cairo.RectangleInt(rim, rim, width - 2 * rim, height - rim - bottom))
             self.shape_combine_region(region)
             self.input_shape_combine_region(cairo.Region())
+            if not self.get_mapped():
+                # GTK applies its bounding shape at paint time. Set it on the
+                # X window before mapping so even the first frame has a hole.
+                self.get_display().sync()
+                native = self.x_display.create_resource_object("window", self.get_window().get_xid())
+                scale = self.get_scale_factor()
+                rectangles = []
+                for index in range(region.num_rectangles()):
+                    rect = region.get_rectangle(index)
+                    rectangles.append((rect.x * scale, rect.y * scale, rect.width * scale, rect.height * scale))
+                native.shape_rectangles(shape.SO.Set, shape.SK.Bounding, X.Unsorted, 0, 0, rectangles)
+                self.x_display.sync()
             self.queue_draw()
         return True
 

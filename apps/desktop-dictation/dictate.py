@@ -169,7 +169,7 @@ class Dictation:
                                                Path(__file__).with_name("transcribe.py")))
         self.paused_clients = {}
         self.overlay = Overlay(self.copy_recovery, self.paused_clients, self.resume_client)
-        self.glow = RecordingGlow()
+        self.glow = RecordingGlow(self.x)
         self.recording = None
         self.worker = None
         self.idle_since = time.monotonic()

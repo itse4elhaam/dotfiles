@@ -105,13 +105,17 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
     assert app.overlay.wave.get_visible()
     assert run.item.analysis.font.describe().get_family() == "Inter"
     from Xlib.ext import shape
-    Gdk.Display.get_default().sync()
-    light = x.create_resource_object("window", app.glow.get_window().get_xid())
-    assert not light.shape_get_rectangles(shape.SK.Input).rectangles
-    _, _, glow_w, glow_h, _ = app.glow.bounds
-    rim = light.shape_get_rectangles(shape.SK.Bounding).rectangles
-    assert rim and not any(r.x <= glow_w // 2 < r.x + r.width and
-                           r.y <= glow_h // 2 < r.y + r.height for r in rim), (app.glow.bounds, rim)
+    def check_outline(glow):
+        Gdk.Display.get_default().sync()
+        light = x.create_resource_object("window", glow.get_window().get_xid())
+        assert not light.shape_get_rectangles(shape.SK.Input).rectangles
+        _, _, width, height, _ = glow.bounds
+        scale = glow.get_scale_factor()
+        cx, cy = width * scale // 2, height * scale // 2
+        rim = light.shape_get_rectangles(shape.SK.Bounding).rectangles
+        assert rim and not any(r.x <= cx < r.x + r.width and r.y <= cy < r.y + r.height
+                               for r in rim), (glow.bounds, rim)
+    check_outline(app.glow)
     assert app.focus() == app.recording.target
     if not real:
         window.move(40, 35)
@@ -232,6 +236,14 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
             chrome.wait(timeout=10)
             app.stop_worker()
         return
+    # Inspect a freshly mapped popup before processing another GTK frame.
+    from glow import RecordingGlow
+    fresh_glow = RecordingGlow(app.x)
+    fresh_glow.track(window.get_window())
+    fresh_glow.level(.5)
+    check_outline(fresh_glow)
+    fresh_glow.destroy()
+
     from gi.repository import GdkPixbuf
     pixels = GdkPixbuf.Pixbuf.new(GdkPixbuf.Colorspace.RGB, True, 8, 400, 300)
     pixels.fill(0x317baa93)
