@@ -34,7 +34,7 @@ Keep the caret in the original field until insertion finishes. If dictation dete
 
 Dictation uses one native paste per utterance. Some editors include the paste shortcut’s timestamp. Others, including Chrome, request clipboard formats and text in several steps without a timestamp. After the first untagged text read, each further text read or format-list request from the recipient extends the wait by 350 ms, up to 1.8 seconds after the shortcut. The next dictation waits for this paste to finish. X11 gives the service no way to distinguish a new untagged request from an old one that the same app delayed indefinitely.
 
-If the app leaves the paste unread, the service pauses it and keeps the transcript available through **Copy**. While paused, the app cannot read clipboard data served by dictation. Other apps can paste as usual. Choose **Resume** before pasting a recovered transcript into the paused app.
+If the app leaves the paste unread, the service pauses it and keeps the transcript available through **Copy**. A recovered copy is available immediately to other identified apps. Choose **Resume** before pasting it into the paused app.
 
 For a screenshot copied with GTK’s standard image command on Pop!_OS, dictation restores a lossless PNG with the original pixels and transparency. For mixed selections, it backs up each supported format, including editable project data. If a format is unavailable or exceeds the backup limit, the original clipboard stays in place and the overlay offers **Copy**.
 

@@ -462,10 +462,12 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
 
     other_read(b"Newer clipboard")
     assert app.pending_backup is not None
-    def secondary_read(expected, timestamp, target=utf8):
+    def secondary_read(expected, timestamp, target=utf8, queued_input=None):
         reader.delete_property(prop)
         reader.convert_selection(app.selection.atom, target, prop, timestamp)
-        x.flush()
+        x.sync()
+        if queued_input:
+            queued_input()
         def notified():
             while x.pending_events():
                 event = x.next_event()
@@ -484,24 +486,6 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
         assert value == expected, (value, expected)
         return value
 
-    def retired_read(timestamp, queued_input=None):
-        while x.pending_events():
-            x.next_event()
-        reader.delete_property(prop)
-        reader.convert_selection(app.selection.atom, utf8, prop, timestamp)
-        x.sync()
-        if queued_input:
-            queued_input()
-        def answered():
-            while x.pending_events():
-                event = x.next_event()
-                if event.type == X.SelectionNotify and event.requestor == reader:
-                    return True
-            return False
-        until(answered)
-        data = reader.get_full_property(prop, utf8)
-        assert data is None or data.value == b"", data.value
-
     secondary_read(text.encode(), key_time)
     until(lambda: app.pending_backup is None)
     assert app.clipboard.wait_for_text() == "Newer clipboard"
@@ -509,7 +493,7 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
     secondary_read(text.encode(), key_time)
     keys("key", "Tab")
     until(lambda: window.get_focus() is second)
-    retired_read(key_time)
+    secondary_read(None, key_time)
     assert not app.paused_clients
     assert app.clipboard.wait_for_text() == "Newer clipboard"
     first.grab_focus()
@@ -536,7 +520,7 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
         else:
             until(lambda: app.selection.replay is None)
         x.sync()
-        retired_read(stamp)
+        secondary_read(None, stamp)
         assert not app.paused_clients and app.overlay.recovery == text
         assert not app.root.get_attributes().your_event_mask
         app.overlay.dismiss_recovery()
@@ -573,7 +557,7 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
     secondary_read(b"CurrentTime sentinel", X.CurrentTime)
     # The server already queued the conversion when the pointer redirected
     # the gesture. Both events await dispatch on the selection connection.
-    retired_read(current_gesture, lambda: keys("click", "1"))
+    secondary_read(None, current_gesture, queued_input=lambda: keys("click", "1"))
     first.grab_focus()
     assert not app.paused_clients
     app.overlay.dismiss_recovery()
