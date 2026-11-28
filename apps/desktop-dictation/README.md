@@ -48,7 +48,7 @@ After you release the shortcut, **Waiting for app** keeps the finished transcrip
 
 For a screenshot copied with GTK’s standard image command on Pop!_OS, dictation restores a lossless PNG with the original pixels and transparency. For mixed selections, it backs up each supported format, including editable project data. If a payload uses 32-bit X11 elements, is unavailable, or exceeds the backup limit, the original clipboard stays in place and the overlay offers **Copy**.
 
-If text reaches the application's clipboard handler, **Sent to app** offers Copy for four seconds. Open **Last Dictation** in the application launcher to recall the latest acknowledged transcript or **Resume** a paused app, even after dismissing its card. A clipboard read alone cannot confirm what an editor kept. Unhandled transcripts remain available until copied, dismissed or cleared when the session locks.
+**Sent to app** means the editor read the transcript. The card offers **Copy** for four seconds. When the card hides automatically, you can reopen the latest acknowledged transcript from **Last Dictation** in the application launcher. Clicking **×** removes that transcript from recall. **Last Dictation** still offers **Resume** for a paused app. Transcripts waiting for recovery stay available until you copy or dismiss them, or lock the screen.
 
 ## Testing
 
