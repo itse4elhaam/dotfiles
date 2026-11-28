@@ -262,6 +262,7 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
     project = Gdk.Atom.intern("application/x-test-project", False)
     Gtk.selection_add_target(owner, clip, png, 1)
     Gtk.selection_add_target(owner, clip, project, 2)
+    project_bits = 8
     project_data = b"layers and editable shapes"
     refuse_project = False
     requested = []
@@ -271,7 +272,7 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
         if info == 1:
             data.set(png, 8, backup.values[x.intern_atom("image/png")][2])
         elif not refuse_project:
-            data.set(project, 8, project_data)
+            data.set(project, project_bits, project_data)
 
     owner.connect("selection-get", offer_project)
     generation = app.clipboard_generation
@@ -293,6 +294,59 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
     refuse_project = False
     assert bytes(app.clipboard.wait_for_contents(project).get_data()) == project_data
     app.overlay.dismiss_recovery()
+    # Inspect the X property on a separate connection, outside GDK's
+    # native-long representation of format-32 selection data.
+    from array import array
+    probe_display = display.Display()
+    probe = probe_display.screen().root.create_window(0, 0, 1, 1, 0, 0, X.InputOnly, X.CopyFromParent)
+    project_atom = x.intern_atom(project.name())
+    probe_prop = x.intern_atom("DICTATION_PROJECT_READ")
+
+    def read_project(bits, expected):
+        probe.delete_property(probe_prop)
+        probe.convert_selection(app.selection.atom, project_atom, probe_prop, X.CurrentTime)
+        probe_display.flush()
+        until(probe_display.pending_events)
+        event = probe_display.next_event()
+        assert (event.type, event.target, event.property) == (X.SelectionNotify, project_atom, probe_prop)
+        result = probe.get_full_property(probe_prop, X.AnyPropertyType)
+        assert (result.property_type, result.format) == (project_atom, bits)
+        assert result.value == expected
+
+    # On LP64 GTK stores two wire words in two native longs. A failed
+    # backup of this format must leave the entire mixed offer in place.
+    for words in ([0x89abcdef - (1 << 32), 0x12345678], []):
+        project_bits = 32
+        project_data = array("l", words).tobytes()
+        serial = app.paste_serial
+        requested.clear()
+        hold("Alt_L", "Super_L")
+        until(lambda: 2 in requested)
+        keys("keyup", "Super_L", "keyup", "Alt_L")
+        until(lambda: app.recording is None and app.overlay.recovery == text)
+        assert app.paste_serial == serial
+        assert x.get_selection_owner(app.selection.atom) == original_owner
+        assert app.overlay.status.get_text() == "Couldn’t back up clipboard"
+        read_project(32, array("I", (word & 0xffffffff for word in words)))
+        app.overlay.dismiss_recovery()
+
+    # Cross the 128 KiB property append boundary and check empty values.
+    # The 16-bit case ends exactly at the per-format 8 MiB limit.
+    full_project = array("H", [0xffff]) * (4 * 1024 * 1024 - 1) + array("H", [0x8123])
+    for project_bits, expected in ((8, b"\xff" * 131072 + b"Z"), (16, full_project),
+                                   (8, b""), (16, array("H"))):
+        project_data = bytes(expected)
+        generation = app.clipboard_generation
+        assert Gtk.selection_owner_set(owner, clip, Gdk.CURRENT_TIME)
+        until(lambda: app.clipboard_generation > generation)
+        first.set_text("")
+        hold("Alt_L", "Super_L")
+        until(lambda: app.recording.backup.ready)
+        keys("keyup", "Super_L", "keyup", "Alt_L")
+        until(lambda: first.get_text() == text and app.pending_backup is None)
+        read_project(project_bits, expected)
+        app.overlay.dismiss_recovery()
+    probe_display.close()
     # An oversized offer must keep its original owner and Copy recovery.
     original = "x" * (8 * 1024 * 1024 + 1)
     generation = app.clipboard_generation
