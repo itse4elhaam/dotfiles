@@ -20,6 +20,29 @@ REPAIR = re.compile(
 def whole(words):
     return r"(?<!\w)(?:" + "|".join(map(re.escape, sorted(words, key=len, reverse=True))) + r")(?!\w)"
 
+def read_settings(path):
+    try:
+        settings = json.loads(path.read_text())
+        if not isinstance(settings, dict):
+            raise ValueError("expected a JSON object")
+        words = settings.get("speechCustomWords", [])
+        if not isinstance(words, list):
+            raise ValueError("speechCustomWords must be a list")
+        for word in words:
+            if not isinstance(word, dict) or not isinstance(word.get("term"), str):
+                raise ValueError("each dictionary entry needs a term")
+            aliases = word.get("aliases", [])
+            if not isinstance(aliases, list) or not all(isinstance(alias, str) for alias in aliases):
+                raise ValueError("each alias must be a string")
+        if not isinstance(settings.get("speechCorrectionWord", ""), str):
+            raise ValueError("speechCorrectionWord must be a string")
+        return settings
+    except FileNotFoundError:
+        return {}
+    except (OSError, ValueError) as error:
+        print(f"Using default dictation settings ({path}: {error})", file=sys.stderr)
+        return {}
+
 
 def clean(text, settings):
     spellings = {}
@@ -96,7 +119,7 @@ def recognize():
         for raw_line in sys.stdin.buffer:
             line = raw_line.rstrip(b"\r\n")
             if line == b":start" and stream is None:
-                settings = json.loads(CONFIG.read_text()) if CONFIG.exists() else {}
+                settings = read_settings(CONFIG)
                 terms = [w["term"] for w in settings.get("speechCustomWords", [])]
                 stream = session.stream(vocabulary=terms if terms and model.supports("vocabulary") else None)
                 gate = SpeechGate(vad, silero.vad_info.frame_samples) if settings.get("speechSilenceFiltering", True) else None

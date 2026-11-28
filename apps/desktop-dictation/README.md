@@ -16,6 +16,18 @@ The installer downloads pinned engine and model files, verifies their hashes, an
 
 The desktop overlay uses system Python 3, GTK 3, PyGObject, pycairo, python-xlib and `parec`. It registers its bundled Inter typeface inside its own process. Use `systemctl --user status desktop-dictation` to check the service and `journalctl --user -u desktop-dictation` for diagnostics. Disable it with `systemctl --user disable --now desktop-dictation`.
 
+## Words and cleanup
+
+The preview and final transcript use the same cleanup. Fillers and silence filtering are enabled by default. To set a preferred spelling, create `~/.config/desktop-dictation/settings.json`. Changes apply on the next hold.
+
+```json
+{
+  "speechCustomWords": [{"term": "Pop!_OS", "aliases": ["pop os"]}],
+  "speechRemoveFillerWords": true,
+  "speechSilenceFiltering": true
+}
+```
+
 ## Insertion and recovery
 
 Keep the caret in the original field until insertion finishes. If you move to another field or change windows while the transcript is finishing, the overlay holds the text and offers **Copy**. If recognition stops early, it offers the last available partial. A read-only target or an application that cannot consume a paste may also require Copy. X11 exposes the focused window. An application can move its own caret without sending a separate desktop focus event.

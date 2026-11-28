@@ -1,9 +1,20 @@
 import unittest
+from contextlib import redirect_stderr
+from io import StringIO
+from pathlib import Path
+from tempfile import TemporaryDirectory
 
-from transcribe import clean
+from transcribe import clean, read_settings
 
 
 class CleanupTests(unittest.TestCase):
+    def test_invalid_preferences_leave_recognition_available(self):
+        with TemporaryDirectory() as temp, redirect_stderr(StringIO()):
+            path = Path(temp) / "settings.json"
+            for value in ("{", '{"speechCustomWords":[{"term":"hello","aliases":null}]}'):
+                path.write_text(value)
+                self.assertEqual(read_settings(path), {})
+
     def test_longest_alias_first_with_literal_punctuation(self):
         settings = {"speechCustomWords": [
             {"term": "VS", "aliases": ["v s"]},
