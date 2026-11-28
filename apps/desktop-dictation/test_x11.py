@@ -221,6 +221,83 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
             chrome.wait(timeout=10)
             app.stop_worker()
         return
+    from gi.repository import GdkPixbuf
+    pixels = GdkPixbuf.Pixbuf.new(GdkPixbuf.Colorspace.RGB, True, 8, 400, 300)
+    pixels.fill(0x317baa93)
+    pixels.new_subpixbuf(3, 5, 127, 189).fill(0xed081234)
+    generation = app.clipboard_generation
+    app.clipboard.set_image(pixels)
+    until(lambda: app.clipboard_generation > generation)
+    first.set_text("")
+    serial = app.paste_serial
+    hold("Super_L", "Alt_L")
+    backup = app.recording.backup
+    until(lambda: backup.ready)
+    assert set(backup.values) == {x.intern_atom("image/png")}
+    keys("keyup", "Alt_L", "keyup", "Super_L")
+    until(lambda: first.get_text() == text and app.pending_backup is None)
+    assert app.paste_serial == serial + 1
+    restored = app.clipboard.wait_for_image()
+    assert (restored.get_width(), restored.get_height()) == (400, 300)
+    assert restored.get_pixels() == pixels.get_pixels()
+    app.overlay.dismiss_recovery()
+    # A PNG plus independently authored project data is a compound offer.
+    # Exercise both successful and refused conversions from a widget owner.
+    from selection import ClipboardBackup
+    owner = Gtk.Invisible()
+    owner.realize()
+    clip = Gdk.SELECTION_CLIPBOARD
+    png = Gdk.Atom.intern("image/png", False)
+    project = Gdk.Atom.intern("application/x-test-project", False)
+    Gtk.selection_add_target(owner, clip, png, 1)
+    Gtk.selection_add_target(owner, clip, project, 2)
+    project_data = b"layers and editable shapes"
+    refuse_project = False
+    requested = []
+
+    def offer_project(widget, data, info, timestamp):
+        requested.append(info)
+        if info == 1:
+            data.set(png, 8, backup.values[x.intern_atom("image/png")][2])
+        elif not refuse_project:
+            data.set(project, 8, project_data)
+
+    owner.connect("selection-get", offer_project)
+    generation = app.clipboard_generation
+    assert Gtk.selection_owner_set(owner, clip, Gdk.CURRENT_TIME)
+    until(lambda: app.clipboard_generation > generation)
+    original_owner = x.get_selection_owner(app.selection.atom)
+    mixed = ClipboardBackup(app.clipboard, x, original_owner)
+    until(lambda: mixed.ready)
+    assert mixed.values[x.intern_atom("image/png")] == backup.values[x.intern_atom("image/png")]
+    assert mixed.values[x.intern_atom(project.name())][2] == project_data
+    refuse_project = True
+    requested.clear()
+    serial = app.paste_serial
+    hold("Super_L", "Alt_L")
+    until(lambda: 2 in requested)
+    keys("keyup", "Alt_L", "keyup", "Super_L")
+    until(lambda: app.recording is None and app.overlay.recovery == text)
+    assert x.get_selection_owner(app.selection.atom) == original_owner and app.paste_serial == serial
+    refuse_project = False
+    assert bytes(app.clipboard.wait_for_contents(project).get_data()) == project_data
+    app.overlay.dismiss_recovery()
+    # An oversized offer must keep its original owner and Copy recovery.
+    original = "x" * (8 * 1024 * 1024 + 1)
+    generation = app.clipboard_generation
+    app.clipboard.set_text(original, -1)
+    until(lambda: app.clipboard_generation > generation)
+    original_owner = x.get_selection_owner(app.selection.atom)
+    serial = app.paste_serial
+    hold("Super_L", "Alt_L")
+    keys("keyup", "Alt_L", "keyup", "Super_L")
+    until(lambda: app.recording is None and app.overlay.recovery == text)
+    assert x.get_selection_owner(app.selection.atom) == original_owner
+    assert app.paste_serial == serial and app.clipboard.wait_for_text() == original
+    app.overlay.dismiss_recovery()
+    generation = app.clipboard_generation
+    app.clipboard.set_text("Original text", -1)
+    until(lambda: app.clipboard_generation > generation)
     target = x.create_resource_object("window", xid)
     # A stable active-window property can disagree with actual keyboard focus.
     recipient = x.create_resource_object("window", int(other.stdout.readline()))

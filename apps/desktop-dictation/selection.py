@@ -229,24 +229,61 @@ class ClipboardBackup:
         if not self.ready:
             clipboard.request_targets(self._targets, x)
 
+    # Gtk.Clipboard.set_image on Pop!_OS advertises one pixbuf through these
+    # encoders in order. ICO cannot encode a large screenshot. Match the full
+    # offer, since a subset or an extra target can be independently authored.
+    _gtk_image_offer = (
+        "TIMESTAMP", "TARGETS", "MULTIPLE", "SAVE_TARGETS", "image/png", "image/jpeg",
+        "image/bmp", "image/x-bmp", "image/x-MS-bmp", "image/x-icon", "image/x-ico",
+        "image/x-win-bitmap", "image/vnd.microsoft.icon", "application/ico",
+        "image/ico", "image/icon", "text/ico", "image/tiff",
+    )
+
+    @staticmethod
+    def _valid_png(data, payload):
+        if (data.get_format() != 8 or data.get_data_type().name() != "image/png"
+                or not payload.startswith(b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR")
+                or not payload.endswith(b"\x00\x00\x00\x00IEND\xaeB`\x82")):
+            return False
+        width = int.from_bytes(payload[16:20], "big")
+        height = int.from_bytes(payload[20:24], "big")
+        # Bound the decoded RGBA allocation independently of compressed size.
+        if not (0 < width * height <= 16 * 1024 * 1024):
+            return False
+        image = data.get_pixbuf()
+        return image is not None and (image.get_width(), image.get_height()) == (width, height)
+
     def _targets(self, clipboard, targets, count, x):
-        names = {atom.name() for atom in targets or ()}
-        names -= {"TARGETS", "TIMESTAMP", "MULTIPLE", "SAVE_TARGETS"}
+        if not targets or count != len(targets):
+            return
+        atoms = {atom.name(): atom for atom in targets}
+        gtk_image = tuple(atom.name() for atom in targets) == self._gtk_image_offer
+        protocol = {"TIMESTAMP", "TARGETS", "MULTIPLE", "SAVE_TARGETS"}
+        names = ["image/png"] if gtk_image else [name for name in atoms if name not in protocol]
         safe = {"TEXT", "STRING", "UTF8_STRING", "COMPOUND_TEXT"}
         if not names or len(names) > 32 or any(n not in safe and "/" not in n for n in names):
             return
-        remaining = set(names)
+
+        values = {}
         budget = 24 * 1024 * 1024
+
         def received(_clipboard, data, name):
             nonlocal budget
-            if data.get_length() < 0 or data.get_length() > min(8 * 1024 * 1024, budget):
+            size = data.get_length()
+            if not 0 <= size <= min(8 * 1024 * 1024, budget):
                 return
             payload = bytes(data.get_data() or b"")
-            budget -= len(payload)
-            self.values[x.intern_atom(name)] = (
+            if (len(payload) != size or data.get_format() not in (8, 16, 32)
+                    or not data.get_data_type() or (gtk_image and not self._valid_png(data, payload))):
+                return
+            budget -= size
+            values[x.intern_atom(name)] = (
                 x.intern_atom(data.get_data_type().name()), data.get_format(), payload)
-            remaining.remove(name)
-            self.ready = not remaining
-        for atom in targets:
-            if atom.name() in names:
-                clipboard.request_contents(atom, received, atom.name())
+            if len(values) == len(names):
+                self.values = values
+                self.ready = True
+            else:
+                next_name = names[len(values)]
+                clipboard.request_contents(atoms[next_name], received, next_name)
+
+        clipboard.request_contents(atoms[names[0]], received, names[0])
