@@ -46,7 +46,7 @@ If that 350 ms gap hasn’t elapsed by 1.8 seconds after the dictation paste sho
 
 After you release the shortcut, **Waiting for app** keeps the finished transcript visible. If the editor ignores the window-addressed shortcut or never reads the paste, dictation restores the previous clipboard after 1.8 seconds. The card shows **App didn’t read the paste** and offers **Copy** and **Resume**. A recovered copy is available immediately to other identified apps. Choose **Resume** before pasting it into the paused app.
 
-In Firefox 138 on Pop!_OS X11, use **Copy**, then **Resume**, then **Ctrl+V** in the intended field. In testing, Firefox requested the clipboard with a fresh timestamp that dictation could not match to the original paste. The previous clipboard stays intact until you choose **Copy**.
+On Pop!_OS X11, Firefox 138, gedit 41 and GNOME Terminal 3.44 requested the clipboard with timestamps that dictation could not match to the original paste. In those versions, choose **Copy**, then **Resume**, then paste into the intended field. Use **Ctrl+V** in Firefox or gedit and **Ctrl+Shift+V** in GNOME Terminal. The previous clipboard stays intact until you choose **Copy**.
 
 For a screenshot copied with GTK’s standard image command on Pop!_OS, dictation restores a lossless PNG with the original pixels and transparency. For mixed selections, it backs up each supported format, including editable project data. If a payload uses 32-bit X11 elements, is unavailable, or exceeds the backup limit, the original clipboard stays in place and the overlay offers **Copy**.
 

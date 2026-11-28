@@ -183,7 +183,7 @@ class Dictation:
                                                Path(__file__).with_name("transcribe.py")))
         self.paused_clients = {}
         self.navigation_guards = {}  # client -> last hold when navigation was observed
-        self.overlay = Overlay(self.copy_recovery, self.paused_clients, self.resume_client)
+        self.overlay = Overlay(self.copy_recovery, self.paused_clients, self.resume_from_card)
         self.glow = RecordingGlow(self.x)
         self.recording = None
         self.worker = None
@@ -856,6 +856,24 @@ class Dictation:
         self.paused_clients.pop(client, None)
         self.selection.guarded_reads.discard(client)
         self.watch_window_changes()
+
+    def resume_from_card(self, client):
+        selection = self.selection
+        guarded = client in selection.guarded_reads
+        self.resume_client(client)
+        if not guarded or self.pending_backup is not None:
+            return
+        # GTK can cache a refused format query and disable its Paste action.
+        # Notify it after Resume only while we still serve the same clipboard.
+        timestamp = GdkX11.x11_get_server_time(self.overlay.get_window())
+        self.x.grab_server()
+        try:
+            if self.x.get_selection_owner(selection.atom) == selection.window:
+                selection.window.set_selection_owner(selection.atom, timestamp)
+                selection.time = timestamp
+        finally:
+            self.x.ungrab_server()
+            self.x.flush()
 
     def commit(self, text):
         if self.recording.cancelled:
