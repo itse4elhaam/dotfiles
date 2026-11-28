@@ -34,7 +34,9 @@ Keep the caret in the original field until insertion finishes. If dictation dete
 
 Dictation uses one normal desktop paste per utterance. Applications that request a paste with the original key-event timestamp receive that transcript. Some editors request clipboard data without a timestamp. For a response from the focused process, the service keeps the same text available for 350 ms after the last text read, up to 1.8 seconds after dispatch. A subsequent paste waits its turn. An application that leaves the paste unread is paused and its transcript stays available through **Copy**. X11 cannot distinguish an unrelated same-process read, or one delayed indefinitely, from a new untagged paste.
 
-The clipboard delivery path preserves supported existing formats. If text reaches the application's clipboard handler, **Sent to app** offers Copy for four seconds. Open **Last Dictation** in the application launcher to recall the latest acknowledged transcript or **Resume** a paused app, even after dismissing its card. A clipboard read alone cannot confirm what an editor kept. Unhandled transcripts remain available until copied, dismissed or cleared when the session locks.
+For a screenshot copied with GTK’s standard image command on Pop!_OS, dictation restores a lossless PNG with the original pixels and transparency. For mixed selections, it backs up each supported format, including editable project data. If a format is unavailable or exceeds the backup limit, the original clipboard stays in place and the overlay offers **Copy**.
+
+If text reaches the application's clipboard handler, **Sent to app** offers Copy for four seconds. Open **Last Dictation** in the application launcher to recall the latest acknowledged transcript or **Resume** a paused app, even after dismissing its card. A clipboard read alone cannot confirm what an editor kept. Unhandled transcripts remain available until copied, dismissed or cleared when the session locks.
 
 ## Testing
 
