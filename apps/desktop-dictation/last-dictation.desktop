@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Last Dictation
+Comment=Show the most recent transcript
+Exec=systemctl --user kill --kill-who=main --signal=SIGUSR1 desktop-dictation.service
+Icon=audio-input-microphone
+Terminal=false
+Categories=Utility;
