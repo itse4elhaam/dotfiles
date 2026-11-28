@@ -334,6 +334,14 @@ class Dictation:
             print(exc, file=sys.stderr)
             self.end("Could not start microphone or speech engine")
 
+    def redirect_paste(self):
+        # Navigation after an untagged payload already forbids further reads.
+        # Keep that guard through the quiet interval even if focus moves away.
+        if self.pending_read in ("navigation", "redirected"):
+            self.pending_read = "redirected"
+        else:
+            self.interrupt_paste()
+
     def paste_key(self, event, code):
         # Only observed during the outstanding offer. Keep modifier state,
         # never the typed characters. The synthetic shortcut precedes dispatch.
@@ -343,7 +351,9 @@ class Dictation:
         if code in self.chord:
             self.paste_modifiers.add(code)
             return False
-        if self.pending_read not in ("untagged", "typing", "navigation") or self.paste_modifiers & self.chord:
+        if self.paste_modifiers == {self.alt} and self.x.keycode_to_keysym(code, 0) == XK.XK_Tab:
+            self.redirect_paste()
+        elif self.pending_read not in ("untagged", "typing", "navigation") or self.paste_modifiers & self.chord:
             self.interrupt_paste()
         elif code in self.controls | self.shifts:
             self.paste_modifiers.add(code)
@@ -393,13 +403,15 @@ class Dictation:
                             self.interrupt_paste()
                         else:
                             manual_paste = True
+                elif event.evtype == xinput.RawButtonPress and detail == 1:
+                    self.redirect_paste()
                 elif event.evtype == xinput.RawButtonPress and detail not in (4, 5, 6, 7):
                     self.interrupt_paste()
             if self.paste_target and (
                     (event.type == X.FocusOut and event.mode == X.NotifyNormal
                      and event.window.id == self.paste_target[1])
                     or (event.type == X.PropertyNotify and event.atom == self.active_atom)):
-                self.interrupt_paste()
+                self.redirect_paste()
             # These events and the final grab are ordered on the same connection.
             if isinstance(event, xfixes.SelectionNotify):
                 empty_restore = (event.owner.id == X.NONE
@@ -423,7 +435,7 @@ class Dictation:
                     # events into this snapshot. Do it once per batch for
                     # first reads, replay and target negotiation alike.
                     if self.paste_target and self.focus() != self.paste_target:
-                        self.interrupt_paste()
+                        self.redirect_paste()
                     remaining = self.x.pending_events()
                 deferred_requests.append(event)
             elif event.type == X.SelectionClear:
@@ -464,7 +476,7 @@ class Dictation:
                         elif code not in self.chord:
                             self.recording.unsafe = True
         if manual_paste and self.finish_manual_paste:
-            if self.focus() != self.paste_target:
+            if self.pending_read == "redirected" or self.focus() != self.paste_target:
                 self.interrupt_paste()
             elif not self.expire_overdue_paste():
                 self.finish_manual_paste()
@@ -498,7 +510,8 @@ class Dictation:
                     for reader in readers:
                         if self.navigation_guards.pop(reader, None) is not None:
                             self.overlay.late_read(reader, show=self.recording is None)
-                if (request.selection == self.selection.atom and self.pending_read in ("typing", "navigation")
+                if (request.selection == self.selection.atom
+                        and self.pending_read in ("typing", "navigation", "redirected")
                         and (client == self.selection.recipient or client[0] != "process")):
                     # Typing could have moved the caret before a delayed
                     # conversion. Refuse it and its possible fallback reads.
@@ -842,7 +855,7 @@ class Dictation:
                 # second conversion. A redirect ends that gesture successfully.
                 confirm()
                 return False
-            navigated = self.pending_read == "navigation"
+            navigated = self.pending_read in ("navigation", "redirected")
             restore(client)
             if navigated:
                 self.watch_resume_shortcut(rec)
@@ -870,11 +883,11 @@ class Dictation:
                 return False
             # An untagged recipient still negotiating at the hard deadline
             # could otherwise paste the restored clipboard on its next read.
-            if (self.pending_read is None or self.focus() != rec.target
+            if (self.pending_read is None or (self.focus() != rec.target and self.pending_read != "redirected")
                     or self.x.get_selection_owner(self.selection.atom) != self.selection.window
                     or (deadline and self.pending_read != "tagged")):
                 return interrupt()
-            if self.pending_read == "navigation":
+            if self.pending_read in ("navigation", "redirected"):
                 confirm(guard_hold=self.navigation_hold)
                 return False
             confirm(keep_replay=(self.pending_read != "typing" and bool(rec.backup.values)

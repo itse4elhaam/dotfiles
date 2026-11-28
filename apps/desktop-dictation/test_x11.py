@@ -177,7 +177,7 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
             });
             let plainPasteStarted = false;
             document.onkeydown = event => {
-              if (event.target.id === "chat" && event.key === "Enter") {
+              if (event.target.id === "chat" && event.key === "Enter" && event.isTrusted) {
                 event.preventDefault();
                 edits.push(["chat", "submit", event.target.value]);
                 event.target.value = "";
@@ -204,11 +204,13 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
             </script>""")
         chrome_env = dict(os.environ, DBUS_SESSION_BUS_ADDRESS="unix:path=" + str(directory / "no-session-bus"),
                           GTK_USE_PORTAL="0")
-        chrome = subprocess.Popen(["google-chrome", "--ozone-platform=x11",
-            "--user-data-dir=" + str(directory / "chrome-profile"), "--no-first-run",
-            "--no-default-browser-check", "--disable-background-networking", "--disable-sync",
-            "--disable-extensions", "--disable-gpu", "--password-store=basic",
-            page.as_uri()], env=chrome_env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        chrome_log = directory / "chrome.log"
+        with chrome_log.open("wb") as log:
+            chrome = subprocess.Popen(["google-chrome", "--ozone-platform=x11", "--enable-logging=stderr",
+                "--user-data-dir=" + str(directory / "chrome-profile"), "--no-first-run",
+                "--no-default-browser-check", "--disable-background-networking", "--disable-sync",
+                "--disable-extensions", "--disable-gpu", "--password-store=basic",
+                page.as_uri()], env=chrome_env, stdout=subprocess.DEVNULL, stderr=log)
         try:
             def field():
                 return subprocess.run(["xdotool", "search", "--onlyvisible", "--name", "Dictation fixture"],
@@ -218,9 +220,10 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
             x.screen().root.change_property(app.active_atom, Xatom.WINDOW, 32, [browser.id])
             browser.set_input_focus(X.RevertToParent, X.CurrentTime)
             x.sync()
-            def title():
+            def title(target=None):
                 # Read the fixture's edit log in one X request as Chrome updates it.
-                prop = browser.get_full_property(x.intern_atom("_NET_WM_NAME"), X.AnyPropertyType, sizehint=1024)
+                prop = (target or browser).get_full_property(x.intern_atom("_NET_WM_NAME"), X.AnyPropertyType,
+                                                                sizehint=1024)
                 return prop.value.decode() if prop else ""
             until(lambda: title().startswith("Dictation fixture ready"))
             if not real:
@@ -415,8 +418,24 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
             assert app.navigation_guards and app.clipboard.wait_for_text() == "Original text"
             print("Chrome chat submitted twice and inserted three successive messages", flush=True)
             other_page = directory / "chat-window.html"
-            other_page.write_text("""<title>Second chat fixture</title><input autofocus
-                oninput="document.title=JSON.stringify([event.inputType,this.value,document.activeElement===this])">""")
+            other_page.write_text("""<title>Second chat fixture</title><input autofocus>
+                <script>
+                const edits = [];
+                function log(type, event) {
+                    if (event.target !== document.activeElement) throw Error("Expected focused input");
+                    edits.push([type, event.target.value, event.isTrusted]);
+                    document.title = JSON.stringify(edits);
+                    console.log("second-chat " + document.title);
+                }
+                document.oninput = event => log(event.inputType, event);
+                document.onkeydown = event => {
+                    if (event.key === "Enter") {
+                        log("submit", event);
+                        event.target.value = "";
+                        event.preventDefault();
+                    }
+                };
+                </script>""")
             subprocess.run(["google-chrome", "--user-data-dir=" + str(directory / "chrome-profile"),
                             "--new-window", other_page.as_uri()], env=chrome_env, timeout=10,
                            check=True, capture_output=True)
@@ -424,10 +443,15 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
                 return subprocess.run(["xdotool", "search", "--onlyvisible", "--name", "Second chat fixture"],
                                       capture_output=True, text=True).stdout.strip()
             until(other_chat)
+            first_browser = browser
             browser = x.create_resource_object("window", int(other_chat().splitlines()[0]))
-            x.screen().root.change_property(app.active_atom, Xatom.WINDOW, 32, [browser.id])
-            browser.set_input_focus(X.RevertToParent, X.CurrentTime)
-            x.sync()
+            second_browser = browser
+            def activate(target):
+                target.configure(stack_mode=X.Above)
+                x.screen().root.change_property(app.active_atom, Xatom.WINDOW, 32, [target.id])
+                target.set_input_focus(X.RevertToParent, X.CurrentTime)
+                x.sync()
+            activate(browser)
             hold("Super_L", "Alt_L")
             assert app.recording.client in app.navigation_guards and app.recording.target[0] == browser.id
             if real:
@@ -435,12 +459,34 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
             keys("keyup", "Alt_L", "keyup", "Super_L")
             until(lambda: app.recording is None, 12)
             sentence = app.overlay.label.get_text() if real else sentence
-            until(lambda: title().startswith("[") and json.JSONDecoder().raw_decode(title())[0] ==
-                  ["insertFromPaste", sentence, True])
-            until(lambda: app.pending_backup is None)
-            assert app.clipboard.wait_for_text() == "Original text"
+            second_edits = [["insertFromPaste", sentence, True]]
+            # Chrome can throttle native window title updates beyond 350 ms.
+            # Observe the renderer directly before issuing the next X event.
+            def renderer_logged():
+                marker = "second-chat " + json.dumps(second_edits, ensure_ascii=False, separators=(",", ":"))
+                return marker in chrome_log.read_text(errors="replace")
+            until(renderer_logged)
             print("A fresh hold inserted into another Chrome window", flush=True)
             if not real:
+                # Return immediately to the already-open chat after submitting.
+                # Keep the same two Chrome windows and process throughout.
+                keys("key", "Return")
+                second_edits.append(["submit", sentence, True])
+                until(renderer_logged)
+                assert app.pending_read in ("untagged", "navigation"), app.overlay.status.get_text()
+                browser = first_browser
+                activate(browser)
+                audio.with_suffix(".txt").write_text("Fresh message.")
+                serial = app.paste_serial
+                hold("Super_L", "Alt_L")
+                keys("keyup", "Alt_L", "keyup", "Super_L")
+                until(lambda: app.recording is None and app.pending_backup is None)
+                assert app.paste_serial == serial + 1, app.overlay.status.get_text()
+                expected.append(["chat", "insertFromPaste", sentence + "Fresh message."])
+                until(correct_edits)
+                assert app.overlay.status.get_text().startswith("Sent to app")
+                assert json.JSONDecoder().raw_decode(title(second_browser))[0] == second_edits
+                print("Immediate Chrome window switch after Enter inserted exactly once", flush=True)
                 # A new hold probes Chrome's shortcuts before claiming the
                 # selection. A declined claim must preserve the older guard's
                 # manual Ctrl+V, even when both use this same window.
@@ -452,9 +498,11 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
                     until(lambda: app.recording is None)
                 assert app.paste_serial == serial and app.overlay.copy_button.get_visible()
                 keys("key", "ctrl+a", "ctrl+v")
-                until(lambda: title().startswith("[") and json.JSONDecoder().raw_decode(title())[0] ==
-                      ["insertFromPaste", "Original text", True])
+                expected.append(["chat", "insertFromPaste", "Original text"])
+                until(correct_edits)
                 assert not app.paused_clients
+            until(lambda: app.pending_backup is None)
+            assert app.clipboard.wait_for_text() == "Original text"
         finally:
             chrome.terminate()
             chrome.wait(timeout=10)
@@ -1087,6 +1135,36 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
         until(lambda: second.get_text() == text)
         second.set_text("")
         assert not app.paused_clients and len(app.overlay.pending) == cards_before
+
+    for gesture, queued_read in product((("click", "1"), ("key", "alt+Tab")), (False, True)):
+        first.grab_focus()
+        handler = first.connect("paste-clipboard", defer_paste)
+        hold("Super_L", "Alt_L")
+        keys("keyup", "Alt_L", "keyup", "Super_L")
+        until(lambda: bool(delayed))
+        first.disconnect(handler)
+        delayed.pop()
+        secondary_read(text.encode(), X.CurrentTime)
+        keys("key", "Return")
+        until(lambda: app.pending_read == "navigation")
+        def switch_window():
+            keys(*gesture)
+            recipient.set_input_focus(X.RevertToParent, X.CurrentTime)
+            x.sync()
+        if queued_read:
+            secondary_read(None, X.CurrentTime, queued_input=switch_window)
+        else:
+            switch_window()
+        until(lambda: app.pending_backup is None)
+        client = app.selection.client_id(xid)
+        assert client in app.paused_clients
+        assert (client in app.navigation_guards) == (not queued_read), gesture
+        secondary_read(None, X.CurrentTime)
+        assert client not in app.navigation_guards and app.overlay.recovery == text
+        app.overlay.resume.clicked()
+        app.overlay.dismiss_recovery()
+        x.create_resource_object("window", xid).set_input_focus(X.RevertToParent, X.CurrentTime)
+        x.sync()
 
     # A passive synchronous grab can delay a real Ctrl+V even when there
     # is no longer a dictation clipboard to protect. Check the X server's
