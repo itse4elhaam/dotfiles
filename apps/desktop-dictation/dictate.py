@@ -23,8 +23,6 @@ from Xlib.ext import xfixes, xinput, xtest
 
 def paste_shortcut(wm_class):
     names = tuple(name.lower() for name in (wm_class or ()))
-    if names and names[-1] in ("google-chrome", "chromium", "chromium-browser"):
-        return ()
     if any(name in ("xterm", "uxterm", "rxvt", "urxvt", "urxvtc", "rxvt-unicode") for name in names):
         return ()
     terminals = ("terminal", "kitty", "alacritty", "ghostty", "wezterm", "tilix", "konsole", "terminator", "foot")
@@ -61,7 +59,10 @@ class Recording:
             self.backup = app.pending_backup
             self.clipboard_owner = app.selection.window if self.backup.values else X.NONE
         else:
-            self.backup = ClipboardBackup(app.clipboard, app.x, self.clipboard_owner)
+            # A restored selection already has a complete byte-for-byte
+            # snapshot. Avoid converting it again through our own reader.
+            saved = app.selection.saved if self.clipboard_owner == app.selection.window else None
+            self.backup = ClipboardBackup(app.clipboard, app.x, self.clipboard_owner, saved)
         self.cancelled = False
         self.audio = queue.Queue(maxsize=7500)  # Five minutes at 40 ms per block.
         self.worker = self.mic = None
@@ -173,6 +174,7 @@ class Dictation:
         self.worker = None
         self.idle_since = time.monotonic()
         self.pending_backup = None
+        self.pending_target = None
         self.expire_pending = None
         self.lock_generation = 0
         self.paste_press = None
@@ -294,14 +296,24 @@ class Dictation:
     def events(self, *_):
         while self.x.pending_events():
             event = self.x.next_event()
+            if (self.expire_pending and self.selection.press_time is not None
+                    and getattr(event, "extension", None) == self.xi):
+                detail = struct.unpack_from("=I", event.data, 6)[0]
+                if ((event.evtype == xinput.RawKeyPress and detail not in self.chord)
+                        or (event.evtype == xinput.RawButtonPress and detail not in (4, 5, 6, 7))):
+                    self.expire_pending()
             # These events and the final grab are ordered on the same connection.
             if isinstance(event, xfixes.SelectionNotify):
                 if event.owner.id not in (X.NONE, self.selection.window.id):
                     self.clipboard_generation += 1
                 if (event.owner.id != self.selection.window.id and
                         self.x.get_selection_owner(self.selection.atom) != self.selection.window):
+                    if self.expire_pending:
+                        self.expire_pending()
                     self.selection.guarded_reads.clear()
             elif event.type == X.SelectionRequest:
+                if self.expire_pending and self.focus() != self.pending_target:
+                    self.expire_pending()
                 self.selection.serve(event)
             elif event.type == X.SelectionClear:
                 if self.x.get_selection_owner(self.selection.atom) != self.selection.window:
@@ -426,7 +438,8 @@ class Dictation:
         rec, self.recording = self.recording, None
         if rec:
             rec.close()
-        self.watch_input(0)
+        if self.pending_backup is None:
+            self.watch_input(0)
         self.overlay.message(message, 2200)
 
     def keyboard_available(self):
@@ -513,7 +526,9 @@ class Dictation:
                 restored = True
                 self.expire_pending = None
                 self.paste_press = None
-                self.pending_backup = None
+                self.pending_backup = self.pending_target = None
+                if self.recording is None:
+                    self.watch_input(0)
                 self.selection.put_back(rec.backup, late_client)
             return False
         def expire():
@@ -529,10 +544,19 @@ class Dictation:
                         self.overlay.recover(text, client=client, show=self.recording is None)
             return False
 
-        def on_read():
-            nonlocal read
+        settle_timer = None
+        def on_read(untagged):
+            nonlocal read, settle_timer
+            if not read:
+                self.overlay.recover_confirmed(text, show=self.recording is None)
             read = True
-            self.overlay.recover_confirmed(text, show=self.recording is None)
+            if untagged:
+                # Clients may negotiate several formats in one native paste.
+                # Serialize subsequent holds until their reads have settled.
+                if settle_timer is not None:
+                    GLib.source_remove(settle_timer)
+                settle_timer = GLib.timeout_add(350, restore)
+                return
             # With an empty backup, dropping ownership now would also drop
             # a second conversion from the same GTK paste handler. Keep the
             # empty selection available until the delivery window closes.
@@ -557,6 +581,7 @@ class Dictation:
                 if (paste_shortcut(window.get_wm_class()) == rec.paste_keys and all(keys)
                         and self.selection.claim(text, timestamp, client, rec.backup, on_read)):
                     self.expire_pending = expire
+                    self.pending_target = rec.target
                     self.pending_backup = rec.backup
                     self.paste_serial = serial
                     for key in keys[:-1]:
@@ -582,6 +607,7 @@ class Dictation:
             self.end("Transcript ready")
             self.overlay.sent(text)
             GLib.timeout_add(1800, expire)
+            self.events()  # XSync may already have buffered the raw shortcut events.
         else:
             self.recover(text)
 

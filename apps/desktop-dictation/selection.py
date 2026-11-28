@@ -56,6 +56,7 @@ class TextSelection:
         self.confirmed = {}  # X11 timestamp -> process identity, never transcript bytes
         self.replay = None
         self.press_time = None
+        self.allow_current_time = False
         self.saved = None
         self.recipient = None
         self.other_clients = {}
@@ -93,6 +94,7 @@ class TextSelection:
             return False
         self.saved = None
         self.press_time = None
+        self.allow_current_time = True
         self.recipient = recipient
         self.other_clients = backup.values
         self.restore = on_read
@@ -125,12 +127,17 @@ class TextSelection:
         saved = self.saved
         recipient = self.restore is not None and client == self.recipient
         delivering = recipient and request.time != X.CurrentTime and request.time == self.press_time
+        # CurrentTime identifies neither the shortcut nor the field. Treat a
+        # matching process's read during this one outstanding paste as a read
+        # of its offer. A delayed callback and a fresh read look identical.
+        untagged = (recipient and self.allow_current_time and self.press_time is not None
+                    and self.press_time not in self.confirmed and request.time == X.CurrentTime)
         # An unidentified second connection could belong to the target. Keep
         # the previous clipboard private until a distinct process is proven.
         unknown_reader = client[0] != "process" and (self.restore is not None or bool(self.guarded_reads))
         if self.restore and not recipient and not unknown_reader:
             saved = self.other_clients
-        guard = client in self.guarded_reads or unknown_reader or (recipient and not delivering)
+        guard = client in self.guarded_reads or unknown_reader or (recipient and not delivering and not untagged)
         # A single GTK handler may request the same selection repeatedly.
         # Consult acknowledged timestamps before a newer claim or backup.
         previous = self.confirmed.get(request.time)
@@ -172,10 +179,13 @@ class TextSelection:
             time=request.time, requestor=request.requestor, selection=request.selection,
             target=target, property=prop))
         self.x.flush()
-        if delivering and not guard and prop and target in self.formats:
+        if untagged and not guard and prop and target in self.formats:
+            self.restore(untagged=True)
+        elif delivering and not guard and prop and target in self.formats:
+            self.allow_current_time = False
             self.confirmed[request.time] = client
             self.replay = (request.time, self.text)
-            self.restore()
+            self.restore(untagged=False)
 
     def put_back(self, backup, late_client=None):
         self.restore = None
@@ -208,10 +218,10 @@ class TextSelection:
 
 class ClipboardBackup:
     """Back up passive clipboard formats while speaking, retaining their original bytes."""
-    def __init__(self, clipboard, x, owner):
-        self.ready = not owner
-        self.values = {}
-        if owner:
+    def __init__(self, clipboard, x, owner, saved=None):
+        self.ready = saved is not None or not owner
+        self.values = {} if saved is None else saved
+        if not self.ready:
             clipboard.request_targets(self._targets, x)
 
     def _targets(self, clipboard, targets, count, x):

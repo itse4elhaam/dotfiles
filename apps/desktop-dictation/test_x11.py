@@ -1,5 +1,6 @@
 #!/usr/bin/python3
-"""Run GTK integration checks on a private Xvfb. Add --real-model to exercise the installed Parakeet engine."""
+"""Exercise desktop dictation on a private Xvfb with GTK or optional Chrome."""
+import json
 import os
 from pathlib import Path
 import signal
@@ -148,14 +149,31 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
     assert paste_shortcut(("gnome-terminal-server", "Gnome-terminal")) == (XK.XK_Control_L, XK.XK_Shift_L, XK.XK_v)
     if "--chrome" in sys.argv:
         page = directory / "editor.html"
-        page.write_text("""<title>Dictation fixture</title>
-            <input autofocus oninput="document.title=this.value">
-            <div contenteditable oninput="document.title=this.innerText"></div>""")
+        page.write_text("""<meta charset="utf-8"><title>Dictation fixture</title>
+            <input id="first" autofocus><textarea id="second"></textarea>
+            <div id="editor" contenteditable></div><input id="next">
+            <script>
+            function ready() {
+              if (document.hasFocus() && document.activeElement.id === "first")
+                document.title = "Dictation fixture ready";
+              else requestAnimationFrame(ready);
+            }
+            ready();
+            const edits = [];
+            document.oninput = event => {
+              const field = event.target;
+              edits.push([field.id, event.inputType, field.value ?? field.innerText]);
+              document.title = JSON.stringify(edits);
+              field.nextElementSibling.focus();
+            };
+            </script>""")
         chrome = subprocess.Popen(["google-chrome", "--ozone-platform=x11",
             "--user-data-dir=" + str(directory / "chrome-profile"), "--no-first-run",
             "--no-default-browser-check", "--disable-background-networking", "--disable-sync",
             "--disable-extensions", "--disable-gpu", "--password-store=basic",
-            "--app=" + page.as_uri()], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            page.as_uri()], env=dict(os.environ,
+                DBUS_SESSION_BUS_ADDRESS="unix:path=" + str(directory / "no-session-bus"),
+                GTK_USE_PORTAL="0"), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         try:
             def field():
                 return subprocess.run(["xdotool", "search", "--onlyvisible", "--name", "Dictation fixture"],
@@ -168,25 +186,22 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
             def title():
                 prop = browser.get_full_property(x.intern_atom("_NET_WM_NAME"), X.AnyPropertyType)
                 return prop.value.decode() if prop else ""
-            serial = app.paste_serial
-            for app_class in ("google-chrome", "chromium"):
-                if app_class != "google-chrome":
-                    browser.set_wm_class(app_class.lower(), app_class)
-                    x.sync()
-                    keys("key", "Tab")
-                owner = x.get_selection_owner(app.selection.atom)
-                original_title = title()
-                sentence = f"One complete sentence for {app_class}."
+            until(lambda: title().startswith("Dictation fixture ready"))
+            expected = []
+            for name in ("first", "second", "editor"):
+                serial = app.paste_serial
+                sentence = f"One complete sentence for {name}."
                 audio.with_suffix(".txt").write_text(sentence)
                 hold("Super_L", "Alt_L")
                 keys("keyup", "Alt_L", "keyup", "Super_L")
-                until(lambda: app.overlay.recovery == sentence)
-                assert title() == original_title and app.paste_serial == serial
-                assert x.get_selection_owner(app.selection.atom) == owner
-                app.overlay.copy_recovery()
-                keys("key", "ctrl+v")
-                until(lambda: title() == sentence)
-                print(browser.get_wm_class(), "manual paste", title(), flush=True)
+                until(lambda: app.recording is None)
+                expected.append([name, "insertFromPaste", sentence])
+                until(lambda: title().startswith("[") and json.JSONDecoder().raw_decode(title())[0] == expected)
+                assert app.paste_serial == serial + 1
+                assert app.clipboard.wait_for_text() == "Original text"
+                print(name, "native paste", sentence, flush=True)
+            until(lambda: app.pending_backup is None)
+            assert app.clipboard.wait_for_text() == "Original text"
         finally:
             chrome.terminate()
             chrome.wait(timeout=10)
@@ -345,17 +360,27 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
     until(lambda: bool(delayed))
     first.disconnect(handler)
     entry, _ = delayed.pop()
-    entry.set_text(entry.get_text() + secondary_read(b"", X.CurrentTime).decode())
-    until(lambda: app.pending_backup is None and app.overlay.recovery == text)
-    assert entry.get_text() == text
-    app.overlay.copy_recovery()
-    secondary_read(b"", X.CurrentTime)
-    secondary_read(b"", X.CurrentTime)
-    other_read(text.encode())
-    assert app.overlay.resume.get_mapped() and not app.overlay.copy_button.get_visible()
-    app.overlay.resume.clicked()
-    assert not app.overlay.get_visible()
+    entry.set_text(secondary_read(text.encode(), X.CurrentTime).decode())
     secondary_read(text.encode(), X.CurrentTime)
+    until(lambda: app.pending_backup is None and app.overlay.recovery == text)
+    assert entry.get_text() == text and not app.paused_clients
+    secondary_read(b"CurrentTime sentinel", X.CurrentTime)
+    app.overlay.dismiss_recovery()
+
+    # A key after dispatch but before the application's first read can
+    # change the field. Keep the transcript for recovery in this case.
+    handler = first.connect("paste-clipboard", defer_paste)
+    hold("Alt_L", "Super_L")
+    keys("keyup", "Alt_L", "keyup", "Super_L")
+    until(lambda: bool(delayed))
+    first.disconnect(handler)
+    delayed.pop()
+    keys("key", "Right")
+    until(lambda: app.overlay.resume.is_visible() and app.pending_backup is None)
+    secondary_read(b"", X.CurrentTime)
+    app.overlay.resume.clicked()
+    secondary_read(b"CurrentTime sentinel", X.CurrentTime)
+    app.overlay.dismiss_recovery()
 
     # Both fields belong to one X client. A late reader from the first
     # field must never consume the second transcript when the first expires.
@@ -416,7 +441,6 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
     generation = app.clipboard_generation
     app.clipboard.set_text("Copied during pending paste", -1)
     until(lambda: app.clipboard_generation > generation)
-    assert app.pending_backup is not None
     until(lambda: app.pending_backup is None and app.overlay.resume.is_visible())
 
     x.screen().root.change_property(app.active_atom, Xatom.WINDOW, 32, [recipient.id])
@@ -428,8 +452,6 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
     until(lambda: app.pending_backup is not None)
     delayed.pop()[0].emit("paste-clipboard")
     until(lambda: first.get_text() == "Copied during pending paste")
-    other_read(b"")
-    assert app.pending_backup is not None
     other_read(b"Other client transcript", "key-time")
     until(lambda: app.pending_backup is None)
     assert app.clipboard.wait_for_text() == "Copied during pending paste"
@@ -694,6 +716,9 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
     until(lambda: bool(delayed))
     second.disconnect(handler)
     entry, _ = delayed.pop()
+    app.x.sync()
+    app.events()
+    assert app.paste_press is None and app.selection.press_time is not None
     app.selection.press_time = gesture[0][-1]
     entry.set_text(secondary_read(b"", gesture[0][-1]).decode())
     assert app.pending_backup is not None

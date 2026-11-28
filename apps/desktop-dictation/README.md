@@ -2,7 +2,7 @@
 
 Place the caret in a text field and hold **Super + Left Alt**. A blue and lavender outline marks the window that was active when recording began. Its lower edge and the waveform on the bottom card follow the microphone. The card shows the words as Parakeet recognizes them. Release either key to finish, then let both keys up for insertion. Press **Esc** during a hold to cancel it.
 
-Speech recognition runs locally. The service uses the English Parakeet Unified 0.6B Q8_0 model, Silero voice detection, a native CPU speech engine and a microphone accessible through PulseAudio or PipeWire’s PulseAudio service. Audio stays in memory. The recognizer stays warm for 15 minutes between holds.
+Speech recognition runs locally. The service uses the English Parakeet Unified 0.6B Q8_0 model, Silero voice detection, a native CPU speech engine and a microphone accessible through PulseAudio or PipeWire’s PulseAudio service. Each hold records up to five minutes. Audio stays in memory. The recognizer stays warm for 15 minutes between holds.
 
 ## Install
 
@@ -31,6 +31,8 @@ The preview and final transcript use the same cleanup. Fillers and silence filte
 ## Insertion and recovery
 
 Keep the caret in the original field until insertion finishes. If you move to another field or change windows while the transcript is finishing, the overlay holds the text and offers **Copy**. If recognition stops early, it offers the last available partial. A read-only target or an application that cannot consume a paste may also require Copy. X11 exposes the focused window. An application can move its own caret without sending a separate desktop focus event.
+
+Dictation uses one normal desktop paste per utterance. Applications that request a paste with the original key-event timestamp receive that transcript. Some editors request clipboard data without a timestamp. For a response from the focused process, the service keeps the same text available for 350 ms after the last text read, up to 1.8 seconds after dispatch. A subsequent paste waits its turn. An application that leaves the paste unread is paused and its transcript stays available through **Copy**. X11 cannot distinguish an unrelated same-process read, or one delayed indefinitely, from a new untagged paste.
 
 The clipboard delivery path preserves supported existing formats. If text reaches the application's clipboard handler, **Sent to app** offers Copy for four seconds. Open **Last Dictation** in the application launcher to recall the latest acknowledged transcript. A clipboard read alone cannot confirm what an editor kept. Unhandled transcripts remain available until copied, dismissed or cleared when the session locks.
 
