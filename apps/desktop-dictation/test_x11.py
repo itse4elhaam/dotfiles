@@ -211,7 +211,16 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
                     until(lambda: app.overlay.recovery and direction.lower() in app.overlay.recovery.lower())
                     sentence = app.overlay.recovery
                 expected.append([name, "insertFromPaste", sentence])
-                until(lambda: title().startswith("[") and json.JSONDecoder().raw_decode(title())[0] == expected)
+                def correct_edits():
+                    current = title()
+                    return current.startswith("[") and json.JSONDecoder().raw_decode(current)[0] == expected
+                try:
+                    until(correct_edits)
+                except AssertionError as exc:
+                    raise AssertionError(
+                        f"{name} expected {expected!r}, browser title {title()!r}, "
+                        f"status {app.overlay.status.get_text()!r}, "
+                        f"paste serial {serial} → {app.paste_serial}") from exc
                 assert app.paste_serial == serial + 1
                 assert app.clipboard.wait_for_text() == "Original text"
                 print(name, "native paste", sentence, flush=True)
