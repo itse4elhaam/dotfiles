@@ -267,13 +267,17 @@ class ClipboardBackup:
             size = data.get_length()
             if not 0 <= size <= min(8 * 1024 * 1024, budget):
                 return
+            bits = data.get_format()
+            # GDK can expose format-32 words as native longs. Only retain
+            # formats whose bytes can be replayed directly as X11 elements.
+            if bits not in (8, 16) or size % (bits // 8) or not data.get_data_type():
+                return
             payload = bytes(data.get_data() or b"")
-            if (len(payload) != size or data.get_format() not in (8, 16, 32)
-                    or not data.get_data_type() or (gtk_image and not self._valid_png(data, payload))):
+            if len(payload) != size or (gtk_image and not self._valid_png(data, payload)):
                 return
             budget -= size
             values[x.intern_atom(name)] = (
-                x.intern_atom(data.get_data_type().name()), data.get_format(), payload)
+                x.intern_atom(data.get_data_type().name()), bits, payload)
             if len(values) == len(names):
                 self.values = values
                 self.ready = True
