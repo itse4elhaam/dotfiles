@@ -632,6 +632,28 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
     assert not app.paused_clients
     app.overlay.dismiss_recovery()
 
+    # An editor may still be negotiating at the hard timeout. Its next
+    # untagged conversion must not paste the restored clipboard into the field.
+    handler = first.connect("paste-clipboard", defer_paste)
+    hold("Alt_L", "Super_L")
+    keys("keyup", "Alt_L", "keyup", "Super_L")
+    until(lambda: bool(delayed))
+    first.disconnect(handler)
+    delayed.pop()
+    secondary_read(text.encode(), X.CurrentTime)
+    deadline = time.monotonic() + 3
+    while app.pending_backup is not None and time.monotonic() < deadline:
+        secondary_read(offered, X.CurrentTime, app.selection.targets)
+        wake = time.monotonic() + .12
+        until(lambda: app.pending_backup is None or time.monotonic() >= wake)
+    assert app.pending_backup is None
+    secondary_read(None, X.CurrentTime)
+    other_read(b"CurrentTime sentinel")
+    assert app.overlay.recovery == text and app.overlay.resume.get_visible()
+    app.overlay.resume.clicked()
+    secondary_read(b"CurrentTime sentinel", X.CurrentTime)
+    app.overlay.dismiss_recovery()
+
     # A key after dispatch but before the application's first read can
     # change the field. Keep the transcript for recovery in this case.
     handler = first.connect("paste-clipboard", defer_paste)

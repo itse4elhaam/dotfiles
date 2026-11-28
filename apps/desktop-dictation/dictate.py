@@ -651,7 +651,10 @@ class Dictation:
             self.events()
             if restored:
                 return False
-            if (not self.pending_read or self.focus() != rec.target or
+            # An untagged recipient still negotiating at the hard deadline
+            # could otherwise paste the restored clipboard on its next read.
+            if (not self.pending_read or (deadline and self.pending_read == "untagged")
+                    or self.focus() != rec.target or
                     self.x.get_selection_owner(self.selection.atom) != self.selection.window):
                 return interrupt()
             if deadline or settle_timer is None:
