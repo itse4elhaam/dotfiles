@@ -161,6 +161,11 @@ class Dictation:
             return self.x.keysym_to_keycode(XK.string_to_keysym(name))
         self.alt = keycode("Alt_L")
         self.supers = {keycode("Super_L"), keycode("Super_R")} - {0}
+        self.controls = {keycode("Control_L"), keycode("Control_R")}
+        self.shifts = {keycode("Shift_L"), keycode("Shift_R")}
+        self.paste_modifiers = set()
+        self.paste_needs_shift = False
+        self.finish_manual_paste = None
         self.chord = self.supers | {self.alt}
         self.other_modifiers = {keycode(name) for name in
                                 ("Alt_R", "Shift_L", "Shift_R", "Control_L", "Control_R",
@@ -306,7 +311,7 @@ class Dictation:
         window = GdkX11.X11Window.foreign_new_for_display(Gdk.Display.get_default(), active) if active else None
         self.overlay.present_at(window)
         try:
-            self.watch_input(xinput.RawButtonPressMask | xinput.RawKeyPressMask)
+            self.watch_input(xinput.RawButtonPressMask | xinput.RawKeyPressMask | xinput.RawKeyReleaseMask)
             self.recording = Recording(self, target)
             recording = self.recording
             self.glow.track(window)
@@ -315,8 +320,37 @@ class Dictation:
             print(exc, file=sys.stderr)
             self.end("Could not start microphone or speech engine")
 
+    def paste_key(self, event, code):
+        # Only observed during the outstanding offer. Keep modifier state,
+        # never the typed characters. The synthetic shortcut precedes dispatch.
+        if event.evtype == xinput.RawKeyRelease:
+            self.paste_modifiers.discard(code)
+            return False
+        if code in self.chord:
+            self.paste_modifiers.add(code)
+            return False
+        if self.pending_read not in ("untagged", "typing") or self.paste_modifiers & self.chord:
+            self.interrupt_paste()
+        elif code in self.controls | self.shifts:
+            self.paste_modifiers.add(code)
+            self.pending_read = "typing"
+        else:
+            symbol = self.x.keycode_to_keysym(code, 0)
+            control = bool(self.paste_modifiers & self.controls)
+            shifted = bool(self.paste_modifiers & self.shifts)
+            if symbol == XK.XK_v and control and shifted == self.paste_needs_shift:
+                return True
+            printable = (0x20 <= symbol <= 0x7e or 0xa0 <= symbol <= 0xff
+                         or 0x01000100 <= symbol <= 0x0110ffff)
+            if printable and (not control or (symbol == XK.XK_a and not shifted)):
+                self.pending_read = "typing"
+            else:
+                self.interrupt_paste()
+        return False
+
     def events(self, *_):
         deferred_requests = []
+        manual_paste = False
         batch_recipient = None
         if self.selection.replay:
             batch_recipient = self.selection.gestures[self.selection.replay[0]]
@@ -327,8 +361,14 @@ class Dictation:
             if (self.paste_target and self.selection.press_time is not None
                     and getattr(event, "extension", None) == self.xi):
                 detail = struct.unpack_from("=I", event.data, 6)[0]
-                if ((event.evtype == xinput.RawKeyPress and detail not in self.chord)
-                        or (event.evtype == xinput.RawButtonPress and detail not in (4, 5, 6, 7))):
+                if event.evtype in (xinput.RawKeyPress, xinput.RawKeyRelease):
+                    if self.paste_key(event, detail):
+                        # A queued request predating this V is still ambiguous.
+                        if deferred_requests:
+                            self.interrupt_paste()
+                        else:
+                            manual_paste = True
+                elif event.evtype == xinput.RawButtonPress and detail not in (4, 5, 6, 7):
                     self.interrupt_paste()
             if self.paste_target and (
                     (event.type == X.FocusOut and event.mode == X.NotifyNormal
@@ -382,6 +422,12 @@ class Dictation:
                             self.cancel()
                         elif code not in self.chord:
                             self.recording.unsafe = True
+        if manual_paste and self.finish_manual_paste:
+            if self.focus() == self.paste_target:
+                self.finish_manual_paste()
+                batch_recipient = None
+            else:
+                self.interrupt_paste()
         if deferred_requests:
             if not self.expire_pending and time.monotonic() >= self.replay_deadline:
                 self.retire_replay()
@@ -390,6 +436,11 @@ class Dictation:
             if not owns_selection:
                 self.interrupt_paste()
             for request in deferred_requests:
+                if (self.pending_read == "typing" and
+                        self.selection.client_id(request.requestor.id) == self.selection.recipient):
+                    # Typing could have moved the caret before a delayed
+                    # conversion. Refuse it and its possible fallback reads.
+                    self.interrupt_paste()
                 if not owns_selection:
                     self.selection.notify(request, X.NONE)
                 elif batch_recipient is not None and self.paste_target is None:
@@ -611,6 +662,8 @@ class Dictation:
             nonlocal restored
             restored = True
             self.expire_pending = None
+            self.finish_manual_paste = None
+            self.paste_modifiers.clear()
             self.paste_press = None
             self.pending_backup = None
             self.pending_read = None
@@ -653,12 +706,13 @@ class Dictation:
                 return False
             # An untagged recipient still negotiating at the hard deadline
             # could otherwise paste the restored clipboard on its next read.
-            if (not self.pending_read or (deadline and self.pending_read == "untagged")
+            if (not self.pending_read or (deadline and self.pending_read in ("untagged", "typing"))
                     or self.focus() != rec.target or
                     self.x.get_selection_owner(self.selection.atom) != self.selection.window):
                 return interrupt()
             if deadline or settle_timer is None:
-                confirm(keep_replay=bool(rec.backup.values) and not deadline and hold_serial == self.hold_serial)
+                confirm(keep_replay=(self.pending_read != "typing" and bool(rec.backup.values)
+                                     and not deadline and hold_serial == self.hold_serial))
             return False
 
         settle_timer = None
@@ -690,6 +744,9 @@ class Dictation:
                 if (paste_shortcut(window.get_wm_class()) == rec.paste_keys and all(keys)
                         and self.selection.claim(text, timestamp, client, rec.backup, on_read)):
                     self.pending_read = None
+                    self.paste_modifiers.clear()
+                    self.paste_needs_shift = XK.XK_Shift_L in rec.paste_keys
+                    self.finish_manual_paste = confirm
                     self.expire_pending = interrupt
                     self.paste_target = rec.target
                     self.root.change_attributes(event_mask=X.PropertyChangeMask)

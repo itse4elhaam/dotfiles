@@ -161,7 +161,7 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
         page = directory / "editor.html"
         page.write_text("""<meta charset="utf-8"><title>Dictation fixture</title>
             <input id="first" autofocus><textarea id="second"></textarea>
-            <div id="editor" contenteditable></div><input id="next">
+            <div id="editor" contenteditable></div><div id="next" contenteditable></div>
             <script>
             function ready() {
               if (document.hasFocus() && document.activeElement.id === "first")
@@ -174,7 +174,7 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
               const field = event.target;
               edits.push([field.id, event.inputType, field.value ?? field.innerText]);
               document.title = JSON.stringify(edits);
-              field.nextElementSibling.focus();
+              if (field.id !== "next") field.nextElementSibling.focus();
             };
             </script>""")
         chrome = subprocess.Popen(["google-chrome", "--ozone-platform=x11",
@@ -199,7 +199,7 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
                 return prop.value.decode() if prop else ""
             until(lambda: title().startswith("Dictation fixture ready"))
             expected = []
-            for name, direction in (("first", "Center"), ("second", "Left"), ("editor", "Right")):
+            for name, direction in (("first", "Center"), ("second", "Left"), ("editor", "Right"), ("next", "Center")):
                 serial = app.paste_serial
                 sentence = f"One complete sentence for {name}."
                 if real:
@@ -212,7 +212,12 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
                     until(lambda: time.monotonic() - app.recording.started >= 2)
                 keys("keyup", "Alt_L", "keyup", "Super_L")
                 until(lambda: app.recording is None, 12)
-                if real:
+                if real and name == "next":
+                    # The confirmation card appears only after negotiation.
+                    # Read the released transcript while the guard is active.
+                    sentence = app.overlay.label.get_text()
+                    assert direction.lower() in sentence.lower()
+                elif real:
                     until(lambda: app.overlay.recovery and direction.lower() in app.overlay.recovery.lower())
                     sentence = app.overlay.recovery
                 expected.append([name, "insertFromPaste", sentence])
@@ -229,6 +234,14 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
                 assert app.paste_serial == serial + 1
                 assert app.clipboard.wait_for_text() == "Original text"
                 print(name, "native paste", sentence, flush=True)
+            assert app.pending_read == "untagged"
+            keys("key", "x")
+            until(lambda: app.pending_read == "typing")
+            expected.append(["next", "insertText", sentence + "x"])
+            keys("key", "ctrl+a", "key", "ctrl+v")
+            expected.append(["next", "insertFromPaste", "Original text"])
+            until(correct_edits)
+            assert not app.paused_clients
             until(lambda: app.pending_backup is None)
             assert app.clipboard.wait_for_text() == "Original text"
         finally:
@@ -642,6 +655,32 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
     first.grab_focus()
     assert not app.paused_clients
     app.overlay.dismiss_recovery()
+
+    # Typing ends a quiet offer without replay. If the editor still wants
+    # data after the key, protect the field through all its fallback reads.
+    for delayed_read in (False, True):
+        handler = first.connect("paste-clipboard", defer_paste)
+        hold("Alt_L", "Super_L")
+        keys("keyup", "Alt_L", "keyup", "Super_L")
+        until(lambda: bool(delayed))
+        first.disconnect(handler)
+        entry, stamp = delayed.pop()
+        entry.set_text(secondary_read(text.encode(), X.CurrentTime).decode())
+        entry.set_position(-1)
+        if delayed_read:
+            secondary_read(None, X.CurrentTime, queued_input=lambda: keys("key", "x"))
+            secondary_read(None, X.CurrentTime)
+            other_read(b"CurrentTime sentinel")
+            assert app.overlay.resume.get_visible()
+            app.overlay.resume.clicked()
+        else:
+            keys("key", "x")
+            until(lambda: app.pending_backup is None)
+            assert not app.paused_clients
+            secondary_read(b"CurrentTime sentinel", X.CurrentTime)
+        assert entry.get_text() == text + "x"
+        secondary_read(None, stamp)
+        app.overlay.dismiss_recovery()
 
     # An editor may still be negotiating at the hard timeout. Its next
     # untagged conversion must not paste the restored clipboard into the field.
