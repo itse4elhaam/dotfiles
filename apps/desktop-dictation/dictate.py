@@ -326,7 +326,7 @@ class Dictation:
                   and event.evtype == xinput.RawKeyPress
                   and self.paste_press == (event.sequence_number, struct.unpack_from("=I", event.data, 6)[0])):
                 # XI2 raw time and detail start at wire bytes 12 and 16.
-                self.selection.press_time = struct.unpack_from("=I", event.data, 2)[0]
+                self.selection.dispatch(struct.unpack_from("=I", event.data, 2)[0])
                 self.paste_press = None
             elif self.recording:
                 if event.type == X.KeyPress and event.detail == self.escape:
@@ -501,7 +501,7 @@ class Dictation:
     def copy_recovery(self, text):
         if self.expire_pending:
             self.expire_pending()
-        if self.paused_clients or self.selection.confirmed:
+        if self.paused_clients or self.selection.gestures:
             self.clipboard_generation += 1
             timestamp = GdkX11.x11_get_server_time(self.overlay.get_window())
             self.selection.copy(text, timestamp, self.paused_clients)

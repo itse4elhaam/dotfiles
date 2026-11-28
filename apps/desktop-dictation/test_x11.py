@@ -385,11 +385,18 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
     keys("keyup", "Alt_L", "keyup", "Super_L")
     until(lambda: bool(delayed))
     first.disconnect(handler)
-    entry, _ = delayed.pop()
+    entry, current_gesture = delayed.pop()
     entry.set_text(secondary_read(text.encode(), X.CurrentTime).decode())
     secondary_read(text.encode(), X.CurrentTime)
     until(lambda: app.pending_backup is None and app.overlay.recovery == text)
     assert entry.get_text() == text and not app.paused_clients
+    secondary_read(text.encode(), current_gesture)
+    xres = app.selection.xres
+    app.selection.xres = None
+    try:
+        secondary_read(b"", current_gesture)
+    finally:
+        app.selection.xres = xres
     secondary_read(b"CurrentTime sentinel", X.CurrentTime)
     app.overlay.dismiss_recovery()
 
@@ -436,6 +443,7 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
     until(lambda: bool(ordinary))
     assert not ordinary[0] and app.pending_backup is not None
     other_read(b"Original before two holds")
+    until(lambda: app.pending_backup is None and app.overlay.resume.is_visible())
     second.grab_focus()
     audio.with_suffix(".txt").write_text("Second transcript")
     hold("Super_L", "Alt_L")
@@ -458,6 +466,7 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
     entry, key_time = delayed.pop()
     entry.set_text(entry.get_text() + secondary_read(b"", key_time).decode())
     app.overlay.resume.clicked()
+    secondary_read(b"", key_time)
     assert not first.get_text() and not second.get_text()
     keys("key", "ctrl+v")
     until(lambda: second.get_text() == "Second transcript")
@@ -561,12 +570,14 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
                 conversions.append(request.target)
         app.selection.serve = observe_paste
         try:
-            delayed.pop()[0].emit("paste-clipboard")
+            entry, expired_time = delayed.pop()
+            entry.emit("paste-clipboard")
             until(lambda: bool(conversions))
         finally:
             app.selection.serve = serve
         assert not first.get_text()
         app.overlay.resume.clicked()
+        secondary_read(b"", expired_time)
         keys("key", "ctrl+v")
         until(lambda: second.get_text() == "Recovered B")
         assert not first.get_text()
@@ -744,22 +755,36 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
 
     # A wrapped server timestamp is indistinguishable from an old request.
     # Simulate just the repeated XI2 timestamp on the dispatched shortcut.
+    from unittest.mock import patch
     handler = second.connect("paste-clipboard", defer_paste)
     audio.with_suffix(".txt").write_text("Wrapped event")
-    hold("Alt_L", "Super_L")
-    keys("keyup", "Super_L", "keyup", "Alt_L")
-    until(lambda: bool(delayed))
+    dispatch = app.selection.dispatch
+    with patch.object(app.selection, "dispatch", lambda _: dispatch(gesture[0][-1])):
+        hold("Alt_L", "Super_L")
+        keys("keyup", "Super_L", "keyup", "Alt_L")
+        until(lambda: bool(delayed) and app.selection.press_time == gesture[0][-1])
     second.disconnect(handler)
     entry, _ = delayed.pop()
-    app.x.sync()
-    app.events()
-    assert app.paste_press is None and app.selection.press_time is not None
-    app.selection.press_time = gesture[0][-1]
+    secondary_read(b"", X.CurrentTime)
     entry.set_text(secondary_read(b"", gesture[0][-1]).decode())
     assert app.pending_backup is not None
     until(lambda: app.overlay.recovery == "Wrapped event")
     assert not entry.get_text()
     other_read(b"Before GTK handler")
+
+    # When the timestamp table is full, a fresh hold goes to recovery and
+    # old timestamps still guard a later explicit Copy.
+    app.overlay.resume.clicked()
+    serial = app.paste_serial
+    with patch("selection.MAX_GESTURES", len(app.selection.gestures)):
+        audio.with_suffix(".txt").write_text("At capacity")
+        hold("Alt_L", "Super_L")
+        keys("keyup", "Super_L", "keyup", "Alt_L")
+        until(lambda: app.overlay.recovery == "At capacity")
+        assert app.paste_serial == serial
+        app.overlay.copy_recovery()
+        secondary_read(b"", gesture[0][-1])
+        secondary_read(b"At capacity", X.CurrentTime)
     app.stop_worker()
 
 

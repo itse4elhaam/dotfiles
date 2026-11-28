@@ -23,7 +23,7 @@ class QueryClientIds(rq.ReplyRequest):
 
 
 LOCAL_CLIENT_PID_MASK = 2
-MAX_CONFIRMED_EVENTS = 65536
+MAX_GESTURES = 65536
 
 
 def xres_opcode(x):
@@ -53,7 +53,7 @@ class TextSelection:
         self.text_atom = x.intern_atom("TEXT")
         self.utf8 = x.intern_atom("UTF8_STRING")
         self.compound = x.intern_atom("COMPOUND_TEXT")
-        self.confirmed = {}  # X11 timestamp -> process identity, never transcript bytes
+        self.gestures = {}  # Dispatched V timestamp -> process identity (None on collision)
         self.replay = None
         self.press_time = None
         self.allow_current_time = False
@@ -86,7 +86,7 @@ class TextSelection:
     def claim(self, text, timestamp, recipient, backup, on_read):
         # Keep exact tombstones even across clock wrap. At capacity use Copy
         # until restart instead of forgetting a potentially queued conversion.
-        if len(self.confirmed) >= MAX_CONFIRMED_EVENTS:
+        if len(self.gestures) >= MAX_GESTURES:
             return False
         self.replay = None
         self.window.set_selection_owner(self.atom, timestamp)
@@ -94,13 +94,21 @@ class TextSelection:
             return False
         self.saved = None
         self.press_time = None
-        self.allow_current_time = True
+        self.allow_current_time = False
         self.recipient = recipient
         self.other_clients = backup.values
         self.restore = on_read
         self.text = text
         self.time = timestamp
         return True
+
+    def dispatch(self, timestamp):
+        self.press_time = timestamp
+        # A wrapped timestamp can name two queued gestures. Suppress reads
+        # for that time regardless of which process eventually converts it.
+        self.allow_current_time = bool(timestamp) and timestamp not in self.gestures
+        if timestamp:
+            self.gestures[timestamp] = self.recipient if self.allow_current_time else None
 
     def copy(self, text, timestamp, paused_clients):
         self.replay = None
@@ -126,25 +134,25 @@ class TextSelection:
         client = self.client_id(request.requestor.id)
         saved = self.saved
         recipient = self.restore is not None and client == self.recipient
-        delivering = recipient and request.time != X.CurrentTime and request.time == self.press_time
+        previous = self.gestures.get(request.time)
+        delivering = (recipient and previous == client and request.time == self.press_time
+                      and self.replay is None)
         # CurrentTime identifies neither the shortcut nor the field. Treat a
         # matching process's read during this one outstanding paste as a read
         # of its offer. A delayed callback and a fresh read look identical.
-        untagged = (recipient and self.allow_current_time and self.press_time is not None
-                    and self.press_time not in self.confirmed and request.time == X.CurrentTime)
+        untagged = (recipient and self.allow_current_time and request.time == X.CurrentTime)
         # An unidentified second connection could belong to the target. Keep
         # the previous clipboard private until a distinct process is proven.
         unknown_reader = client[0] != "process" and (self.restore is not None or bool(self.guarded_reads))
         if self.restore and not recipient and not unknown_reader:
             saved = self.other_clients
         guard = client in self.guarded_reads or unknown_reader or (recipient and not delivering and not untagged)
-        # A single GTK handler may request the same selection repeatedly.
-        # Consult acknowledged timestamps before a newer claim or backup.
-        previous = self.confirmed.get(request.time)
-        repeated = previous is not None and (previous == client or client[0] != "process" or delivering)
+        # Requests carrying an old V timestamp can arrive after restore,
+        # Copy or Resume. Only the most recent successful offer can replay.
+        repeated = (request.time in self.gestures and not delivering
+                    and (previous is None or previous == client or client[0] != "process"))
         value_text = self.text
         if repeated:
-            delivering = False
             saved = None
             guard = False
             value_text = (self.replay[1] if previous == client and self.replay
@@ -179,13 +187,10 @@ class TextSelection:
             time=request.time, requestor=request.requestor, selection=request.selection,
             target=target, property=prop))
         self.x.flush()
-        if untagged and not guard and prop and target in self.formats:
-            self.restore(untagged=True)
-        elif delivering and not guard and prop and target in self.formats:
-            self.allow_current_time = False
-            self.confirmed[request.time] = client
-            self.replay = (request.time, self.text)
-            self.restore(untagged=False)
+        if (untagged or delivering) and not guard and prop and target in self.formats:
+            self.allow_current_time = untagged
+            self.replay = (self.press_time, self.text)
+            self.restore(untagged=untagged)
 
     def put_back(self, backup, late_client=None):
         self.restore = None
