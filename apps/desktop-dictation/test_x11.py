@@ -174,11 +174,24 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
             document.addEventListener("focusin", event => {
               if (edits.length) document.title = JSON.stringify(edits) + " focus=" + event.target.id;
             });
+            let plainPasteStarted = false;
+            document.onkeydown = event => {
+              if (event.target.id === "editor" && event.ctrlKey && event.shiftKey && event.code === "KeyV") {
+                plainPasteStarted = true;
+                document.title = "Manual paste key delivered";
+              }
+            };
             document.oninput = event => {
               if (!event.isTrusted) throw Error("Expected native input");
               const field = event.target;
               edits.push([field.id, event.inputType, field.value ?? field.textContent]);
               document.title = JSON.stringify(edits);
+              if (field.id === "editor" && event.inputType === "deleteContentForward") {
+                plainPasteStarted = false;
+                setTimeout(() => {
+                  if (!plainPasteStarted) document.title = "Deletion processed";
+                }, 50);
+              }
               if (field.id === "first" || field.id === "second") field.nextElementSibling.focus();
             };
             </script>""")
@@ -242,6 +255,17 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
                 if name == "editor":
                     assert app.pending_read == "untagged"
                     keys("key", "BackSpace", "ctrl+a", "Delete", "ctrl+shift+v")
+                    # Keep the service busy while the renderer processes Delete.
+                    # Chrome must still be waiting for the manual V. If Chrome
+                    # starts that paste first, it can reuse the dictation even
+                    # when every X11 text conversion returns the old clipboard.
+                    deadline = time.monotonic() + 2
+                    while time.monotonic() < deadline:
+                        marker = title()
+                        if marker.startswith(("Deletion processed", "Manual paste key delivered")):
+                            break
+                        time.sleep(.005)
+                    assert marker.startswith("Deletion processed"), marker
                     expected.extend([
                         [name, "deleteContentBackward", sentence[:-1]],
                         [name, "deleteContentForward", ""],

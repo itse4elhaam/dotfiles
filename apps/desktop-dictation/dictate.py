@@ -370,6 +370,8 @@ class Dictation:
     def events(self, *_):
         deferred_requests = []
         manual_paste = False
+        grabbed_v = None
+        offer_focus = self.paste_target[1] if self.expire_pending and self.paste_target else None
         batch_recipient = None
         if self.selection.replay:
             batch_recipient = self.selection.gestures[self.selection.replay[0]]
@@ -418,7 +420,11 @@ class Dictation:
                     self.selection.saved = None
             elif (event.type == X.KeyPress and event.detail == self.v_key and not event.send_event
                   and event.window != self.root):
-                self.replay_resume_shortcut(event, deferred_requests)
+                if event.window.id in self.resume_grabs and event.window.id != offer_focus:
+                    self.replay_resume_shortcut(event, deferred_requests)
+                else:
+                    # Chrome must see the ownership change before receiving V.
+                    grabbed_v = event
             elif event.type == X.KeyPress and event.detail in self.chord:
                 self.modifiers_changed()
             elif event.type == X.KeyRelease and event.detail in self.chord:
@@ -451,6 +457,21 @@ class Dictation:
             elif not self.expire_overdue_paste():
                 self.finish_manual_paste()
                 batch_recipient = None
+        if grabbed_v is not None:
+            # Focus can leave the original window while the key is frozen.
+            # Discard that press rather than replay it into another client.
+            unresolved = self.expire_pending is not None
+            if unresolved:
+                self.interrupt_paste()
+            mode = X.AsyncKeyboard
+            self.x.grab_server()
+            try:
+                if not unresolved and not self.locked and self.x.get_input_focus().focus == grabbed_v.window:
+                    mode = X.ReplayKeyboard
+            finally:
+                self.x.allow_events(mode, grabbed_v.time)
+                self.x.ungrab_server()
+                self.x.flush()
         if deferred_requests:
             # A cancellation can release an empty clipboard while draining.
             owns_selection = self.x.get_selection_owner(self.selection.atom) == self.selection.window
@@ -716,6 +737,8 @@ class Dictation:
         restored = False
         lock_generation = self.lock_generation
         hold_serial = self.hold_serial
+        paste_grabs = []
+
         def restore(late_client=None, keep_replay=False):
             nonlocal restored
             restored = True
@@ -728,6 +751,10 @@ class Dictation:
             if not keep_replay:
                 self.retire_replay()
             self.selection.put_back(rec.backup, late_client)
+            for modifiers in paste_grabs:
+                focus_window.ungrab_key(self.v_key, modifiers,
+                                       onerror=lambda exc, _: isinstance(exc, error.BadWindow))
+            self.x.flush()
 
         def confirm(keep_replay=False):
             restore(keep_replay=keep_replay)
@@ -740,9 +767,10 @@ class Dictation:
                 # second conversion. A redirect ends that gesture successfully.
                 confirm()
                 return False
-            if self.pending_read == "navigation":
-                self.watch_resume_shortcut(rec)
+            navigated = self.pending_read == "navigation"
             restore(client)
+            if navigated:
+                self.watch_resume_shortcut(rec)
             # A conversion need not be the paste that changes the field.
             self.paused_clients[client] = rec.app_name
             if self.lock_generation == lock_generation:
@@ -809,15 +837,16 @@ class Dictation:
                     self.paste_modifiers.clear()
                     self.paste_shift_states = {XK.XK_Shift_L in rec.paste_keys}
                     # Chrome also accepts Ctrl+Shift+V for plain-text paste.
-                    if any(name.lower() in ("google-chrome", "google-chrome-beta", "google-chrome-unstable",
-                                            "chromium", "chromium-browser") for name in wm_class):
+                    chrome = any(name.lower() in ("google-chrome", "google-chrome-beta", "google-chrome-unstable",
+                                                  "chromium", "chromium-browser") for name in wm_class)
+                    if chrome:
                         self.paste_shift_states.add(True)
                     self.finish_manual_paste = confirm
                     self.expire_pending = interrupt
                     self.paste_target = rec.target
                     self.root.change_attributes(event_mask=X.PropertyChangeMask)
-                    self.x.create_resource_object("window", rec.target[1]).change_attributes(
-                        event_mask=X.FocusChangeMask)
+                    focus_window = self.x.create_resource_object("window", rec.target[1])
+                    focus_window.change_attributes(event_mask=X.FocusChangeMask)
                     self.pending_backup = rec.backup
                     self.paste_serial = serial
                     for key in keys[:-1]:
@@ -834,6 +863,17 @@ class Dictation:
                     time.sleep(.002)
                     for key in reversed(keys):
                         xtest.fake_input(self.x, X.KeyRelease, key)
+                    if chrome:
+                        # Chromium can retain the previous paste result when V
+                        # reaches it before the clipboard ownership notification,
+                        # even if every new X conversion returns the restored text.
+                        for shift in (0, X.ShiftMask):
+                            for lock in self.lock_masks:
+                                modifiers = X.ControlMask | shift | lock
+                                focus_window.grab_key(
+                                    self.v_key, modifiers, False, X.GrabModeAsync, X.GrabModeSync,
+                                    onerror=lambda exc, _: isinstance(exc, (error.BadAccess, error.BadWindow)))
+                                paste_grabs.append(modifiers)
                     pasted = True
         except error.XError:
             pass
