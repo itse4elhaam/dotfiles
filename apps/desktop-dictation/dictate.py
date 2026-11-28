@@ -15,7 +15,6 @@ from pathlib import Path
 
 from selection import ClipboardBackup, TextSelection
 from overlay import Gdk, GLib, Gtk, Overlay
-from browser_field import capture_field, commit_field, is_browser_class
 from glow import RecordingGlow
 from gi.repository import GdkX11, Gio
 from Xlib import X, XK, display, error
@@ -24,7 +23,7 @@ from Xlib.ext import xfixes, xinput, xtest
 
 def paste_shortcut(wm_class):
     names = tuple(name.lower() for name in (wm_class or ()))
-    if is_browser_class(wm_class):
+    if names and names[-1] in ("google-chrome", "chromium", "chromium-browser", "com.t3tools.t3code"):
         return ()
     if any(name in ("xterm", "uxterm", "rxvt", "urxvt", "urxvtc", "rxvt-unicode") for name in names):
         return ()
@@ -47,7 +46,6 @@ class Recording:
         self.client = app.selection.client_id(self.target[0])
         self.clipboard_generation = app.clipboard_generation
         self.clipboard_owner = app.x.get_selection_owner(app.selection.atom)
-        wm_class = None
         try:
             window = app.x.create_resource_object("window", target[0])
             wm_class = window.get_wm_class() if target[0] else None
@@ -56,7 +54,6 @@ class Recording:
         except error.BadWindow:
             self.paste_keys = ()
             self.unsafe = True
-        self.field = None
         if not self.paste_keys or self.client in app.paused_clients:
             self.backup = None
         elif app.pending_backup is not None and self.clipboard_owner == app.selection.window:
@@ -73,8 +70,6 @@ class Recording:
                 "parec", "--raw", "--format=s16le", "--rate=16000", "--channels=1",
                 "--latency-msec=40", "--process-time-msec=20",
             ], stdout=subprocess.PIPE)
-            if not self.unsafe and is_browser_class(wm_class):
-                self.field = capture_field(self.client)
             self.worker = app.get_worker()
         except OSError:
             self.close()
@@ -146,9 +141,6 @@ class Recording:
         self.mic.terminate()
 
     def close(self):
-        if self.field is not None:
-            self.field.close()
-            self.field = None
         self.finished = True
         if self.mic and self.mic.poll() is None:
             self.mic.terminate()
@@ -414,7 +406,7 @@ class Dictation:
         if self.recording.cancelled:
             self.end("Cancelled")
         elif self.recording.last_partial:
-            self.recover(self.recording.last_partial, "Partial transcript")
+            self.recover(self.recording.last_partial, incomplete=True)
         else:
             self.end(message)
 
@@ -459,10 +451,10 @@ class Dictation:
     def modifiers_down(self):
         return self.root.query_pointer().mask & (X.ShiftMask | X.ControlMask | X.Mod1Mask | X.Mod4Mask | X.Mod5Mask)
 
-    def recover(self, text, status=None):
+    def recover(self, text, incomplete=False):
         client = self.recording.client
         self.end("")
-        self.overlay.recover(text, status, client)
+        self.overlay.recover(text, incomplete, client)
 
     def copy_recovery(self, text):
         if self.expire_pending:
@@ -505,7 +497,7 @@ class Dictation:
         if self.recording is not rec:
             return
         timestamp = GdkX11.x11_get_server_time(self.overlay.get_window())
-        field_ready = pasted = False
+        pasted = False
         serial = self.paste_serial + 1
         restored = False
         read = False
@@ -554,7 +546,6 @@ class Dictation:
                     and rec.clipboard_generation == self.clipboard_generation
                     and rec.clipboard_owner == self.x.get_selection_owner(self.selection.atom)
                     and not self.modifiers_down())
-            field_ready = safe and rec.field is not None and not any(self.x.query_keymap()) and not self.x.pending_events()
             if safe and rec.paste_keys and rec.backup and rec.backup.ready and self.keyboard_available():
                 window = self.x.create_resource_object("window", rec.target[0])
                 keys = [self.x.keysym_to_keycode(sym) for sym in rec.paste_keys]
@@ -582,17 +573,12 @@ class Dictation:
         finally:
             self.x.ungrab_server()
             self.x.flush()
-        # The renderer must run to acknowledge the edit. Release the X grab first.
-        inserted = field_ready and commit_field(rec.field, text)
-        if pasted or inserted:
+        if pasted:
             self.end("Transcript ready")
             self.overlay.sent(text)
-            if pasted:
-                GLib.timeout_add(1800, expire)
-            else:
-                self.overlay.recover_confirmed(text, show=True, status="Inserted")
+            GLib.timeout_add(1800, expire)
         else:
-            self.recover(text, "Check field before pasting" if field_ready else None)
+            self.recover(text)
 
 
 if __name__ == "__main__":

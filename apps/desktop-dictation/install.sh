@@ -2,11 +2,9 @@
 set -euo pipefail
 here="$(cd "$(dirname "$0")" && pwd)"
 install -d "$HOME/.local/share/desktop-dictation" "$HOME/.config/systemd/user"
-for file in dictate.py overlay.py glow.py browser_field.py selection.py forest.jpg transcribe.cjs; do
+for file in dictate.py overlay.py glow.py selection.py forest.jpg transcribe.cjs; do
     install -m 644 "$here/$file" "$HOME/.local/share/desktop-dictation/$file"
 done
-install -d "$HOME/.local/share/desktop-dictation/t3-speech"
-install -m 644 "$here"/t3-speech/{customWords.mts,fillerWords.mts,LICENSE} "$HOME/.local/share/desktop-dictation/t3-speech/"
 install -d "$HOME/.local/share/desktop-dictation/fonts"
 install -m 644 "$here/fonts/Inter-latin-variable.ttf" "$here/fonts/OFL.txt" "$HOME/.local/share/desktop-dictation/fonts/"
 install -Dm644 "$here/last-dictation.desktop" "$HOME/.local/share/applications/last-dictation.desktop"

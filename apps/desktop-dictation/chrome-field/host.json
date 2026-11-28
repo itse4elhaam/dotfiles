@@ -1,9 +1,0 @@
-{
-  "name": "local.desktop_dictation.field",
-  "description": "One armed dictation field",
-  "path": "INSTALL_PATH",
-  "type": "stdio",
-  "allowed_origins": [
-    "chrome-extension://klchocbgbfpleclhlhnheaklnlofodpk/"
-  ]
-}

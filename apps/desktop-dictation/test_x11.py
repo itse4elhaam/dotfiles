@@ -95,11 +95,9 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
     light = x.create_resource_object("window", app.glow.get_window().get_xid())
     assert not light.shape_get_rectangles(shape.SK.Input).rectangles
     _, _, glow_w, glow_h, _ = app.glow.bounds
-    def rim_is_hollow():
-        rim = light.shape_get_rectangles(shape.SK.Bounding).rectangles
-        return rim and not any(r.x <= glow_w // 2 < r.x + r.width and
-                               r.y <= glow_h // 2 < r.y + r.height for r in rim)
-    until(rim_is_hollow)
+    rim = light.shape_get_rectangles(shape.SK.Bounding).rectangles
+    assert rim and not any(r.x <= glow_w // 2 < r.x + r.width and
+                           r.y <= glow_h // 2 < r.y + r.height for r in rim), (app.glow.bounds, rim)
     assert app.focus() == app.recording.target
     if not real:
         window.move(40, 35)
@@ -138,165 +136,49 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
     assert text == "Finished words."
     assert paste_shortcut(("gnome-terminal-server", "Gnome-terminal")) == (XK.XK_Control_L, XK.XK_Shift_L, XK.XK_v)
     if "--chrome" in sys.argv:
-        from functools import partial
-        from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
-        import json
-        import threading
-
-        here = Path(__file__).resolve().parent
-        profile = directory / "config/google-chrome"
-        (profile / "Default").mkdir(parents=True)
-        (profile / "Default/Preferences").write_text(json.dumps({"extensions": {"ui": {"developer_mode": True}}}))
-        runtime = directory / "runtime"
-        runtime.mkdir(mode=0o700)
-        os.environ["XDG_RUNTIME_DIR"] = str(runtime)
-        # Keep file choosers on the private X server instead of the session's
-        # desktop portal. The extension and native host do not require D-Bus.
-        browser_env = dict(os.environ, HOME=str(directory), XDG_CONFIG_HOME=str(directory / "config"),
-                           DBUS_SESSION_BUS_ADDRESS=f"unix:path={runtime}/no-session-bus",
-                           GTK_USE_PORTAL="0", GSETTINGS_BACKEND="memory", GIO_USE_VFS="local")
-        subprocess.run([here / "install-chrome-field.sh"], env=browser_env, check=True)
-        pages = directory / "pages"
-        pages.mkdir()
-        (pages / "editor.html").write_text("""<title>Dictation fixture</title>
-          <input id=first autofocus><div id=editor contenteditable></div>
-          <input id=advance><input id=next><input id=ro readonly><input id=mutable>
-          <script>
-            document.addEventListener('focusin', e => document.title = 'focus ' + e.target.id);
-            document.addEventListener('input', e => {
-              const el = e.target;
-              const msg = JSON.stringify([el.id, el.value ?? el.textContent, e.inputType, e.data, e.isTrusted]);
-              if (el.id === 'advance' && el.value.length >= 3) next.focus();
-              document.title = msg;
-            });
-            document.addEventListener('keydown', e => {
-              if (e.key === 'ArrowDown') setTimeout(() => {
-                mutable.readOnly = true;
-                document.title = 'became readonly';
-              }, 1000);
-              if (e.key === 'ArrowUp') setTimeout(() => next.focus(), 1000);
-              if (e.key === 'F8') { ro.readOnly = true; ro.focus(); }
-            });
-          </script>""")
-        server = ThreadingHTTPServer(("127.0.0.1", 0), partial(SimpleHTTPRequestHandler, directory=pages))
-        threading.Thread(target=server.serve_forever, daemon=True).start()
-        chrome = subprocess.Popen(["google-chrome", "--ozone-platform=x11", "--user-data-dir=" + str(profile),
-            "--no-first-run", "--no-default-browser-check", "--disable-background-networking", "--disable-sync",
-            "--disable-gpu", "--password-store=basic", "--window-size=950,630", "--window-position=0,0",
-            "chrome://extensions/"], env=browser_env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        page = directory / "editor.html"
+        page.write_text("""<title>Dictation fixture</title>
+            <input autofocus oninput="document.title=this.value">
+            <div contenteditable oninput="document.title=this.innerText"></div>""")
+        chrome = subprocess.Popen(["google-chrome", "--ozone-platform=x11",
+            "--user-data-dir=" + str(directory / "chrome-profile"), "--no-first-run",
+            "--no-default-browser-check", "--disable-background-networking", "--disable-sync",
+            "--disable-extensions", "--disable-gpu", "--password-store=basic",
+            "--app=" + page.as_uri()], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         try:
-            def search(title):
-                return subprocess.run(["xdotool", "search", "--onlyvisible", "--name", title],
+            def field():
+                return subprocess.run(["xdotool", "search", "--onlyvisible", "--name", "Dictation fixture"],
                                       capture_output=True, text=True).stdout.strip()
-            until(lambda: search("Google Chrome"), 20)
-            browser = x.create_resource_object("window", int(search("Google Chrome").splitlines()[0]))
+            until(field, 20)
+            browser = x.create_resource_object("window", int(field().splitlines()[0]))
             x.screen().root.change_property(app.active_atom, Xatom.WINDOW, 32, [browser.id])
             browser.set_input_focus(X.RevertToParent, X.CurrentTime)
             x.sync()
             def title():
                 prop = browser.get_full_property(x.intern_atom("_NET_WM_NAME"), X.AnyPropertyType)
                 return prop.value.decode() if prop else ""
-            # Use Chrome's own Load unpacked dialog in the throwaway profile.
-            if not title().startswith("Extensions"):
-                time.sleep(2)
-                keys("windowraise", str(browser.id), "windowfocus", str(browser.id), "key", "ctrl+l")
-                keys("type", "chrome://extensions/")
-                keys("key", "Return")
-                until(lambda: title().startswith("Extensions"), 18)
-            time.sleep(.6)
-            keys("mousemove", "80", "170", "click", "1")
-            until(lambda: search("Select the extension directory|Select Folder|Open File"), 12)
-            dialog = search("Select the extension directory|Select Folder|Open File").splitlines()[0]
-            keys("windowfocus", dialog, "key", "ctrl+l")
-            keys("type", str(directory / ".local/share/desktop-dictation/chrome-field"))
-            keys("key", "Return")
-            until(lambda: not search("Select the extension directory|Select Folder|Open File"))
-            keys("windowfocus", str(browser.id), "key", "ctrl+l")
-            keys("type", f"http://127.0.0.1:{server.server_port}/editor.html")
-            keys("key", "Return")
-            until(lambda: title().startswith("focus first"))
-            sentence = "abcdef"
-            audio.with_suffix(".txt").write_text(sentence)
-            def socket_version():
-                for path in runtime.glob("desktop-dictation-fields/*.sock"):
-                    try:
-                        return path.stat().st_ctime_ns
-                    except FileNotFoundError:
-                        pass
-            def arm():
-                previous = socket_version()
-                keys("key", "alt+shift+u")
-                until(lambda: (current := socket_version()) and current != previous)
-            def dictate():
+            serial = app.paste_serial
+            for app_class in ("google-chrome", "com.t3tools.T3Code"):
+                if app_class != "google-chrome":
+                    browser.set_wm_class(app_class.lower(), app_class)
+                    x.sync()
+                    keys("key", "Tab")
+                owner = x.get_selection_owner(app.selection.atom)
+                original_title = title()
+                sentence = f"One complete sentence for {app_class}."
+                audio.with_suffix(".txt").write_text(sentence)
                 hold("Super_L", "Alt_L")
                 keys("keyup", "Alt_L", "keyup", "Super_L")
-                until(lambda: app.recording is None)
-            for element in ("first", "editor", "advance"):
-                if element != "first":
-                    keys("key", "Tab")
-                    until(lambda: title().startswith("focus " + element))
-                arm()
-                dictate()
-                expected = json.dumps([element, sentence, "insertText", sentence, True], separators=(",", ":"))
-                until(lambda: title().startswith(expected))
-                assert app.overlay.status.get_text().startswith("Inserted") and app.overlay.recovery == sentence
-                assert app.clipboard.wait_for_text() == "Original text"
-                print(element, expected, flush=True)
-            # Auto-advance left focus in next. Try an unarmed writable field, then a readonly field.
-            sentence = "Full recovery 🐈" * 50
-            audio.with_suffix(".txt").write_text(sentence)
-            for element in ("next", "ro"):
-                if element == "ro":
-                    keys("key", "F8", "key", "alt+shift+u")
-                    until(lambda: title().startswith("focus ro"))
-                previous = title()
-                dictate()
-                assert app.overlay.recovery == sentence and title() == previous
+                until(lambda: app.overlay.recovery == sentence)
+                assert title() == original_title and app.paste_serial == serial
+                assert x.get_selection_owner(app.selection.atom) == owner
                 app.overlay.copy_recovery()
-                assert app.clipboard.wait_for_text() == sentence
-            # Readonly changes can occur inside the original focused X window.
-            keys("key", "Tab")
-            until(lambda: title().startswith("focus mutable"))
-            arm()
-            keys("key", "Down")
-            hold("Super_L", "Alt_L")
-            assert app.recording.field is not None
-            until(lambda: title().startswith("became readonly"))
-            keys("keyup", "Alt_L", "keyup", "Super_L")
-            until(lambda: app.recording is None)
-            assert app.overlay.recovery == sentence and title().startswith("became readonly")
-            app.overlay.dismiss_recovery()
-            keys("key", "shift+Tab", "key", "shift+Tab")
-            until(lambda: title().startswith("focus next"))
-            keys("key", "shift+Tab")
-            until(lambda: title().startswith("focus advance"))
-            arm()
-            keys("key", "Up")
-            hold("Alt_L", "Super_L")
-            assert app.recording.field is not None
-            until(lambda: title().startswith("focus next"))
-            keys("keyup", "Super_L", "keyup", "Alt_L")
-            until(lambda: app.recording is None)
-            assert app.overlay.recovery == sentence and title().startswith("focus next")
-            app.overlay.dismiss_recovery()
-            # A ready host alone cannot establish which X client owns the target.
-            from unittest.mock import patch
-            arm()
-            with patch.object(app.selection, "client_id", return_value=("connection", 0)):
-                dictate()
-            assert app.overlay.recovery == sentence and title().startswith("focus next")
-            app.overlay.dismiss_recovery()
-            keys("key", "Tab")
-            until(lambda: title().startswith("focus ro"))
-            # Electron with no field integration uses full recovery even for plain text.
-            browser.set_wm_class("com.t3tools.t3code", "com.t3tools.T3Code")
-            x.sync()
-            dictate()
-            assert app.overlay.recovery == sentence and title().startswith("focus ro")
+                keys("key", "ctrl+v")
+                until(lambda: title() == sentence)
+                print(browser.get_wm_class(), "manual paste", title(), flush=True)
         finally:
             chrome.terminate()
             chrome.wait(timeout=10)
-            server.shutdown()
             app.stop_worker()
         return
     target = x.create_resource_object("window", xid)
@@ -662,7 +544,7 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
         hold("Alt_L", "Super_L")
         keys("keyup", "Super_L", "keyup", "Alt_L")
         until(lambda: entry.get_text() == transcript and app.pending_backup is None)
-    assert len(app.overlay.pending) == 1 and app.overlay.recovery == "Direct B"
+    assert app.overlay.pending == [("Direct B", False, None)]
     assert app.overlay.status.get_text() == "Sent to app"
     until(lambda: not app.overlay.get_visible(), 6)
     os.kill(os.getpid(), signal.SIGUSR1)
