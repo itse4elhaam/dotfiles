@@ -1,5 +1,6 @@
 #!/usr/bin/python3
 """Exercise desktop dictation on a private Xvfb with GTK or optional Chrome."""
+from itertools import product
 import json
 import os
 from pathlib import Path
@@ -171,6 +172,7 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
             ready();
             const edits = [];
             document.oninput = event => {
+              if (!event.isTrusted) throw Error("Expected native input");
               const field = event.target;
               edits.push([field.id, event.inputType, field.value ?? field.textContent]);
               document.title = JSON.stringify(edits);
@@ -252,9 +254,34 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
             keys("key", "x")
             until(lambda: app.pending_read == "typing")
             expected.append(["next", "insertText", sentence + "x"])
-            keys("key", "ctrl+a", "key", "ctrl+v")
+            keys("key", "Left", "ctrl+a", "ctrl+v")
             expected.append(["next", "insertFromPaste", "Original text"])
             until(correct_edits)
+            assert not app.paused_clients
+            # Tab within the page after a confirmed DOM insertion. Chrome
+            # receives all navigation keys, then a user paste after quiet.
+            keys("key", "ctrl+a", "Delete")
+            expected.append(["next", "deleteContentForward", ""])
+            until(correct_edits)
+            hold("Alt_L", "Super_L")
+            if real:
+                until(lambda: time.monotonic() - app.recording.started >= 2)
+            keys("keyup", "Super_L", "keyup", "Alt_L")
+            until(lambda: app.recording is None, 12)
+            sentence = app.overlay.label.get_text() if real else sentence
+            expected.append(["next", "insertFromPaste", sentence])
+            until(correct_edits)
+            assert app.pending_read == "untagged"
+            keys("key", "Return", "Left", "Right", "Up", "Down", "Home", "End",
+                 "Prior", "Next", "Escape", "shift+Tab")
+            expected.append(["next", "insertParagraph", sentence])
+            until(lambda: app.pending_backup is None)
+            keys("key", "ctrl+a", "ctrl+v")
+            expected.append(["editor", "insertFromPaste", "Original text"])
+            try:
+                until(correct_edits)
+            except AssertionError as exc:
+                raise AssertionError(f"Navigation and user paste: {title()!r}") from exc
             assert not app.paused_clients
             until(lambda: app.pending_backup is None)
             assert app.clipboard.wait_for_text() == "Original text"
@@ -808,7 +835,7 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
 
     # The first CurrentTime conversion can precede GTK's actual insertion.
     # Tab changes the focused entry without changing the X11 target window.
-    for clipboard_kind in ("text", "no owner", "image", "empty text"):
+    for clipboard_kind, queued_read in product(("text", "no owner", "image", "empty text"), (True, False)):
         app.clipboard.set_text("Newer clipboard", -1)
         if clipboard_kind == "image":
             app.clipboard.set_image(pixels)
@@ -828,7 +855,12 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
         secondary_read(text.encode(), X.CurrentTime)
         assert app.pending_backup is not None
         assert not app.overlay.status.get_text().startswith("Sent")
-        secondary_read(None, X.CurrentTime, app.selection.targets, queued_input=lambda: keys("key", "Tab"))
+        if not queued_read:
+            # No follow-up read before the quiet timer. GTK's real paste
+            # handler below first asks for data after focus and restoration.
+            keys("key", "Tab")
+        else:
+            secondary_read(None, X.CurrentTime, app.selection.targets, queued_input=lambda: keys("key", "Tab"))
         until(lambda: second.has_focus() and app.pending_backup is None)
         keep = "KEEP THIS SELECTION"
         second.set_text(keep)
@@ -840,6 +872,11 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
             until(lambda: time.monotonic() >= until_time)
         else:
             native_paste_refused(second)
+        if clipboard_kind == "text":
+            # A queued conversion before the physical V cannot be attributed
+            # to this new paste, even when our passive grab catches the V.
+            secondary_read(None, X.CurrentTime, queued_input=lambda: keys("key", "ctrl+v"))
+            secondary_read(None, X.CurrentTime)
         assert second.get_text() == keep and second.get_selection_bounds() == (0, len(keep))
         assert app.overlay.status.get_text().startswith("Auto-paste paused")
         assert app.overlay.resume.is_visible() and app.overlay.recovery == text

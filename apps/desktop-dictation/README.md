@@ -36,6 +36,8 @@ Dictation uses one native paste per utterance. Some editors include the paste sh
 
 You can type or delete text as soon as the transcript appears, then use the app’s usual paste shortcut to insert your previous clipboard contents. Chrome also supports **Ctrl+Shift+V** to paste as plain text. If the app requests more data after you edit but before that shortcut or the end of the gap, dictation pauses paste and offers **Resume**.
 
+Enter, Tab, Escape and caret navigation still reach the editor. If you navigate while an untagged paste is settling, the service guards the original clipboard even after the quiet period. X11 reports the same clipboard read whether the text already appeared or the app still plans to insert it in the newly focused field. Pressing the usual paste shortcut in the original window releases the guard and pastes normally. This also allows any untagged read the same app makes afterward, including a delayed one. The service listens only for that window’s paste shortcut after the offer ends. Use **Resume** if the window manager reserves the shortcut or focus moved to another window.
+
 If that 350 ms gap hasn’t elapsed by 1.8 seconds after the dictation paste shortcut, dictation pauses paste for the app. Even a single read can trigger this if it arrives close to the deadline. Other apps regain access to the original clipboard, and the transcript stays on the **Copy** card. X11 gives the service no way to distinguish a new untagged request from an old one that the same app delayed indefinitely.
 
 If the app leaves the paste unread, the service pauses it and keeps the transcript available through **Copy**. A recovered copy is available immediately to other identified apps. Choose **Resume** before pasting it into the paused app.

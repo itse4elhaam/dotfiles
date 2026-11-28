@@ -215,6 +215,9 @@ class Dictation:
         for index, codes in enumerate(self.x.get_modifier_mapping()):
             if num in codes:
                 lock_masks |= {mask | (1 << index) for mask in lock_masks}
+        self.lock_masks = lock_masks
+        self.resume_grabs = {}
+        self.v_key = keycode("v")
         errors = []
         grabs = [(self.alt, X.Mod4Mask), *((code, X.Mod1Mask) for code in self.supers)]
         for code, modifier in grabs:
@@ -338,11 +341,12 @@ class Dictation:
         if code in self.chord:
             self.paste_modifiers.add(code)
             return False
-        if self.pending_read not in ("untagged", "typing") or self.paste_modifiers & self.chord:
+        if self.pending_read not in ("untagged", "typing", "navigation") or self.paste_modifiers & self.chord:
             self.interrupt_paste()
         elif code in self.controls | self.shifts:
             self.paste_modifiers.add(code)
-            self.pending_read = "typing"
+            if self.pending_read != "navigation":
+                self.pending_read = "typing"
         else:
             symbol = self.x.keycode_to_keysym(code, 0)
             control = bool(self.paste_modifiers & self.controls)
@@ -353,7 +357,12 @@ class Dictation:
                          or 0x01000100 <= symbol <= 0x0110ffff)
             deletion = symbol in (XK.XK_BackSpace, XK.XK_Delete, XK.XK_KP_Delete) and not shifted
             if deletion or (printable and (not control or (symbol == XK.XK_a and not shifted))):
-                self.pending_read = "typing"
+                if self.pending_read != "navigation":
+                    self.pending_read = "typing"
+            elif (XK.XK_Home <= symbol <= XK.XK_End
+                  or symbol in (XK.XK_Tab, XK.XK_Return, XK.XK_KP_Enter, XK.XK_Escape)):
+                # Navigation may redirect a native paste within the same X window.
+                self.pending_read = "navigation"
             else:
                 self.interrupt_paste()
         return False
@@ -407,6 +416,9 @@ class Dictation:
                 if self.x.get_selection_owner(self.selection.atom) != self.selection.window:
                     self.selection.text = ""
                     self.selection.saved = None
+            elif (event.type == X.KeyPress and event.detail == self.v_key and not event.send_event
+                  and event.window != self.root):
+                self.replay_resume_shortcut(event, deferred_requests)
             elif event.type == X.KeyPress and event.detail in self.chord:
                 self.modifiers_changed()
             elif event.type == X.KeyRelease and event.detail in self.chord:
@@ -446,7 +458,7 @@ class Dictation:
                 self.interrupt_paste()
             for request in deferred_requests:
                 client = self.selection.client_id(request.requestor.id)
-                if self.pending_read == "typing" and client == self.selection.recipient:
+                if self.pending_read in ("typing", "navigation") and client == self.selection.recipient:
                     # Typing could have moved the caret before a delayed
                     # conversion. Refuse it and its possible fallback reads.
                     self.interrupt_paste()
@@ -635,7 +647,40 @@ class Dictation:
         else:
             self.clipboard.set_text(text, -1)
 
+    def watch_resume_shortcut(self, rec):
+        # After navigation, keep only a passive grab on this app window.
+        window = self.x.create_resource_object("window", rec.target[0])
+        masks = {X.ControlMask | (X.ShiftMask if shift else 0) | lock
+                 for shift in self.paste_shift_states for lock in self.lock_masks}
+        for mask in masks:
+            window.grab_key(self.v_key, mask, False, X.GrabModeAsync, X.GrabModeSync,
+                            onerror=lambda exc, _: isinstance(exc, (error.BadAccess, error.BadWindow)))
+        self.resume_grabs[window.id] = rec.client, rec.target, masks
+
+    def replay_resume_shortcut(self, event, queued):
+        # Replay the physical V to its native handler even if Resume raced
+        # the frozen grab, or an older conversion prevents releasing the guard.
+        try:
+            grab = self.resume_grabs.get(event.window.id)
+            if not grab or self.locked:
+                return
+            client, target, _ = grab
+            if (self.focus() == target and self.selection.client_id(event.window.id) == client
+                    and not any(self.selection.could_be_recipient(req, client) for req in queued)):
+                self.resume_client(client)
+                self.overlay.client_resumed(client)
+        finally:
+            self.x.allow_events(X.ReplayKeyboard, event.time)
+            self.x.flush()
+
     def resume_client(self, client):
+        for xid, (owner, _, masks) in list(self.resume_grabs.items()):
+            if owner == client:
+                window = self.x.create_resource_object("window", xid)
+                for mask in masks:
+                    window.ungrab_key(self.v_key, mask, onerror=lambda exc, _: isinstance(exc, error.BadWindow))
+                del self.resume_grabs[xid]
+        self.x.flush()
         self.paused_clients.pop(client, None)
         self.selection.guarded_reads.discard(client)
 
@@ -695,6 +740,8 @@ class Dictation:
                 # second conversion. A redirect ends that gesture successfully.
                 confirm()
                 return False
+            if self.pending_read == "navigation":
+                self.watch_resume_shortcut(rec)
             restore(client)
             # A conversion need not be the paste that changes the field.
             self.paused_clients[client] = rec.app_name
@@ -720,7 +767,7 @@ class Dictation:
                 return False
             # An untagged recipient still negotiating at the hard deadline
             # could otherwise paste the restored clipboard on its next read.
-            if (not self.pending_read or (deadline and self.pending_read in ("untagged", "typing"))
+            if (self.pending_read in (None, "navigation") or (deadline and self.pending_read in ("untagged", "typing"))
                     or self.focus() != rec.target or
                     self.x.get_selection_owner(self.selection.atom) != self.selection.window):
                 return interrupt()

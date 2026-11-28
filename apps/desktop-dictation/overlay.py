@@ -286,8 +286,12 @@ class Overlay(Gtk.Window):
         client = self.pending[-1][2]
         if client in self.paused_clients:
             self.resume_client(client)
-            self.pending = [card for card in self.pending
-                            if card[0] is not None or card[2] != client]
+            self.client_resumed(client)
+
+    def client_resumed(self, client):
+        showing = self.pending and self.pending[-1][2] == client and self.actions.get_visible()
+        self.pending = [card for card in self.pending if card[0] is not None or card[2] != client]
+        if showing:
             self.next_recovery()
 
     def sent(self, text):
