@@ -34,9 +34,9 @@ Keep the caret in the original field until insertion finishes. If dictation dete
 
 Dictation sends one paste shortcut directly to the X11 window that had keyboard focus when recording started. It rechecks the window and its owner before sending. Some editors include the paste shortcut’s timestamp. Others, including Chrome, request clipboard formats and text in several steps without a timestamp. After the first untagged text read, dictation waits for a 350 ms gap in the app’s requests before restoring the clipboard. The next dictation waits for this paste to finish.
 
-You can type or delete text as soon as the transcript appears, then use the app’s usual paste shortcut to insert your previous clipboard contents. Chrome also supports **Ctrl+Shift+V** to paste as plain text. If the app requests more data after you edit but before that shortcut or the end of the gap, dictation pauses paste and offers **Resume**.
+Once the dictated words appear in the editor, you can type, delete text, or use the app’s usual paste shortcut to insert your previous clipboard contents. Chrome also supports **Ctrl+Shift+V** to paste as plain text. If the app requests more data after you edit but before that shortcut or the end of the gap, dictation pauses paste and offers **Resume**.
 
-When dictation detects a conflicting shortcut, it offers **Copy** before changing the clipboard. The window manager can reserve shortcuts outside that check. Automatic paste is addressed only to the editor window. A physical **Ctrl+V** you press yourself still follows your desktop shortcut settings.
+When dictation detects a conflicting shortcut, it offers **Copy** before changing the clipboard. When you press **Ctrl+V** yourself, a desktop shortcut reserved by the window manager can take precedence over the editor’s paste command.
 
 Enter, Tab, Escape and caret navigation still reach the editor. If you navigate while an untagged paste is settling, the service guards the original clipboard even after the quiet period. X11 reports the same clipboard read whether the text already appeared or the app still plans to insert it in the newly focused field. A new Super+Left Alt hold after navigation can deliver another transcript in the same app, including a different Chrome window. You can start speaking immediately after Enter submits a chat message. Delivery waits for the previous offer to settle, and the original clipboard stays guarded during recording and after the new delivery. During the new offer, a delayed untagged read from the same process is indistinguishable from its new paste. If a possible late read reaches the service before dispatch, the new transcript goes to **Copy** and the app stays paused.
 
@@ -46,9 +46,11 @@ If that 350 ms gap hasn’t elapsed by 1.8 seconds after the dictation paste sho
 
 After you release the shortcut, **Waiting for app** keeps the finished transcript visible. If the editor ignores the window-addressed shortcut or never reads the paste, dictation restores the previous clipboard after 1.8 seconds. The card shows **App didn’t read the paste** and offers **Copy** and **Resume**. A recovered copy is available immediately to other identified apps. Choose **Resume** before pasting it into the paused app.
 
+On Pop!_OS X11, Firefox 138, gedit 41 and GNOME Terminal 3.44 requested the clipboard with timestamps that dictation could not match to the original paste. In those versions, choose **Copy**, then **Resume**, then paste into the intended field. Use **Ctrl+V** in Firefox or gedit and **Ctrl+Shift+V** in GNOME Terminal. The previous clipboard stays intact until you choose **Copy**.
+
 For a screenshot copied with GTK’s standard image command on Pop!_OS, dictation restores a lossless PNG with the original pixels and transparency. For mixed selections, it backs up each supported format, including editable project data. If a payload uses 32-bit X11 elements, is unavailable, or exceeds the backup limit, the original clipboard stays in place and the overlay offers **Copy**.
 
-If text reaches the application's clipboard handler, **Sent to app** offers Copy for four seconds. Open **Last Dictation** in the application launcher to recall the latest acknowledged transcript or **Resume** a paused app, even after dismissing its card. A clipboard read alone cannot confirm what an editor kept. Unhandled transcripts remain available until copied, dismissed or cleared when the session locks.
+**Sent to app** means the editor read the transcript. The card offers **Copy** for four seconds. When the card hides automatically, you can reopen the latest acknowledged transcript from **Last Dictation** in the application launcher. Clicking **×** removes that transcript from recall. **Last Dictation** still offers **Resume** for a paused app. Transcripts waiting for recovery stay available until you copy or dismiss them, or lock the screen.
 
 ## Testing
 

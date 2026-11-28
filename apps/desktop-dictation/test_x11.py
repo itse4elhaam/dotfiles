@@ -1382,7 +1382,14 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
     secondary_read(None, X.CurrentTime)
     entry, key_time = delayed.pop()
     secondary_read(None, key_time)
+    # A toolkit that cached the unavailable formats must be told to query
+    # again when Resume makes the copied text readable.
+    previous_time = app.selection.time
+    changes = []
+    listener = app.clipboard.connect("owner-change", lambda _, event: changes.append(event.selection_time))
     app.overlay.resume.clicked()
+    until(lambda: app.selection.time != previous_time and app.selection.time in changes)
+    app.clipboard.disconnect(listener)
     secondary_read(None, key_time)
     assert not first.get_text() and not second.get_text()
     keys("key", "ctrl+v")
