@@ -678,6 +678,21 @@ class Dictation:
         else:
             self.clipboard.set_text(text, -1)
 
+    def probe_chrome_paste_grabs(self, window):
+        # Probe every native shortcut before touching CLIPBOARD. XUngrabKey
+        # releases only this client's reservations, including partial successes.
+        # The surrounding server grab excludes competitors until we reinstall
+        # these grabs after dispatching our own XTest V.
+        masks = [X.ControlMask | shift | lock for shift in (0, X.ShiftMask)
+                 for lock in self.lock_masks]
+        caught = error.CatchError()
+        for mask in masks:
+            window.grab_key(self.v_key, mask, False, X.GrabModeAsync, X.GrabModeSync, onerror=caught)
+        for mask in masks:
+            window.ungrab_key(self.v_key, mask, onerror=caught)
+        self.x.sync()
+        return [] if caught.get_error() else masks
+
     def watch_resume_shortcut(self, rec):
         # After navigation, keep only a passive grab on this app window.
         window = self.x.create_resource_object("window", rec.target[0])
@@ -846,21 +861,25 @@ class Dictation:
                 window = self.x.create_resource_object("window", rec.target[0])
                 keys = [self.x.keysym_to_keycode(sym) for sym in rec.paste_keys]
                 wm_class = window.get_wm_class() or ()
-                if (paste_shortcut(wm_class) == rec.paste_keys and all(keys)
+                chrome = any(name.lower() in ("google-chrome", "google-chrome-beta", "google-chrome-unstable",
+                                              "chromium", "chromium-browser") for name in wm_class)
+                focus_window = self.x.create_resource_object("window", rec.target[1])
+                if chrome:
+                    paste_grabs = self.probe_chrome_paste_grabs(focus_window)
+                    if not paste_grabs:
+                        reason = "Paste shortcut in use"
+                if (reason is None and paste_shortcut(wm_class) == rec.paste_keys and all(keys)
                         and self.selection.claim(text, timestamp, client, rec.backup, on_read)):
                     self.pending_read = None
                     self.paste_modifiers.clear()
                     self.paste_shift_states = {XK.XK_Shift_L in rec.paste_keys}
                     # Chrome also accepts Ctrl+Shift+V for plain-text paste.
-                    chrome = any(name.lower() in ("google-chrome", "google-chrome-beta", "google-chrome-unstable",
-                                                  "chromium", "chromium-browser") for name in wm_class)
                     if chrome:
                         self.paste_shift_states.add(True)
                     self.finish_manual_paste = confirm
                     self.expire_pending = interrupt
                     self.paste_target = rec.target
                     self.root.change_attributes(event_mask=X.PropertyChangeMask)
-                    focus_window = self.x.create_resource_object("window", rec.target[1])
                     focus_window.change_attributes(event_mask=X.FocusChangeMask)
                     self.pending_backup = rec.backup
                     self.paste_serial = serial
@@ -878,17 +897,9 @@ class Dictation:
                     time.sleep(.002)
                     for key in reversed(keys):
                         xtest.fake_input(self.x, X.KeyRelease, key)
-                    if chrome:
-                        # Chromium can retain the previous paste result when V
-                        # reaches it before the clipboard ownership notification,
-                        # even if every new X conversion returns the restored text.
-                        for shift in (0, X.ShiftMask):
-                            for lock in self.lock_masks:
-                                modifiers = X.ControlMask | shift | lock
-                                focus_window.grab_key(
-                                    self.v_key, modifiers, False, X.GrabModeAsync, X.GrabModeSync,
-                                    onerror=lambda exc, _: isinstance(exc, (error.BadAccess, error.BadWindow)))
-                                paste_grabs.append(modifiers)
+                    # Hold the next manual V until Chrome sees the restored clipboard.
+                    for mask in paste_grabs:
+                        focus_window.grab_key(self.v_key, mask, False, X.GrabModeAsync, X.GrabModeSync)
                     pasted = True
         except error.XError:
             pass

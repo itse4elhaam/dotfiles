@@ -159,7 +159,7 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
     else:
         assert text == "Finished words."
     assert paste_shortcut(("gnome-terminal-server", "Gnome-terminal")) == (XK.XK_Control_L, XK.XK_Shift_L, XK.XK_v)
-    if "--chrome" in sys.argv:
+    if "--chrome" in sys.argv or "--chrome-grabs" in sys.argv:
         page = directory / "editor.html"
         page.write_text("""<meta charset="utf-8"><title>Dictation fixture</title>
             <input id="first" autofocus><textarea id="second"></textarea>
@@ -217,6 +217,59 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
                 prop = browser.get_full_property(x.intern_atom("_NET_WM_NAME"), X.AnyPropertyType, sizehint=1024)
                 return prop.value.decode() if prop else ""
             until(lambda: title().startswith("Dictation fixture ready"))
+            if not real:
+                # A separate X client may already own a passive shortcut on
+                # Chrome's focused window, even with no active keyboard grab.
+                generation = app.clipboard_generation
+                app.clipboard.set_text("Original text", -1)
+                until(lambda: app.clipboard_generation > generation)
+                focus = x.get_input_focus().focus
+                masks = {X.ControlMask | shift | lock for shift in (0, X.ShiftMask)
+                         for lock in app.lock_masks}
+                probe = display.Display()
+                probe_window = probe.create_resource_object("window", focus.id)
+                try:
+                    for occupied in (X.ControlMask, X.ControlMask | X.ShiftMask):
+                        focus.grab_key(app.v_key, occupied, False, X.GrabModeAsync, X.GrabModeAsync)
+                        x.sync()
+                        serial = app.paste_serial
+                        owner = x.get_selection_owner(app.selection.atom)
+                        audio.with_suffix(".txt").write_text("Shortcut conflict")
+                        hold("Super_L", "Alt_L")
+                        keys("keyup", "Alt_L", "keyup", "Super_L")
+                        until(lambda: app.recording is None)
+                        assert app.paste_serial == serial, "Dispatched despite occupied Chrome shortcut"
+                        assert app.overlay.status.get_text() == "Paste shortcut in use"
+                        assert app.overlay.recovery == "Shortcut conflict" and app.overlay.copy_button.get_visible()
+                        assert title().startswith("Dictation fixture ready") and x.get_input_focus().focus == focus
+                        assert x.get_selection_owner(app.selection.atom) == owner
+                        assert app.clipboard.wait_for_text() == "Original text"
+                        # The competitor keeps its grab. Every other combination
+                        # must be free, including any partial dictation reservations.
+                        for mask in masks:
+                            caught = error.CatchError()
+                            probe_window.grab_key(app.v_key, mask, False, X.GrabModeAsync,
+                                                  X.GrabModeAsync, onerror=caught)
+                            probe.sync()
+                            if mask == occupied:
+                                assert isinstance(caught.get_error(), error.BadAccess)
+                            else:
+                                assert caught.get_error() is None
+                                probe_window.ungrab_key(app.v_key, mask)
+                        probe.sync()
+                        events = [x.next_event() for _ in range(x.pending_events())]
+                        assert all(event.type != X.KeyPress or event.detail != app.v_key for event in events)
+                        shortcut = "ctrl+shift+v" if occupied & X.ShiftMask else "ctrl+v"
+                        keys("key", shortcut)
+                        x.sync()
+                        events = [x.next_event() for _ in range(x.pending_events())]
+                        assert any(event.type == X.KeyPress and event.detail == app.v_key
+                                   and event.window == focus for event in events)
+                        focus.ungrab_key(app.v_key, occupied)
+                        x.sync()
+                        app.overlay.dismiss_recovery()
+                finally:
+                    probe.close()
             expected = []
             for name, direction in (("first", "Center"), ("second", "Left"), ("editor", "Right"), ("next", "Center")):
                 serial = app.paste_serial
@@ -253,6 +306,8 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
                 assert app.paste_serial == serial + 1
                 assert app.clipboard.wait_for_text() == "Original text"
                 print(name, "native paste", sentence, flush=True)
+                if "--chrome-grabs" in sys.argv:
+                    return
                 if name == "editor":
                     assert app.pending_read == "untagged"
                     keys("key", "BackSpace", "ctrl+a", "Delete", "ctrl+shift+v")
