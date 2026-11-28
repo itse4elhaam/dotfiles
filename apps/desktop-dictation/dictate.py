@@ -468,10 +468,35 @@ class Dictation:
     def modifiers_down(self):
         return self.root.query_pointer().mask & (X.ShiftMask | X.ControlMask | X.Mod1Mask | X.Mod4Mask | X.Mod5Mask)
 
-    def recover(self, text, incomplete=False):
+    def paste_blocked_reason(self, rec):
+        # Called after syncing inside the server grab, immediately before dispatch.
+        if rec.client in self.paused_clients:
+            # The card shows the live pause state until the user resumes.
+            return "Ready to copy"
+        if rec.client[0] != "process":
+            return "Couldn’t identify the app"
+        if not rec.paste_keys:
+            return "Use Copy in this app"
+        if (rec.unsafe or rec.target != self.focus() or not self.focus_inside(*rec.target)
+                or rec.client != self.selection.client_id(rec.target[0])):
+            return "Focus or input changed"
+        if (rec.clipboard_generation != self.clipboard_generation
+                or rec.clipboard_owner != self.x.get_selection_owner(self.selection.atom)):
+            return "Clipboard changed"
+        if self.x.pending_events():
+            return "Desktop changed during dictation"
+        if self.modifiers_down():
+            return "Modifier key held"
+        if not rec.backup or not rec.backup.ready:
+            return "Couldn’t back up clipboard"
+        if not self.keyboard_available():
+            return "Keyboard in use"
+        return None
+
+    def recover(self, text, incomplete=False, reason=None):
         client = self.recording.client
         self.end("")
-        self.overlay.recover(text, incomplete, client)
+        self.overlay.recover(text, incomplete, client, reason=reason)
 
     def copy_recovery(self, text):
         if self.expire_pending:
@@ -563,18 +588,12 @@ class Dictation:
                 GLib.idle_add(restore)
             else:
                 self.selection.saved = {}
+        reason = None
         self.x.grab_server()
         try:
             self.x.sync()
-            safe = (client[0] == "process" and client not in self.paused_clients
-                    and not self.x.pending_events()
-                    and not rec.unsafe and rec.target == self.focus()
-                    and self.focus_inside(*rec.target)
-                    and client == self.selection.client_id(rec.target[0])
-                    and rec.clipboard_generation == self.clipboard_generation
-                    and rec.clipboard_owner == self.x.get_selection_owner(self.selection.atom)
-                    and not self.modifiers_down())
-            if safe and rec.paste_keys and rec.backup and rec.backup.ready and self.keyboard_available():
+            reason = self.paste_blocked_reason(rec)
+            if reason is None:
                 window = self.x.create_resource_object("window", rec.target[0])
                 keys = [self.x.keysym_to_keycode(sym) for sym in rec.paste_keys]
                 if (paste_shortcut(window.get_wm_class()) == rec.paste_keys and all(keys)
@@ -608,7 +627,7 @@ class Dictation:
             GLib.timeout_add(1800, expire)
             self.events()  # XSync may already have buffered the raw shortcut events.
         else:
-            self.recover(text)
+            self.recover(text, reason=reason)
 
 
 if __name__ == "__main__":

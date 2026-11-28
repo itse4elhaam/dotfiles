@@ -30,11 +30,11 @@ The preview and final transcript use the same cleanup. Fillers and silence filte
 
 ## Insertion and recovery
 
-Keep the caret in the original field until insertion finishes. If you move to another field or change windows while the transcript is finishing, the overlay holds the text and offers **Copy**. If recognition stops early, it offers the last available partial. A read-only target or an application that cannot consume a paste may also require Copy. X11 exposes the focused window. An application can move its own caret without sending a separate desktop focus event.
+Keep the caret in the original field until insertion finishes. If dictation detects a key press, a click, or a change of focus that could redirect the paste, the overlay holds the text and offers **Copy**. An application can move its own caret inside a window without sending a focus event that X11 can detect. If recognition stops early, the overlay offers the last available preview. A read-only field or an application that cannot consume a paste may also require Copy.
 
 Dictation uses one normal desktop paste per utterance. Applications that request a paste with the original key-event timestamp receive that transcript. Some editors request clipboard data without a timestamp. For a response from the focused process, the service keeps the same text available for 350 ms after the last text read, up to 1.8 seconds after dispatch. A subsequent paste waits its turn. An application that leaves the paste unread is paused and its transcript stays available through **Copy**. X11 cannot distinguish an unrelated same-process read, or one delayed indefinitely, from a new untagged paste.
 
-The clipboard delivery path preserves supported existing formats. If text reaches the application's clipboard handler, **Sent to app** offers Copy for four seconds. Open **Last Dictation** in the application launcher to recall the latest acknowledged transcript. A clipboard read alone cannot confirm what an editor kept. Unhandled transcripts remain available until copied, dismissed or cleared when the session locks.
+The clipboard delivery path preserves supported existing formats. If text reaches the application's clipboard handler, **Sent to app** offers Copy for four seconds. Open **Last Dictation** in the application launcher to recall the latest acknowledged transcript or **Resume** a paused app, even after dismissing its card. A clipboard read alone cannot confirm what an editor kept. Unhandled transcripts remain available until copied, dismissed or cleared when the session locks.
 
 ## Testing
 

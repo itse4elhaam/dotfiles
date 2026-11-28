@@ -84,7 +84,6 @@ class Overlay(Gtk.Window):
         self.label = Gtk.Label(name="transcript", xalign=0, yalign=.5)
         self.label.set_line_wrap(True)
         self.label.set_line_wrap_mode(Pango.WrapMode.WORD_CHAR)
-        self.label.set_ellipsize(Pango.EllipsizeMode.START)
         self.label.set_lines(2)
         self.label.set_max_width_chars(1)  # Wrap to the allocated card width.
         self.wave = Gtk.DrawingArea()
@@ -189,7 +188,7 @@ class Overlay(Gtk.Window):
     def release_hold(self):
         if self.hold_notice.get_visible():
             self.hold_notice.hide()
-            self.wave.show()
+            self.wave.set_visible(self.listening)
             if self.dismiss_on_release:
                 self.dismiss_result()
 
@@ -216,9 +215,11 @@ class Overlay(Gtk.Window):
         self.indicator.set_text("◌")
         self.hint.hide()
         self.escape.hide()
+        self.wave.hide()
 
-    def recover(self, text, incomplete=False, client=None, show=True):
-        self.pending.append((text, incomplete, client))
+    def recover(self, text, incomplete=False, client=None, show=True, reason=None):
+        status = "Partial transcript" if incomplete else reason or "Ready to copy"
+        self.pending.append((text, status, client))
         if show:
             self.show_recovery()
 
@@ -226,7 +227,7 @@ class Overlay(Gtk.Window):
         # A conversion acknowledges the shortcut, not insertion into a field.
         if self.confirmed_card is not None:
             self.pending = [card for card in self.pending if card is not self.confirmed_card]
-        self.confirmed_card = (text, False, None)
+        self.confirmed_card = (text, "Sent to app", None)
         self.pending.append(self.confirmed_card)
         if show:
             self.show_recovery()
@@ -234,6 +235,9 @@ class Overlay(Gtk.Window):
     def recall(self):
         if self.confirmed_card is not None and not self.pending:
             self.pending.append(self.confirmed_card)
+        represented = {client for _, _, client in self.pending}
+        self.pending.extend((None, "Auto-paste paused", client) for client in self.paused_clients
+                            if client not in represented)
         if self.pending:
             self.show_recovery(auto_hide=False)
         else:
@@ -241,26 +245,23 @@ class Overlay(Gtk.Window):
 
     def show_recovery(self, auto_hide=True):
         self.dismiss_on_release = False
-        text, incomplete, client = self.pending[-1]
+        text, status, client = self.pending[-1]
         paused = client in self.paused_clients
         self.serial += 1
         self.listening = False
         self.recovery = text
-        status = "Auto-paste paused" if paused else "Ready to copy"
-        if incomplete:
-            status = "Partial transcript"
+        if text is not None and paused and status != "Partial transcript":
+            status = "Auto-paste paused"
         acknowledged = self.pending[-1] is self.confirmed_card
-        if acknowledged:
-            status = "Sent to app"
-        if len(self.pending) > 1:
+        if text is not None and len(self.pending) > 1:
             status += f" · {len(self.pending)} left"
-        if text is None:
-            status = "Copied · ready in other apps"
         self.status.set_text(status)
         self.indicator.set_text("◇")
         self.clock.hide()
         self.escape.hide()
         self.hint.hide()
+        self.wave.hide()
+        self.label.set_ellipsize(Pango.EllipsizeMode.END)
         self.label.set_text(text if text is not None else
                             f"Resume to paste in {self.paused_clients[client]}.")
         self.copy_button.set_visible(text is not None)
@@ -322,7 +323,7 @@ class Overlay(Gtk.Window):
         # Copy may itself expire an earlier paste and queue its transcript.
         # Keep all transcript cards, then offer Resume for each paused app.
         self.pending = [card for card in self.pending if card[0] is not None]
-        self.pending.extend((None, False, client) for client in self.paused_clients)
+        self.pending.extend((None, "Copied · ready in other apps", client) for client in self.paused_clients)
         self.next_recovery()
 
     def present_at(self, window, animate=True):
@@ -332,6 +333,7 @@ class Overlay(Gtk.Window):
         self.status.set_text("Listening")
         self.indicator.set_text("●")
         self.clock.set_text("00:00")
+        self.label.set_ellipsize(Pango.EllipsizeMode.START)
         self.label.set_text("Speak now…")
         self.levels = deque([0.] * 90, maxlen=90)
         screen = self.get_display()
@@ -371,6 +373,8 @@ class Overlay(Gtk.Window):
         self.clock.hide()
         self.status.set_text("Dictation")
         self.indicator.set_text("◇")
+        self.wave.hide()
+        self.label.set_ellipsize(Pango.EllipsizeMode.END)
         self.label.set_text(text)
         def dismiss():
             if self.serial == serial:

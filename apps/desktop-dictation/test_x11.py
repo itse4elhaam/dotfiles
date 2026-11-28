@@ -101,6 +101,7 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
     hold("Super_L", "Alt_L")
     until(app.glow.get_mapped)
     run = app.overlay.label.get_layout().get_iter().get_run_readonly()
+    assert app.overlay.wave.get_visible()
     assert run.item.analysis.font.describe().get_family() == "Inter"
     from Xlib.ext import shape
     Gdk.Display.get_default().sync()
@@ -130,6 +131,8 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
     until(lambda: app.selection.saved is not None)
     assert app.clipboard.wait_for_text() == "Original text"
     assert app.overlay.recovery == text
+    assert not app.overlay.wave.get_visible()
+    assert app.overlay.label.get_ellipsize().value_nick == "end"
     app.overlay.dismiss_recovery()
     if real:
         assert "front" in text.lower()
@@ -242,11 +245,23 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
         hold("Alt_L", "Super_L")
         keys("keyup", "Alt_L", "keyup", "Super_L")
         until(lambda: app.overlay.recovery == text)
+        assert app.overlay.status.get_text() == "Use Copy in this app"
         assert app.paste_serial == serial and first.get_text() == text
         assert app.clipboard.wait_for_text() == "Original text"
         app.overlay.dismiss_recovery()
     target.set_wm_class(*original_class)
     x.sync()
+    # A backup can be too large or still pending at release. Explain why
+    # the original clipboard and both fields were preserved.
+    hold("Alt_L", "Super_L")
+    until(lambda: app.recording.backup.ready)
+    app.recording.backup.ready = False
+    keys("keyup", "Alt_L", "keyup", "Super_L")
+    until(lambda: app.overlay.recovery == text)
+    assert app.overlay.status.get_text() == "Couldn’t back up clipboard"
+    assert app.paste_serial == serial and app.clipboard.wait_for_text() == "Original text"
+    app.overlay.dismiss_recovery()
+
     app.clipboard.set_text("Existing clipboard", -1)
     hold("Alt_L", "Super_L")
     keys("keyup", "Alt_L", "keyup", "Super_L", "key", "Tab")
@@ -388,10 +403,19 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
     delayed.pop()
     keys("key", "Right")
     until(lambda: app.overlay.resume.is_visible() and app.pending_backup is None)
+    app.overlay.dismiss_recovery()
+    assert not app.overlay.get_visible()
+    os.kill(os.getpid(), signal.SIGUSR1)  # Last Dictation launcher
+    until(lambda: app.overlay.resume.get_mapped())
+    assert app.overlay.status.get_text() == "Auto-paste paused"
+    assert next(iter(app.paused_clients.values())) in app.overlay.label.get_text()
+    assert not app.overlay.copy_button.get_visible()
     secondary_read(b"", X.CurrentTime)
+    app.show_last()
+    assert len(app.overlay.pending) == 1
     app.overlay.resume.clicked()
     secondary_read(b"CurrentTime sentinel", X.CurrentTime)
-    app.overlay.dismiss_recovery()
+    assert not app.paused_clients and not app.overlay.get_visible()
 
     # Both fields belong to one X client. A late reader from the first
     # field must never consume the second transcript when the first expires.
@@ -588,7 +612,7 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
         hold("Alt_L", "Super_L")
         keys("keyup", "Super_L", "keyup", "Alt_L")
         until(lambda: entry.get_text() == transcript and app.pending_backup is None)
-    assert app.overlay.pending == [("Direct B", False, None)]
+    assert len(app.overlay.pending) == 1 and app.overlay.recovery == "Direct B"
     assert app.overlay.status.get_text() == "Sent to app"
     until(lambda: not app.overlay.get_visible(), 6)
     os.kill(os.getpid(), signal.SIGUSR1)
