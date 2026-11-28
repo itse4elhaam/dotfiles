@@ -34,7 +34,7 @@ Keep the caret in the original field until insertion finishes. If dictation dete
 
 Dictation sends one paste shortcut directly to the X11 window that had keyboard focus when recording started. It rechecks the window and its owner before sending. Some editors include the paste shortcut’s timestamp. Others, including Chrome, request clipboard formats and text in several steps without a timestamp. After the first untagged text read, dictation waits for a 350 ms gap in the app’s requests before restoring the clipboard. The next dictation waits for this paste to finish.
 
-You can type or delete text as soon as the transcript appears, then use the app’s usual paste shortcut to insert your previous clipboard contents. Chrome also supports **Ctrl+Shift+V** to paste as plain text. If the app requests more data after you edit but before that shortcut or the end of the gap, dictation pauses paste and offers **Resume**.
+Once the dictated words appear in the editor, you can type, delete text, or use the app’s usual paste shortcut to insert your previous clipboard contents. Chrome also supports **Ctrl+Shift+V** to paste as plain text. If the app requests more data after you edit but before that shortcut or the end of the gap, dictation pauses paste and offers **Resume**.
 
 When dictation detects a conflicting shortcut, it offers **Copy** before changing the clipboard. When you press **Ctrl+V** yourself, a desktop shortcut reserved by the window manager can take precedence over the editor’s paste command.
 
