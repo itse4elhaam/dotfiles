@@ -174,11 +174,14 @@ class Dictation:
         self.worker = None
         self.idle_since = time.monotonic()
         self.pending_backup = None
-        self.pending_target = None
+        self.paste_target = None
         self.expire_pending = None
         self.lock_generation = 0
         self.paste_press = None
+        self.hold_serial = 0
+        self.pending_read = None
         self.paste_serial = 0
+        self.replay_deadline = 0
         self.selection = TextSelection(self.x)
         self.clipboard = Gtk.Clipboard.get(Gdk.SELECTION_CLIPBOARD)
         self.clipboard_generation = 0
@@ -256,15 +259,31 @@ class Dictation:
                 self.lock_generation += 1
                 if self.recording:
                     self.end("Cancelled")
-                if self.expire_pending:
-                    self.expire_pending()
-                self.selection.replay = None
+                self.interrupt_paste()
                 self.overlay.clear_recoveries()
                 self.stop_worker()
 
     def watch_input(self, mask):
         self.root.xinput_select_events([(xinput.AllMasterDevices, mask)])
         self.x.flush()
+
+    def interrupt_paste(self):
+        if self.expire_pending:
+            self.expire_pending()
+        else:
+            self.retire_replay()
+
+    def retire_replay(self):
+        self.selection.replay = None
+        if self.paste_target is not None:
+            _, focus_id = self.paste_target
+            self.paste_target = None
+            self.root.change_attributes(event_mask=0)
+            self.x.create_resource_object("window", focus_id).change_attributes(
+                event_mask=0, onerror=lambda exc, _: isinstance(exc, error.BadWindow))
+            if self.recording is None:
+                self.watch_input(0)
+            self.x.flush()
 
     def focus(self):
         active = self.root.get_full_property(self.active_atom, X.AnyPropertyType)
@@ -278,6 +297,9 @@ class Dictation:
         if self.recording:
             self.overlay.reject_hold()
             return
+        self.hold_serial += 1
+        if not self.expire_pending or self.pending_read == "tagged":
+            self.interrupt_paste()
         target = self.focus()
         active, _ = target
         window = GdkX11.X11Window.foreign_new_for_display(Gdk.Display.get_default(), active) if active else None
@@ -293,27 +315,39 @@ class Dictation:
             self.end("Could not start microphone or speech engine")
 
     def events(self, *_):
+        deferred_requests = []
         while self.x.pending_events():
             event = self.x.next_event()
-            if (self.expire_pending and self.selection.press_time is not None
+            if (self.paste_target and self.selection.press_time is not None
                     and getattr(event, "extension", None) == self.xi):
                 detail = struct.unpack_from("=I", event.data, 6)[0]
                 if ((event.evtype == xinput.RawKeyPress and detail not in self.chord)
                         or (event.evtype == xinput.RawButtonPress and detail not in (4, 5, 6, 7))):
-                    self.expire_pending()
+                    self.interrupt_paste()
+            if self.paste_target and (
+                    (event.type == X.FocusOut and event.mode == X.NotifyNormal
+                     and event.window.id == self.paste_target[1])
+                    or (event.type == X.PropertyNotify and event.atom == self.active_atom)):
+                self.interrupt_paste()
             # These events and the final grab are ordered on the same connection.
             if isinstance(event, xfixes.SelectionNotify):
                 if event.owner.id not in (X.NONE, self.selection.window.id):
                     self.clipboard_generation += 1
                 if (event.owner.id != self.selection.window.id and
                         self.x.get_selection_owner(self.selection.atom) != self.selection.window):
-                    if self.expire_pending:
-                        self.expire_pending()
+                    self.interrupt_paste()
                     self.selection.guarded_reads.clear()
             elif event.type == X.SelectionRequest:
-                if self.expire_pending and self.focus() != self.pending_target:
-                    self.expire_pending()
-                self.selection.serve(event)
+                if self.paste_target and self.focus() != self.paste_target:
+                    self.interrupt_paste()
+                if deferred_requests or (self.selection.replay and event.time == self.selection.replay[0]):
+                    # A redirect may already follow the request in the X queue.
+                    # Drain through a server round trip before answering it.
+                    if not deferred_requests:
+                        self.x.sync()
+                    deferred_requests.append(event)
+                else:
+                    self.selection.serve(event)
             elif event.type == X.SelectionClear:
                 if self.x.get_selection_owner(self.selection.atom) != self.selection.window:
                     self.selection.text = ""
@@ -344,6 +378,10 @@ class Dictation:
                             self.cancel()
                         elif code not in self.chord:
                             self.recording.unsafe = True
+        if deferred_requests and not self.expire_pending and time.monotonic() >= self.replay_deadline:
+            self.retire_replay()
+        for request in deferred_requests:
+            self.selection.serve(request)
         return True
 
     def chord_down(self, keys=None):
@@ -437,7 +475,7 @@ class Dictation:
         rec, self.recording = self.recording, None
         if rec:
             rec.close()
-        if self.pending_backup is None:
+        if self.paste_target is None:
             self.watch_input(0)
         self.overlay.message(message, 2200)
 
@@ -499,8 +537,7 @@ class Dictation:
         self.overlay.recover(text, incomplete, client, reason=reason)
 
     def copy_recovery(self, text):
-        if self.expire_pending:
-            self.expire_pending()
+        self.interrupt_paste()
         if self.paused_clients or self.selection.gestures:
             self.clipboard_generation += 1
             timestamp = GdkX11.x11_get_server_time(self.overlay.get_window())
@@ -542,20 +579,30 @@ class Dictation:
         pasted = False
         serial = self.paste_serial + 1
         restored = False
-        read = False
         lock_generation = self.lock_generation
-        def restore(late_client=None):
+        hold_serial = self.hold_serial
+        def restore(late_client=None, keep_replay=False):
             nonlocal restored
             restored = True
             self.expire_pending = None
             self.paste_press = None
-            self.pending_backup = self.pending_target = None
-            if self.recording is None:
-                self.watch_input(0)
+            self.pending_backup = None
+            self.pending_read = None
+            if not keep_replay:
+                self.retire_replay()
             self.selection.put_back(rec.backup, late_client)
 
+        def confirm(keep_replay=False):
+            restore(keep_replay=keep_replay)
+            if self.lock_generation == lock_generation:
+                self.overlay.recover_confirmed(text, show=self.recording is None)
+
         def interrupt():
-            self.selection.replay = None
+            if self.pending_read == "tagged":
+                # Empty backups can keep a delivered GTK offer alive for a
+                # second conversion. A redirect ends that gesture successfully.
+                confirm()
+                return False
             restore(client)
             # A conversion need not be the paste that changes the field.
             self.paused_clients[client] = rec.app_name
@@ -567,29 +614,28 @@ class Dictation:
             nonlocal settle_timer
             if serial != self.paste_serial:
                 return False
-            if deadline:
-                self.selection.replay = None
-            else:
-                settle_timer = None
             if restored:
+                if deadline:
+                    self.retire_replay()
                 return False
+            if not deadline:
+                settle_timer = None
             # A timer can run while raw input is buffered on the X connection.
             self.x.sync()
             self.events()
             if restored:
                 return False
-            if (not read or self.focus() != rec.target or
+            if (not self.pending_read or self.focus() != rec.target or
                     self.x.get_selection_owner(self.selection.atom) != self.selection.window):
                 return interrupt()
             if deadline or settle_timer is None:
-                restore()
-                self.overlay.recover_confirmed(text, show=self.recording is None)
+                confirm(keep_replay=bool(rec.backup.values) and not deadline and hold_serial == self.hold_serial)
             return False
 
         settle_timer = None
         def on_read(untagged):
-            nonlocal read, settle_timer
-            read = True
+            nonlocal settle_timer
+            self.pending_read = "untagged" if untagged else "tagged"
             if untagged:
                 # Clients may negotiate several formats in one native paste.
                 # Serialize subsequent holds until their reads have settled.
@@ -614,8 +660,12 @@ class Dictation:
                 keys = [self.x.keysym_to_keycode(sym) for sym in rec.paste_keys]
                 if (paste_shortcut(window.get_wm_class()) == rec.paste_keys and all(keys)
                         and self.selection.claim(text, timestamp, client, rec.backup, on_read)):
+                    self.pending_read = None
                     self.expire_pending = interrupt
-                    self.pending_target = rec.target
+                    self.paste_target = rec.target
+                    self.root.change_attributes(event_mask=X.PropertyChangeMask)
+                    self.x.create_resource_object("window", rec.target[1]).change_attributes(
+                        event_mask=X.FocusChangeMask)
                     self.pending_backup = rec.backup
                     self.paste_serial = serial
                     for key in keys[:-1]:
@@ -640,6 +690,7 @@ class Dictation:
         if pasted:
             self.end("Transcript ready")
             self.overlay.sent(text)
+            self.replay_deadline = time.monotonic() + 1.8
             GLib.timeout_add(1800, settle, True)
             self.events()  # XSync may already have buffered the raw shortcut events.
         else:

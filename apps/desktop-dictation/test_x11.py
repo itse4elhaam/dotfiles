@@ -484,12 +484,62 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
         assert value == expected, (value, expected)
         return value
 
+    def retired_read(timestamp, queued_input=None):
+        while x.pending_events():
+            x.next_event()
+        reader.delete_property(prop)
+        reader.convert_selection(app.selection.atom, utf8, prop, timestamp)
+        x.sync()
+        if queued_input:
+            queued_input()
+        def answered():
+            while x.pending_events():
+                event = x.next_event()
+                if event.type == X.SelectionNotify and event.requestor == reader:
+                    return True
+            return False
+        until(answered)
+        data = reader.get_full_property(prop, utf8)
+        assert data is None or data.value == b"", data.value
+
     secondary_read(text.encode(), key_time)
     until(lambda: app.pending_backup is None)
     assert app.clipboard.wait_for_text() == "Newer clipboard"
 
+    secondary_read(text.encode(), key_time)
+    keys("key", "Tab")
+    until(lambda: window.get_focus() is second)
+    retired_read(key_time)
+    assert not app.paused_clients
+    assert app.clipboard.wait_for_text() == "Newer clipboard"
+    first.grab_focus()
     assert app.overlay.recovery == text
     app.overlay.dismiss_recovery()
+
+    # A transient switch can leave the snapshot identical when the old
+    # timestamp is presented. Exercise both X focus and the WM active window.
+    for redirect in ("focus", "active window", "expiry"):
+        handler = first.connect("paste-clipboard", defer_paste)
+        hold("Alt_L", "Super_L")
+        keys("keyup", "Super_L", "keyup", "Alt_L")
+        until(lambda: bool(delayed))
+        first.disconnect(handler)
+        _, stamp = delayed.pop()
+        secondary_read(text.encode(), stamp)
+        until(lambda: app.pending_backup is None)
+        if redirect == "focus":
+            recipient.set_input_focus(X.RevertToParent, X.CurrentTime)
+            x.create_resource_object("window", xid).set_input_focus(X.RevertToParent, X.CurrentTime)
+        elif redirect == "active window":
+            for active in (recipient.id, xid):
+                x.screen().root.change_property(app.active_atom, Xatom.WINDOW, 32, [active])
+        else:
+            until(lambda: app.selection.replay is None)
+        x.sync()
+        retired_read(stamp)
+        assert not app.paused_clients and app.overlay.recovery == text
+        assert not app.root.get_attributes().your_event_mask
+        app.overlay.dismiss_recovery()
 
     # arboard-style readers use CurrentTime even inside the V handler.
     # Exercise the value the field would actually insert, including recovery.
@@ -521,6 +571,11 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
     finally:
         app.selection.xres = xres
     secondary_read(b"CurrentTime sentinel", X.CurrentTime)
+    # The server already queued the conversion when the pointer redirected
+    # the gesture. Both events await dispatch on the selection connection.
+    retired_read(current_gesture, lambda: keys("click", "1"))
+    first.grab_focus()
+    assert not app.paused_clients
     app.overlay.dismiss_recovery()
 
     # A key after dispatch but before the application's first read can
@@ -925,6 +980,29 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
     assert app.overlay.recovery == "Intended field text"
     assert app.clipboard.wait_for_text() == "Before GTK handler"
     other_read(b"Before GTK handler")
+    # The GTK default paste still carries the original event time after a
+    # nested event loop moved the caret inside the same entry.
+    second.set_text("AB")
+    second.set_position(0)
+    before_default = []
+    def move_before_default(entry):
+        preflight = app.clipboard.wait_for_text()
+        until(lambda: app.pending_backup is None)
+        keys("key", "Right")
+        until(lambda: entry.get_position() == 1)
+        before_default.append((preflight, len(fields), Gtk.get_current_event_time()))
+    handler = second.connect("paste-clipboard", move_before_default)
+    hold("Alt_L", "Super_L")
+    keys("keyup", "Super_L", "keyup", "Alt_L")
+    until(lambda: before_default and len(fields) > before_default[0][1])
+    second.disconnect(handler)
+    preflight, _, timestamp = before_default[0]
+    assert preflight == "Intended field text" and fields[-1][-1] == timestamp != X.CurrentTime
+    # Let GTK process SelectionNotify and finish its asynchronous insertion.
+    delivered = time.monotonic() + .15
+    until(lambda: time.monotonic() >= delivered)
+    assert (second.get_text(), second.get_position()) == ("AB", 1)
+    assert not app.paused_clients
     # A newer acknowledged paste must not revive A, even when replayed by
     # the same process on another connection.
     reader = x.screen().root.create_window(0, 0, 1, 1, 0, 0, X.InputOnly, X.CopyFromParent)
