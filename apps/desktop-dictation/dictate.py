@@ -684,18 +684,13 @@ class Dictation:
             pass
         return False
 
-    def modifiers_down(self):
-        # The low eight bits are core keyboard modifiers. Dispatch only from
-        # a lock state covered by the passive-key preflight.
-        return (self.root.query_pointer().mask & 0xff) not in self.lock_masks
-
     def hold_blocked(self, client):
         if client not in self.paused_clients:
             return False
         navigation_hold = self.navigation_guards.get(client)
         return navigation_hold is None or self.hold_serial <= navigation_hold
 
-    def paste_blocked_reason(self, rec):
+    def paste_blocked_reason(self, rec, modifiers):
         # Called after syncing inside the server grab, immediately before dispatch.
         if self.hold_blocked(rec.client):
             # The card shows the live pause state until the user resumes.
@@ -712,7 +707,7 @@ class Dictation:
             return "Clipboard changed"
         if self.x.pending_events():
             return "Desktop changed during dictation"
-        if self.modifiers_down():
+        if modifiers not in self.lock_masks:
             return "Modifier key held"
         if not rec.backup or not rec.backup.ready:
             return "Couldn’t back up clipboard"
@@ -734,12 +729,12 @@ class Dictation:
         else:
             self.clipboard.set_text(text, -1)
 
-    def paste_keys_available(self, window, client, keys, v_masks):
+    def paste_keys_available(self, window, client, keys, v_masks, locks):
         # A passive grab can intercept any press, starting with bare Control.
         # Probe while the server is grabbed so no client can race dispatch.
-        shortcuts = [(keys[0], lock) for lock in self.lock_masks]
+        shortcuts = [(keys[0], lock) for lock in locks]
         if len(keys) == 3:
-            shortcuts.extend((keys[1], X.ControlMask | lock) for lock in self.lock_masks)
+            shortcuts.extend((keys[1], X.ControlMask | lock) for lock in locks)
         shortcuts.extend((keys[-1], mask) for mask in v_masks)
         # X also activates grabs below focus when the grab window contains
         # the pointer. Start at that child and walk the whole path to root.
@@ -1001,7 +996,8 @@ class Dictation:
         self.x.grab_server()
         try:
             self.x.sync()
-            reason = self.paste_blocked_reason(rec)
+            modifiers = self.root.query_pointer().mask & 0xff
+            reason = self.paste_blocked_reason(rec, modifiers)
             if reason is None:
                 window = self.x.create_resource_object("window", rec.target[0])
                 keys = [self.x.keysym_to_keycode(sym) for sym in rec.paste_keys]
@@ -1011,11 +1007,13 @@ class Dictation:
                 shift_states = {XK.XK_Shift_L in rec.paste_keys}
                 if chrome:  # Chrome also accepts Ctrl+Shift+V for plain-text paste.
                     shift_states.add(True)
+                # Chrome also reserves future manual V presses, which may use a different lock state.
+                locks = self.lock_masks if chrome else (modifiers,)
                 v_masks = [X.ControlMask | (X.ShiftMask if shift else 0) | lock
-                           for shift in shift_states for lock in self.lock_masks]
+                           for shift in shift_states for lock in locks]
                 if paste_shortcut(wm_class) != rec.paste_keys or not all(keys):
                     reason = "Paste shortcut changed"
-                elif not self.paste_keys_available(focus_window, client, keys, v_masks):
+                elif not self.paste_keys_available(focus_window, client, keys, v_masks, locks):
                     reason = "Paste shortcut in use"
                 elif self.selection.claim(text, timestamp, client, rec.backup, on_read):
                     if chrome:

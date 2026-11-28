@@ -567,6 +567,40 @@ with open(os.environ["DICTATION_FIXTURE"], "rb") as audio:
                     chrome.wait()
             app.stop_worker()
         return
+    # A Caps Lock-only shortcut is a conflict only while that lock is active.
+    root = x.screen().root
+    assert not (root.query_pointer().mask & X.LockMask)
+    root.grab_key(app.v_key, X.ControlMask | X.LockMask, False, X.GrabModeAsync, X.GrabModeAsync)
+    x.sync()
+    try:
+        for caps_on in (False, True):
+            if caps_on:
+                keys("key", "Caps_Lock")
+            generation = app.clipboard_generation
+            app.clipboard.set_text("Original text", -1)
+            until(lambda: app.clipboard_generation > generation)
+            first.set_text("")
+            serial = app.paste_serial
+            owner = x.get_selection_owner(app.selection.atom)
+            hold("Super_L", "Alt_L")
+            keys("keyup", "Alt_L", "keyup", "Super_L")
+            until(lambda: app.recording is None)
+            if caps_on:
+                assert app.paste_serial == serial and first.get_text() == ""
+                assert x.get_selection_owner(app.selection.atom) == owner
+                assert app.overlay.status.get_text() == "Paste shortcut in use"
+            else:
+                assert app.paste_serial == serial + 1, app.overlay.status.get_text()
+                until(lambda: first.get_text() == text and app.pending_backup is None)
+            assert app.clipboard.wait_for_text() == "Original text"
+            app.overlay.dismiss_recovery()
+    finally:
+        if root.query_pointer().mask & X.LockMask:
+            keys("key", "Caps_Lock")
+        root.ungrab_key(app.v_key, X.ControlMask | X.LockMask)
+        x.sync()
+    first.set_text(text)
+
     # Inspect a freshly mapped popup before processing another GTK frame.
     from glow import RecordingGlow
     fresh_glow = RecordingGlow(app.x)
